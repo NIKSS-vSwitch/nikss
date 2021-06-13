@@ -1,5 +1,5 @@
-#ifndef __PRECTL_CLONE_SESSION_H
-#define __PRECTL_CLONE_SESSION_H
+#ifndef __PSABPFCTL_CLONE_SESSION_H
+#define __PSABPFCTL_CLONE_SESSION_H
 
 #include "common.h"
 
@@ -18,4 +18,4 @@ static const struct cmd clone_session_cmds[] = {
         {0}
 };
 
-#endif //__PRECTL_CLONE_SESSION_H
+#endif //__PSABPFCTL_CLONE_SESSION_H

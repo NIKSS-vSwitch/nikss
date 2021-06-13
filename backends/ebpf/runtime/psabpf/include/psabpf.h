@@ -3,14 +3,18 @@
 
 #include <stdint.h>
 
-#define PSABPF_MAX_CLONE_SESSION_MEMBERS 64
+/**
+ * When PIN_GLOBAL_NS is used, this is deafult global namespace that is loaded.
+ */
+static const char *BPF_FS = "/sys/fs/bpf";
 
+typedef uint32_t psabpf_pipeline_id_t;
 
 /**
  * \brief          Global PSABPF context. Should be maintained between calls to the PSABPF API.
  */
 typedef struct psabpf_context {
-
+    psabpf_pipeline_id_t pipeline_id;
 } psabpf_context_t;
 
 /**
@@ -18,83 +22,22 @@ typedef struct psabpf_context {
  *
  * @param ctx
  */
-void psabpf_init(psabpf_context_t *ctx);
+void psabpf_context_init(psabpf_context_t *ctx);
 
 /**
  * Clear the PSABPF context.
  *
  * @param ctx
  */
-void psabpf_free(psabpf_context_t *ctx);
+void psabpf_context_free(psabpf_context_t *ctx);
 
-/*
- * PRE - Clone Sessions
+/**
+ * The PSABPF context is pipeline-scoped.
+ * This functions allow to set/get pipeline object to control.
  */
-typedef uint32_t psabpf_clone_session_id_t;
-struct psabpf_clone_session_entry {
-    uint32_t  egress_port;
-    uint16_t  instance;
-    uint8_t   class_of_service;
-    uint8_t   truncate;
-    uint16_t  packet_length_bytes;
-} __attribute__((aligned(4)));
+void psabpf_context_set_pipeline(psabpf_context_t *ctx, psabpf_pipeline_id_t pipeline_id);
+void psabpf_context_get_pipeline(psabpf_context_t *ctx);
 
-typedef struct psabpf_clone_session_entry psabpf_clone_session_entry_t;
-
-typedef struct psabpf_clone_session_ctx {
-    psabpf_clone_session_id_t id;
-
-    // TODO: to consider if this is the best way to iterate
-    size_t curr_idx;
-    psabpf_clone_session_entry_t *next_id;
-} psabpf_clone_session_ctx_t;
-
-
-/*
- * We do we need clone session context? It is mainly useful for iteration over clone session members.
- */
-void psabpf_clone_session_context_init(psabpf_clone_session_ctx_t *ctx);
-void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx);
-
-void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_id_t id);
-
-// TODO: add function to get all identifiers of clone sessions, which are created.
-int psabpf_clone_session_create(psabpf_clone_session_ctx_t *ctx);
-int psabpf_clone_session_exists(psabpf_clone_session_ctx_t *ctx);
-int psabpf_clone_session_delete(psabpf_clone_session_ctx_t *ctx);
-
-void psabpf_clone_session_entry_init(psabpf_clone_session_entry_t *entry);
-void psabpf_clone_session_entry_free(psabpf_clone_session_entry_t *entry);
-
-void psabpf_clone_session_entry_port(psabpf_clone_session_entry_t *entry, uint32_t egress_port);
-void psabpf_clone_session_entry_instance(psabpf_clone_session_entry_t *entry, uint16_t instance);
-void psabpf_clone_session_entry_cos(psabpf_clone_session_entry_t *entry, uint8_t class_of_service);
-int psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes);
-// The function to set 'truncate' to false.
-int psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry);
-
-int psabpf_clone_session_entry_update(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_entry_delete(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_entry_exists(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-int psabpf_clone_session_entry_get(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t *entry);
-
-/*
- * Example:
- * psabpf_clone_session_ctx_t ctx;
- * psabpf_clone_session_context_init(&ctx);
- *
- * psabpf_clone_session_entry_t entry;
- * psabpf_clone_session_entry_init(&entry);
- *
- * while(psabpf_clone_session_entry_getnext(&ctx, &entry)) {
- *     // print entry fields
- * }
- *
- * psabpf_clone_session_entry_free(&entry);
- * psabpf_clone_session_context_free(&ctx);
- *
- */
-int psabpf_clone_session_entry_getnext(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t **entry);
 
 /*
  * PRE - Multicast Groups
@@ -129,26 +72,6 @@ int psabpf_mcast_grp_member_update(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp
 int psabpf_mcast_grp_member_exists(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_delete(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
 // psabpf_mcast_grp_member_get does not make sense as mcast grp member does not have additional parameters
-
-////// ForwardingConfig
-typedef struct psabpf_prog {
-    const char *obj;
-
-    // TODO: consider to move it to the global context
-    int prog_id;
-} psabpf_prog_t;
-
-int psabpf_prog_init(psabpf_prog_t *prog);
-int psabpf_prog_free(psabpf_prog_t *prog);
-
-int psabpf_prog_setobj(psabpf_prog_t *prog, char *obj);
-
-/* This function should load BPF program and initialize default maps (call map initializer program) */
-int psabpf_prog_load(psabpf_prog_t *prog);
-int psabpf_prog_getid(psabpf_prog_t *prog, int *prog_id);
-
-int psabpf_prog_setid(psabpf_prog_t *prog, int prog_id);
-int psabpf_prog_unload(psabpf_prog_t *prog);
 
 ////// TableEntry
 enum psabpf_matchkind_t {

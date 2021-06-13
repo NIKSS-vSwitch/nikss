@@ -11,18 +11,9 @@
 
 #include "backends/ebpf/runtime/psa.h"
 
-#include "../include/psabpf.h"
 #include "clone_session.h"
-
-/**
- * When PIN_GLOBAL_NS is used, this is deafult global namespace that is loaded.
- */
-static const char *BPF_FS = "/sys/fs/bpf";
-
-/**
- * The name of the BPF MAP variable in packet-cloning.c
- */
-static const char *CLONE_SESSION_TABLE = "clone_session_tbl";
+#include "../include/psabpf.h"
+#include "../include/psabpf_clone_session.h"
 
 struct list_key_t {
     __u32 port;
@@ -43,48 +34,66 @@ double get_current_time() {
 static double start_time;
 static double end_time;
 
-
-int clone_session_create(__u32 clone_session_id)
+int clone_session_create(__u32 pipeline_id, __u32 clone_session_id)
 {
-    psabpf_clone_session_ctx_t ctx;
-    psabpf_clone_session_context_init(&ctx);
-    psabpf_clone_session_id(&ctx, clone_session_id);
+    int error = 0;
+    psabpf_context_t ctx;
+    psabpf_clone_session_ctx_t session;
 
-    if (psabpf_clone_session_exists(&ctx)) {
-        psabpf_clone_session_context_free(&ctx);
-        return EEXIST;
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, pipeline_id);
+
+    psabpf_clone_session_context_init(&session);
+    psabpf_clone_session_id(&session, clone_session_id);
+
+    if (psabpf_clone_session_exists(&ctx, &session)) {
+        error = EEXIST;
+        goto err;
     }
 
-    if (psabpf_clone_session_create(&ctx)) {
-        psabpf_clone_session_context_free(&ctx);
-        return -1;
+    if (psabpf_clone_session_create(&ctx, &session)) {
+        error = -1;
+        goto err;
     }
 
-    psabpf_clone_session_context_free(&ctx);
-    return 0;
+err:
+    psabpf_context_free(&ctx);
+    psabpf_clone_session_context_free(&session);
+
+    return error;
 }
 
-int clone_session_delete(__u32 clone_session_id)
+int clone_session_delete(__u32 pipeline_id, __u32 clone_session_id)
 {
-    psabpf_clone_session_ctx_t ctx;
-    psabpf_clone_session_context_init(&ctx);
-    psabpf_clone_session_id(&ctx, clone_session_id);
+    int error = 0;
+    psabpf_context_t ctx;
+    psabpf_clone_session_ctx_t session;
 
-    if (psabpf_clone_session_exists(&ctx)) {
-        psabpf_clone_session_context_free(&ctx);
-        return EEXIST;
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, pipeline_id);
+
+    psabpf_clone_session_context_init(&session);
+    psabpf_clone_session_id(&session, clone_session_id);
+
+    if (psabpf_clone_session_exists(&ctx, &session)) {
+        error = EEXIST;
+        goto err;
     }
 
-    if (psabpf_clone_session_delete(&ctx)) {
-        psabpf_clone_session_context_free(&ctx);
-        return -1;
+    if (psabpf_clone_session_delete(&ctx, &session)) {
+        error = -1;
+        goto err;
     }
 
-    psabpf_clone_session_context_free(&ctx);
-    return 0;
+err:
+    psabpf_context_free(&ctx);
+    psabpf_clone_session_context_free(&session);
+
+    return error;
 }
 
-int clone_session_add_member(psabpf_clone_session_id_t clone_session_id,
+int clone_session_add_member(psabpf_pipeline_id_t pipeline_id,
+                             psabpf_clone_session_id_t clone_session_id,
                              uint32_t  egress_port,
                              uint16_t  instance,
                              uint8_t   class_of_service,
@@ -92,17 +101,19 @@ int clone_session_add_member(psabpf_clone_session_id_t clone_session_id,
                              uint16_t  packet_length_bytes)
 {
     int error = 0;
-
-    psabpf_clone_session_ctx_t ctx;
+    psabpf_context_t ctx;
+    psabpf_clone_session_ctx_t session;
     psabpf_clone_session_entry_t entry;
 
-    psabpf_clone_session_context_init(&ctx);
-    psabpf_clone_session_id(&ctx, clone_session_id);
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, pipeline_id);
 
-    error = psabpf_clone_session_exists(&ctx);
-    if (error) {
-        psabpf_clone_session_context_free(&ctx);
-        return error;
+    psabpf_clone_session_context_init(&session);
+    psabpf_clone_session_id(&session, clone_session_id);
+
+    if (psabpf_clone_session_exists(&ctx, &session)) {
+        error = EEXIST;
+        goto err;
     }
 
     psabpf_clone_session_entry_init(&entry);
@@ -114,75 +125,78 @@ int clone_session_add_member(psabpf_clone_session_id_t clone_session_id,
         psabpf_clone_session_entry_truncate_enable(&entry, packet_length_bytes);
     }
 
-    error = psabpf_clone_session_entry_update(&ctx, &entry);
+    error = psabpf_clone_session_entry_update(&ctx, &session, &entry);
     if (error) {
-        psabpf_clone_session_entry_free(&entry);
-        psabpf_clone_session_context_free(&ctx);
-        return error;
+        goto err;
     }
 
+err:
+    psabpf_context_free(&ctx);
+    psabpf_clone_session_context_free(&session);
     psabpf_clone_session_entry_free(&entry);
-    psabpf_clone_session_context_free(&ctx);
 
     return error;
 }
 
+static int parse_pipe_and_id(int *argc, char ***argv, __u32 *pipe, __u32 *id)
+{
+    if (!is_keyword(**argv, "pipe")) {
+        fprintf(stderr, "expected 'pipe', got: %s\n", **argv);
+        return -1;
+    }
+    NEXT_ARGP();
+    char *endptr;
+    *pipe = strtoul(**argv, &endptr, 0);
+    if (*endptr) {
+        fprintf(stderr, "can't parse '%s'\n", **argv);
+        return -1;
+    }
+    NEXT_ARGP();
+
+    if (!is_keyword(**argv, "id")) {
+        fprintf(stderr, "expected 'id', got: %s\n", **argv);
+        return -1;
+    }
+    NEXT_ARGP();
+    *id = strtoul(**argv, &endptr, 0);
+    if (*endptr) {
+        fprintf(stderr, "can't parse '%s'\n", **argv);
+        return -1;
+    }
+
+    return 0;
+}
+
 int do_create(int argc, char **argv)
 {
-    if (!is_keyword(*argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", *argv);
-        return -1;
+    __u32 pipeline_id, clone_session_id;
+    if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
+        return EINVAL;
     }
 
-    NEXT_ARG();
-
-    char *endptr;
-    __u32 id = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-
-    return clone_session_create(id);
+    return clone_session_create(pipeline_id, clone_session_id);
 }
 
 int do_delete(int argc, char **argv)
 {
-    if (!is_keyword(*argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", *argv);
-        return -1;
+    __u32 pipeline_id, clone_session_id;
+    if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
+        return EINVAL;
     }
 
-    NEXT_ARG();
-
-    char *endptr;
-    __u32 id = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-
-    return clone_session_delete(id);
+    return clone_session_delete(pipeline_id, clone_session_id);
 }
 
 
 int do_add_member(int argc, char **argv)
 {
-    if (!is_keyword(*argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", *argv);
-        return -1;
+    __u32 pipeline_id, clone_session_id;
+    if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
+        return EINVAL;
     }
 
     NEXT_ARG();
-
     char *endptr;
-    __u32 id = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-
-    NEXT_ARG();
     if (!is_keyword(*argv, "egress-port")) {
         fprintf(stderr, "expected 'egress-port', got: %s\n", *argv);
         return -1;
@@ -236,9 +250,10 @@ int do_add_member(int argc, char **argv)
         }
     }
 
-    return clone_session_add_member(id, egress_port, instance, cos, truncate, plen_bytes);
+    return clone_session_add_member(pipeline_id, clone_session_id, egress_port, instance, cos, truncate, plen_bytes);
 }
 
+// TODO: use psabpf library
 int clone_session_del_member(__u32 clone_session_id, __u32 egress_port, __u16 instance)
 {
     if (egress_port == 0 || instance == 0) {

@@ -3,9 +3,12 @@
 
 #include "CLI/common.h"
 #include "CLI/clone_session.h"
+#include "CLI/pipeline.h"
 
 /*
  * Formats:
+ * psabpf-ctl pipeline load <path>
+ * psabpf-ctl pipeline unload <handle>
  * psabpf-ctl clone-session create id 5
  * psabpf-ctl clone-session delete id 5
  * psabpf-ctl clone-session add-member id 5 egress-port 1 instance 1
@@ -67,9 +70,15 @@ static int do_clone_session(int argc, char **argv)
     return cmd_select(clone_session_cmds, argc, argv, do_help);
 }
 
+static int do_pipeline(int argc, char **argv)
+{
+    return cmd_select(pipeline_cmds, argc, argv, do_help);
+}
+
 static const struct cmd cmds[] = {
         { "help",	        do_help },
         { "clone-session",	do_clone_session },
+        { "pipeline",      do_pipeline },
         { 0 }
 };
 
@@ -81,7 +90,5 @@ int main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    ret = cmd_select(cmds, argc, argv, do_help);
-
-    return ret;
+    return cmd_select(cmds, argc, argv, do_help);
 }
