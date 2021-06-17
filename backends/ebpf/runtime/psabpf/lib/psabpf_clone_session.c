@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
 #include "bpf/bpf.h"
 #include "bpf/libbpf.h"
 
 #include "../include/psabpf_clone_session.h"
+#include "../include/bpf_defs.h"
 
 struct list_key_t {
     __u32 port;

@@ -3,11 +3,6 @@
 
 #include <stdint.h>
 
-/**
- * When PIN_GLOBAL_NS is used, this is deafult global namespace that is loaded.
- */
-static const char *BPF_FS = "/sys/fs/bpf";
-
 typedef uint32_t psabpf_pipeline_id_t;
 
 /**
@@ -36,7 +31,7 @@ void psabpf_context_free(psabpf_context_t *ctx);
  * This functions allow to set/get pipeline object to control.
  */
 void psabpf_context_set_pipeline(psabpf_context_t *ctx, psabpf_pipeline_id_t pipeline_id);
-void psabpf_context_get_pipeline(psabpf_context_t *ctx);
+psabpf_pipeline_id_t psabpf_context_get_pipeline(psabpf_context_t *ctx);
 
 
 /*
@@ -84,8 +79,8 @@ enum psabpf_matchkind_t {
 // TODO: this struct may not be well-designed yet; we need feedback from implementation; to be adjusted
 typedef struct psabpf_match_key {
     enum psabpf_matchkind_t type;
-    const char *data;
-    const size_t key_size;  // key_size determines size of val and mask
+    void *data;
+    size_t key_size;  // key_size determines size of val and mask
     union {
         struct {
             // used only for 'ternary'
@@ -104,8 +99,9 @@ typedef struct psabpf_match_key {
 } psabpf_match_key_t;
 
 typedef struct psabpf_action_param {
-    const char *data;
-    const size_t len;
+    char *data;  /* might be an action data or reference */
+    size_t len;
+    bool is_group_reference;
 } psabpf_action_param_t;
 
 typedef struct psabpf_action {
@@ -116,10 +112,9 @@ typedef struct psabpf_action {
 } psabpf_action_t;
 
 typedef struct psabpf_table_entry {
-    const char tbl_name[256];
 
     size_t n_keys;
-    psabpf_match_key_t *match_keys;
+    psabpf_match_key_t **match_keys;
 
     psabpf_action_t *action;
 
@@ -132,6 +127,16 @@ typedef struct psabpf_table_entry {
  * It may be filled in based on the P4Info file.
  */
 typedef struct psabpf_table_entry_context {
+    int table_fd;
+    uint32_t table_type;
+    uint32_t key_size;
+    uint32_t value_size;
+    bool is_indirect;
+
+    // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
+    int associated_prog;
+    void * btf;
+    uint32_t btf_type_id;
 
     // below fields might be useful when iterating
     size_t curr_idx;
@@ -140,15 +145,17 @@ typedef struct psabpf_table_entry_context {
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx);
 void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx);
+int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name);
+void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx);
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry);
 void psabpf_table_entry_free(psabpf_table_entry_t *entry);
-void psabpf_table_entry_tblname(psabpf_table_entry_t *entry, const char *name);
 
 // can be invoked multiple times
 int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t *mk);
 
 void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act);
+// only for ternary
 void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority);
 
 void psabpf_matchkey_init(psabpf_match_key_t *mk);
@@ -167,10 +174,15 @@ int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start);
 int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end);
 
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size);
+// should be called when psabpf_action_param() is not called after psabpf_action_param_create()
+void psabpf_action_param_free(psabpf_action_param_t *param);
+
+void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param);
 
 void psabpf_action_init(psabpf_action_t *action);
 void psabpf_action_free(psabpf_action_t *action);
-void psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param);
+void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id);
+int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param);
 
 int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);

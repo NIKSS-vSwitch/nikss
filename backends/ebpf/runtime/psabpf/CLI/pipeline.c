@@ -171,3 +171,14 @@ int do_port_del(int argc, char **argv)
     psabpf_pipeline_free(&pipeline);
     return 0;
 }
+
+int do_pipeline_help(int argc, char **argv)
+{
+    (void) argc; (void) argv;
+    fprintf(stderr,
+            "Usage: %1$s pipeline load id ID PATH\n"
+            "       %1$s pipeline unload id ID\n"
+            "",
+            program_name);
+    return 0;
+}
