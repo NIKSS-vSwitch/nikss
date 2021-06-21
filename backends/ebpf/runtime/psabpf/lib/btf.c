@@ -1,6 +1,8 @@
-#include "btf.h"
-
 #include <stdio.h>
+#include <errno.h>
+
+#include "../include/psabpf.h"
+#include "btf.h"
 
 uint32_t follow_typedefs(struct btf * btf, uint32_t type_id)
 {
@@ -82,15 +84,15 @@ int psabtf_get_member_md_by_name(struct btf * btf, uint32_t type_id,
         const char * member_name, psabtf_struct_member_md_t * md)
 {
     if (type_id == 0)
-        return -1;
+        return -EPERM;
 
     const struct btf_type *type = btf__type_by_id(btf, type_id);
     if (type == NULL)
-        return -1;
+        return -EPERM;
     // type must be a struct or union
     if (btf_kind(type) != BTF_KIND_STRUCT &&
         btf_kind(type) != BTF_KIND_UNION)
-        return -1;
+        return -EPERM;
 
     int type_entries = btf_vlen(type);
     const struct btf_member *type_member = btf_members(type);
@@ -102,30 +104,30 @@ int psabtf_get_member_md_by_name(struct btf * btf, uint32_t type_id,
             md->member = type_member;
             md->index = i;
             md->effective_type_id = follow_typedefs(btf, type_member->type);
-            return 0;
+            return NO_ERROR;
         }
     }
 
-    return -1;
+    return -EPERM;
 }
 
 int psabtf_get_member_md_by_index(struct btf * btf, uint32_t type_id, uint16_t index,
                                   psabtf_struct_member_md_t * md)
 {
     if (type_id == 0)
-        return -1;
+        return -EPERM;
 
     const struct btf_type *type = btf__type_by_id(btf, type_id);
     if (type == NULL)
-        return -1;
+        return -EPERM;
     // type must be a struct or union
     if (btf_kind(type) != BTF_KIND_STRUCT &&
         btf_kind(type) != BTF_KIND_UNION)
-        return -1;
+        return -EPERM;
 
     int type_entries = btf_vlen(type);
     if (index >= type_entries)
-        return -1;
+        return -EPERM;
 
     const struct btf_member *type_member = btf_members(type);
     type_member += index;
@@ -133,7 +135,7 @@ int psabtf_get_member_md_by_index(struct btf * btf, uint32_t type_id, uint16_t i
     md->index = index;
     md->effective_type_id = follow_typedefs(btf, type_member->type);
 
-    return 0;
+    return NO_ERROR;
 }
 
 uint32_t psabtf_get_member_type_id_by_name(struct btf * btf, uint32_t type_id, const char * member_name)

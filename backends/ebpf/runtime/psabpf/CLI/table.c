@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <errno.h>
 #include <gmp.h>  /* GNU LGPL v3 or GNU GPL v2, used only by function convert_number_to_bytes() */
-#include <bpf/bpf.h>
 
 #include "../include/psabpf.h"
 #include "table.h"
@@ -28,28 +30,28 @@ int update_context(const char *data, size_t len, void *ctx, enum destination_ctx
 }
 
 /* TODO: Is there any ready to use function for this purpose? */
-int is_valid_mac_address(const char * data)
+bool is_valid_mac_address(const char * data)
 {
     if (strlen(data) != 2*6+5)  /* 11:22:33:44:55:66 */
-        return 0;
+        return false;
 
     unsigned digits = 0, separators = 0, pos = 0;
     unsigned separator_pos[] = {2, 5, 8, 11, 14};
     while (*data) {
         if (pos == separator_pos[separators]) {
             if ((*data != ':') && (*data != '-'))
-                return 0;
+                return false;
             separators++;
         } else if (isxdigit(*data)) {
             digits++;
         } else {
-            return 0;
+            return false;
         }
         if (separators > 5 || digits > 12)
-            return 0;
+            return false;
         data++; pos++;
     }
-    return 1;
+    return true;
 }
 
 int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
@@ -57,7 +59,7 @@ int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     mpz_t number;  /* converts any precision number to stream of bytes */
     size_t len, forced_len = 0;
     char * buffer;
-    int error_code = -1;
+    int error_code = -EPERM;
 
     /* try find width specification */
     if (strstr(data, "w") != NULL) {
@@ -65,15 +67,15 @@ int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
         forced_len = strtoul(data, &end_ptr, 0);
         if (forced_len == 0 || end_ptr == NULL) {
             fprintf(stderr, "%s: failed to parse width\n", data);
-            return -1;
+            return -EPERM;
         }
         if (strlen(end_ptr) <= 1) {
             fprintf(stderr, "%s: failed to parse width (no data after width)\n", data);
-            return -1;
+            return -EPERM;
         }
         if (end_ptr[0] != 'w') {
             fprintf(stderr, "%s: failed to parse width (wrong format)\n", data);
-            return -1;
+            return -EPERM;
         }
         data = end_ptr + 1;
         size_t part_byte = forced_len % 8;
@@ -131,7 +133,7 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     /* TODO: Try parse IPv6 (similar to IPv4) */
 
     /* Try parse as a MAC address */
-    if (is_valid_mac_address(data) != 0) {
+    if (is_valid_mac_address(data)) {
         int v[6];
         if (sscanf(data, "%x%*c%x%*c%x%*c%x%*c%x%*c%x",
                    &(v[0]), &(v[1]), &(v[2]), &(v[3]), &(v[4]), &(v[5])) == 6) {
@@ -150,24 +152,30 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
  * Command line parsing functions
  *****************************************************************************/
 
-int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx)
+int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
+                    psabpf_table_entry_ctx_t *ctx, bool can_be_last)
 {
     if (is_keyword(**argv, "id")) {
         NEXT_ARGP_EXIT();
         fprintf(stderr, "id: table access not supported\n");
-        return -1;
+        return -EPERM;
     } else if (is_keyword(**argv, "name")) {
         NEXT_ARGP_EXIT();
         fprintf(stderr, "name: table access not supported yet\n");
-        return -1;
+        return -EPERM;
     } else {
         int error_code = psabpf_table_entry_ctx_tblname(psabpf_ctx, ctx, **argv);
-        if (error_code != 0)
+        if (error_code != NO_ERROR)
             return error_code;
     }
-    NEXT_ARGP_EXIT();
 
-    return 0;
+    if (can_be_last) {
+        NEXT_ARGP();
+    } else {
+        NEXT_ARGP_EXIT();
+    }
+
+    return NO_ERROR;
 }
 
 int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
@@ -181,40 +189,40 @@ int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
         psabpf_action_set_id(action, strtoul(**argv, &ptr, 0));
         if (*ptr) {
             fprintf(stderr, "%s: unable to parse as an action id\n", **argv);
-            return -1;
+            return -EPERM;
         }
     } else if (is_keyword(**argv, "ref")) {
         *indirect_table = true;
         psabpf_table_entry_ctx_mark_indirect(ctx);
     } else {
         fprintf(stderr, "specify an action by name is not supported yet\n");
-        return -1;
+        return -EPERM;
     }
     NEXT_ARGP_EXIT();
 
-    return 0;
+    return NO_ERROR;
 }
 
 int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
     bool has_any_key = false;
-    int error_code = -1;
+    int error_code = -EPERM;
 
     if (!is_keyword(**argv, "key"))
-        return 0;
+        return NO_ERROR;
 
     do {
         NEXT_ARGP_EXIT();
         if (is_keyword(**argv, "data") || is_keyword(**argv, "priority"))
-            return 0;
+            return NO_ERROR;
 
         if (is_keyword(**argv, "none")) {
             if (!has_any_key) {
                 fprintf(stderr, "Support for table with empty key not implemented yet\n");
-                return -1;
+                return -EPERM;
             } else {
                 fprintf(stderr, "Unexpected none key\n");
-                return -1;
+                return -EPERM;
             }
         }
 
@@ -222,45 +230,46 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
         psabpf_matchkey_init(&mk);
         if (strstr(**argv, "/") != NULL) {
             fprintf(stderr, "lpm match key not supported yet\n");
-            return -1;
+            return -EPERM;
         } else if (strstr(**argv, "..") != NULL) {
             fprintf(stderr, "range match key not supported yet\n");
-            return -1;
+            return -EPERM;
         } else if (strstr(**argv, "%") != NULL) {
             fprintf(stderr, "ternary match key not supported yet\n");
-            return -1;
+            return -EPERM;
         } else {
             psabpf_matchkey_type(&mk, PSABPF_EXACT);
             error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
-            if (error_code != 0)
-                return -1;
+            if (error_code != NO_ERROR)
+                return error_code;
             error_code = psabpf_table_entry_matchkey(entry, &mk);
         }
         psabpf_matchkey_free(&mk);
-        if (error_code != 0)
-            return -1;
+        if (error_code != NO_ERROR)
+            return error_code;
 
         has_any_key = true;
     } while ((*argc) > 1);
+    NEXT_ARGP();
 
-    return 0;
+    return NO_ERROR;
 }
 
-int parse_action_data(int *argc, char ***argv, psabpf_table_entry_t *entry,
+int parse_action_data(int *argc, char ***argv,
                       psabpf_action_t *action, bool indirect_table)
 {
     if (!is_keyword(**argv, "data")) {
         if (indirect_table) {
             fprintf(stderr, "expected action reference\n");
-            return -1;
+            return -EPERM;
         }
-        return 0;
+        return NO_ERROR;
     }
 
     do {
         NEXT_ARGP_EXIT();
         if (is_keyword(**argv, "priority"))
-            break;
+            return NO_ERROR;
 
         bool ref_is_group_ref = false;
         if (indirect_table) {
@@ -272,41 +281,48 @@ int parse_action_data(int *argc, char ***argv, psabpf_table_entry_t *entry,
 
         psabpf_action_param_t param;
         int error_code = translate_data_to_bytes(**argv, &param, CTX_ACTION_DATA);
-        if (error_code != 0) {
+        if (error_code != NO_ERROR) {
             psabpf_action_param_free(&param);
-            return -1;
+            return error_code;
         }
         if (ref_is_group_ref)
             psabpf_action_param_mark_group_reference(&param);
         error_code = psabpf_action_param(action, &param);
-        if (error_code != 0)
-            return -1;
+        if (error_code != NO_ERROR)
+            return error_code;
     } while ((*argc) > 1);
+    NEXT_ARGP();
 
-    return 0;
+    return NO_ERROR;
 }
 
 int parse_entry_priority(int *argc, char ***argv)
 {
     if (is_keyword(**argv, "priority")) {
-        NEXT_ARGP_EXIT();
-        fprintf(stderr, "Priority not supported\n");
-        return -1;
+        NEXT_ARGP_EXIT();  /* skip keyword */
+        fprintf(stderr, "Priority is not supported\n");
+        NEXT_ARGP();  /* skip priority value */
+        return -EPERM;
     }
-    return 0;
+    return NO_ERROR;
 }
 
 /******************************************************************************
  * Command line table functions
  *****************************************************************************/
 
-int do_table_add(int argc, char **argv)
+enum table_write_type_t {
+    TABLE_ADD_NEW_ENTRY,
+    TABLE_UPDATE_EXISTING_ENTRY
+};
+
+int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
 {
     psabpf_table_entry_t entry;
     psabpf_table_entry_ctx_t ctx;
     psabpf_action_t action;
     psabpf_context_t psabpf_ctx;
-    int error_code = -1;
+    int error_code = -EPERM;
     bool table_is_indirect = false;
 
     psabpf_context_init(&psabpf_ctx);
@@ -315,7 +331,7 @@ int do_table_add(int argc, char **argv)
     psabpf_action_init(&action);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != 0)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
         goto clean_up;
 
     /* no NEXT_ARG before in version from this file, so this check must be preserved */
@@ -325,31 +341,93 @@ int do_table_add(int argc, char **argv)
     }
 
     /* 1. Get table */
-    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx) != 0)
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, false) != NO_ERROR)
         goto clean_up;
 
     /* 2. Get action */
-    if (parse_table_action(&argc, &argv, &ctx, &action, &table_is_indirect) != 0)
+    if (parse_table_action(&argc, &argv, &ctx, &action, &table_is_indirect) != NO_ERROR)
         goto clean_up;
 
     /* 3. Get key */
-    if (parse_table_key(&argc,&argv, &entry) != 0)
+    if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
     /* 4. Get action parameters */
-    if (parse_action_data(&argc, &argv, &entry, &action, table_is_indirect) != 0)
+    if (parse_action_data(&argc, &argv, &action, table_is_indirect) != NO_ERROR)
         goto clean_up;
 
     /* 5. Get entry priority */
-    if (parse_entry_priority(&argc, &argv) != 0)
+    if (parse_entry_priority(&argc, &argv) != NO_ERROR)
         goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
 
     psabpf_table_entry_action(&entry, &action);
 
-    error_code = psabpf_table_entry_add(&ctx, &entry);
+    if (write_type == TABLE_ADD_NEW_ENTRY)
+        error_code = psabpf_table_entry_add(&ctx, &entry);
+    else if (write_type == TABLE_UPDATE_EXISTING_ENTRY)
+        error_code = psabpf_table_entry_update(&ctx, &entry);
 
 clean_up:
     psabpf_action_free(&action);
+    psabpf_table_entry_free(&entry);
+    psabpf_table_entry_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
+
+    return error_code;
+}
+
+int do_table_add(int argc, char **argv)
+{
+    return do_table_write(argc, argv, TABLE_ADD_NEW_ENTRY);
+}
+
+int do_table_update(int argc, char **argv)
+{
+    return do_table_write(argc, argv, TABLE_UPDATE_EXISTING_ENTRY);
+}
+
+int do_table_delete(int argc, char **argv)
+{
+    psabpf_table_entry_t entry;
+    psabpf_table_entry_ctx_t ctx;
+    psabpf_context_t psabpf_ctx;
+    int error_code = -EPERM;
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_table_entry_ctx_init(&ctx);
+    psabpf_table_entry_init(&entry);
+
+    /* 0. Get the pipeline id */
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up;
+
+    /* no NEXT_ARG before in version from this file, so this check must be preserved */
+    if (argc < 1) {
+        fprintf(stderr, "too few parameters\n");
+        goto clean_up;
+    }
+
+    /* 1. Get table */
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, true) != NO_ERROR)
+        goto clean_up;
+
+    /* 2. Get key */
+    if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    error_code = psabpf_table_entry_del(&ctx, &entry);
+
+clean_up:
     psabpf_table_entry_free(&entry);
     psabpf_table_entry_ctx_free(&ctx);
     psabpf_context_free(&psabpf_ctx);
@@ -364,9 +442,9 @@ int do_table_help(int argc, char **argv)
     fprintf(stderr,
             "Usage: %1$s table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
-            "Unimplemented commands:\n"
             "       %1$s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table del pipe ID TABLE [key MATCH_KEY]\n"
+            "Unimplemented commands:\n"
             "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
             "       %1$s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"
             "       %1$s table default pipe ID TABLE\n"
