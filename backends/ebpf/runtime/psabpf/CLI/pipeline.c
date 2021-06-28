@@ -56,7 +56,7 @@ int do_load(int argc, char **argv)
 
 int do_unload(int argc, char **argv)
 {
-    int error;
+    int error = NO_ERROR;
     if (!is_keyword(*argv, "id")) {
         fprintf(stderr, "expected 'id', got: %s\n", *argv);
         return -1;
