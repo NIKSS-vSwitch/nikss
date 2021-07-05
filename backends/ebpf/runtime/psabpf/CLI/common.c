@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "common.h"
 
@@ -25,7 +26,7 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
 
     if (!is_keyword(**argv, "pipe")) {
         fprintf(stderr, "expected 'pipe' keyword\n");
-        return -1;
+        return EINVAL;
     }
     NEXT_ARGP();
 
@@ -33,11 +34,11 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
     psabpf_pipeline_id_t id = strtoul(**argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", **argv);
-        return -1;
+        return EINVAL;
     }
     psabpf_context_set_pipeline(psabpf_ctx, id);
 
     NEXT_ARGP();
 
-    return 0;
+    return NO_ERROR;
 }

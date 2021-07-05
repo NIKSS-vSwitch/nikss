@@ -104,6 +104,7 @@ int psabtf_get_member_md_by_name(struct btf * btf, uint32_t type_id,
             md->member = type_member;
             md->index = i;
             md->effective_type_id = follow_typedefs(btf, type_member->type);
+            md->bit_offset = btf_member_bit_offset(type, i);
             return NO_ERROR;
         }
     }
@@ -134,6 +135,7 @@ int psabtf_get_member_md_by_index(struct btf * btf, uint32_t type_id, uint16_t i
     md->member = type_member;
     md->index = index;
     md->effective_type_id = follow_typedefs(btf, type_member->type);
+    md->bit_offset = btf_member_bit_offset(type, index);
 
     return NO_ERROR;
 }

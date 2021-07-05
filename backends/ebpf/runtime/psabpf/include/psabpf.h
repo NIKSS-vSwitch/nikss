@@ -76,22 +76,23 @@ enum psabpf_matchkind_t {
     PSABPF_EXACT,
     PSABPF_LPM,
     PSABPF_TERNARY,
-    PSBPF_RANGE
+    PSABPF_RANGE
 };
 
 // TODO: this struct may not be well-designed yet; we need feedback from implementation; to be adjusted
 typedef struct psabpf_match_key {
     enum psabpf_matchkind_t type;
     void *data;
-    size_t key_size;  // key_size determines size of val and mask
+    size_t key_size;
     union {
         struct {
             // used only for 'ternary'
-            const void *mask;
+            void *mask;
+            size_t mask_size;
         } ternary;
         struct {
             // used only for 'lpm'
-            const size_t prefix_len;
+            size_t prefix_len;
         } lpm;
         struct {
             // used only for 'range'
@@ -115,13 +116,12 @@ typedef struct psabpf_action {
 } psabpf_action_t;
 
 typedef struct psabpf_table_entry {
-
     size_t n_keys;
     psabpf_match_key_t **match_keys;
 
     psabpf_action_t *action;
 
-    const uint32_t priority;
+    uint32_t priority;
 } psabpf_table_entry_t;
 
 /*
@@ -134,12 +134,22 @@ typedef struct psabpf_table_entry_context {
     uint32_t table_type;
     uint32_t key_size;
     uint32_t value_size;
+    uint32_t btf_type_id;
     bool is_indirect;
+    bool is_ternary;
+
+    char base_name[256];
+
+    /* for ternary tables */
+    uint32_t tuple_max_entries;
+    int prefixes_fd;
+    uint32_t prefixes_key_size, prefixes_value_size, prefixes_btf_type_id;
+    int tuple_map_fd;
+    uint32_t tuple_map_key_size, tuple_map_value_size;
 
     // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
     int associated_prog;
     void * btf;
-    uint32_t btf_type_id;
 
     // below fields might be useful when iterating
     size_t curr_idx;

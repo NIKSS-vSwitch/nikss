@@ -16,6 +16,7 @@
 
 enum destination_ctx_type_t {
     CTX_MATCH_KEY,
+    CTX_MATCH_KEY_TERNARY_MASK,
     CTX_ACTION_DATA
 };
 
@@ -23,10 +24,12 @@ int update_context(const char *data, size_t len, void *ctx, enum destination_ctx
 {
     if (ctx_type == CTX_MATCH_KEY)
         return psabpf_matchkey_data(ctx, data, len);
+    else if (ctx_type == CTX_MATCH_KEY_TERNARY_MASK)
+        return psabpf_matchkey_mask(ctx, data, len);
     else if (ctx_type == CTX_ACTION_DATA)
         return psabpf_action_param_create(ctx, data, len);
 
-    return -1;
+    return EPERM;
 }
 
 /* TODO: Is there any ready to use function for this purpose? */
@@ -59,7 +62,7 @@ int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     mpz_t number;  /* converts any precision number to stream of bytes */
     size_t len, forced_len = 0;
     char * buffer;
-    int error_code = -EPERM;
+    int error_code = EPERM;
 
     /* try find width specification */
     if (strstr(data, "w") != NULL) {
@@ -67,15 +70,15 @@ int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
         forced_len = strtoul(data, &end_ptr, 0);
         if (forced_len == 0 || end_ptr == NULL) {
             fprintf(stderr, "%s: failed to parse width\n", data);
-            return -EPERM;
+            return EINVAL;
         }
         if (strlen(end_ptr) <= 1) {
             fprintf(stderr, "%s: failed to parse width (no data after width)\n", data);
-            return -EPERM;
+            return EINVAL;
         }
         if (end_ptr[0] != 'w') {
             fprintf(stderr, "%s: failed to parse width (wrong format)\n", data);
-            return -EPERM;
+            return EINVAL;
         }
         data = end_ptr + 1;
         size_t part_byte = forced_len % 8;
@@ -156,13 +159,13 @@ int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
                     psabpf_table_entry_ctx_t *ctx, bool can_be_last)
 {
     if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_EXIT();
+        NEXT_ARGP_RET();
         fprintf(stderr, "id: table access not supported\n");
-        return -EPERM;
+        return ENOTSUP;
     } else if (is_keyword(**argv, "name")) {
-        NEXT_ARGP_EXIT();
+        NEXT_ARGP_RET();
         fprintf(stderr, "name: table access not supported yet\n");
-        return -EPERM;
+        return ENOTSUP;
     } else {
         int error_code = psabpf_table_entry_ctx_tblname(psabpf_ctx, ctx, **argv);
         if (error_code != NO_ERROR)
@@ -172,7 +175,7 @@ int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
     if (can_be_last) {
         NEXT_ARGP();
     } else {
-        NEXT_ARGP_EXIT();
+        NEXT_ARGP_RET();
     }
 
     return NO_ERROR;
@@ -184,21 +187,21 @@ int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
     *indirect_table = false;
 
     if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_EXIT();
+        NEXT_ARGP_RET();
         char *ptr;
         psabpf_action_set_id(action, strtoul(**argv, &ptr, 0));
         if (*ptr) {
             fprintf(stderr, "%s: unable to parse as an action id\n", **argv);
-            return -EPERM;
+            return EINVAL;
         }
     } else if (is_keyword(**argv, "ref")) {
         *indirect_table = true;
         psabpf_table_entry_ctx_mark_indirect(ctx);
     } else {
         fprintf(stderr, "specify an action by name is not supported yet\n");
-        return -EPERM;
+        return ENOTSUP;
     }
-    NEXT_ARGP_EXIT();
+    NEXT_ARGP_RET();
 
     return NO_ERROR;
 }
@@ -206,44 +209,70 @@ int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
 int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
     bool has_any_key = false;
-    int error_code = -EPERM;
+    int error_code = EPERM;
 
     if (!is_keyword(**argv, "key"))
         return NO_ERROR;
 
     do {
-        NEXT_ARGP_EXIT();
+        NEXT_ARGP_RET();
         if (is_keyword(**argv, "data") || is_keyword(**argv, "priority"))
             return NO_ERROR;
 
         if (is_keyword(**argv, "none")) {
             if (!has_any_key) {
                 fprintf(stderr, "Support for table with empty key not implemented yet\n");
-                return -EPERM;
+                return ENOTSUP;
             } else {
                 fprintf(stderr, "Unexpected none key\n");
-                return -EPERM;
+                return EPERM;
             }
         }
 
         psabpf_match_key_t mk;
         psabpf_matchkey_init(&mk);
-        if (strstr(**argv, "/") != NULL) {
-            fprintf(stderr, "lpm match key not supported yet\n");
-            return -EPERM;
+        char *substr_ptr;
+        if ((substr_ptr = strstr(**argv, "/")) != NULL) {
+            psabpf_matchkey_type(&mk, PSABPF_LPM);
+            *(substr_ptr++) = 0;
+            if (*substr_ptr == 0) {
+                fprintf(stderr, "missing prefix length for LPM key\n");
+                return EINVAL;
+            }
+            error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
+            if (error_code != NO_ERROR)
+                return error_code;
+            char *ptr;
+            psabpf_matchkey_prefix(&mk, strtoul(substr_ptr, &ptr, 0));
+            if (*ptr) {
+                fprintf(stderr, "%s: unable to parse prefix length\n", substr_ptr);
+                return EINVAL;
+            }
         } else if (strstr(**argv, "..") != NULL) {
             fprintf(stderr, "range match key not supported yet\n");
-            return -EPERM;
-        } else if (strstr(**argv, "%") != NULL) {
-            fprintf(stderr, "ternary match key not supported yet\n");
-            return -EPERM;
+            return ENOTSUP;
+        } else if ((substr_ptr = strstr(**argv, "^")) != NULL) {
+            psabpf_matchkey_type(&mk, PSABPF_TERNARY);
+            /* Split data and mask */
+            *substr_ptr = 0;
+            substr_ptr++;
+            if (*substr_ptr == 0) {
+                fprintf(stderr, "missing mask for ternary key\n");
+                return EINVAL;
+            }
+            error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
+            if (error_code != NO_ERROR)
+                return error_code;
+            error_code = translate_data_to_bytes(substr_ptr, &mk, CTX_MATCH_KEY_TERNARY_MASK);
+            if (error_code != NO_ERROR)
+                return error_code;
         } else {
             psabpf_matchkey_type(&mk, PSABPF_EXACT);
             error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
             if (error_code != NO_ERROR)
                 return error_code;
-            error_code = psabpf_table_entry_matchkey(entry, &mk);
         }
+        error_code = psabpf_table_entry_matchkey(entry, &mk);
         psabpf_matchkey_free(&mk);
         if (error_code != NO_ERROR)
             return error_code;
@@ -261,13 +290,13 @@ int parse_action_data(int *argc, char ***argv,
     if (!is_keyword(**argv, "data")) {
         if (indirect_table) {
             fprintf(stderr, "expected action reference\n");
-            return -EPERM;
+            return EINVAL;
         }
         return NO_ERROR;
     }
 
     do {
-        NEXT_ARGP_EXIT();
+        NEXT_ARGP_RET();
         if (is_keyword(**argv, "priority"))
             return NO_ERROR;
 
@@ -275,7 +304,7 @@ int parse_action_data(int *argc, char ***argv,
         if (indirect_table) {
             if (is_keyword(**argv, "group")) {
                 ref_is_group_ref = true;
-                NEXT_ARGP_EXIT();
+                NEXT_ARGP_RET();
             }
         }
 
@@ -296,14 +325,20 @@ int parse_action_data(int *argc, char ***argv,
     return NO_ERROR;
 }
 
-int parse_entry_priority(int *argc, char ***argv)
+int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
-    if (is_keyword(**argv, "priority")) {
-        NEXT_ARGP_EXIT();  /* skip keyword */
-        fprintf(stderr, "Priority is not supported\n");
-        NEXT_ARGP();  /* skip priority value */
-        return -EPERM;
+    if (!is_keyword(**argv, "priority"))
+        return NO_ERROR;
+    NEXT_ARGP_RET();
+
+    char *ptr;
+    psabpf_table_entry_priority(entry, strtoul(**argv, &ptr, 0));
+    if (*ptr) {
+        fprintf(stderr, "%s: unable to parse priority\n", **argv);
+        return EINVAL;
     }
+    NEXT_ARGP();
+
     return NO_ERROR;
 }
 
@@ -322,7 +357,7 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
     psabpf_table_entry_ctx_t ctx;
     psabpf_action_t action;
     psabpf_context_t psabpf_ctx;
-    int error_code = -EPERM;
+    int error_code = EPERM;
     bool table_is_indirect = false;
 
     psabpf_context_init(&psabpf_ctx);
@@ -357,7 +392,7 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
         goto clean_up;
 
     /* 5. Get entry priority */
-    if (parse_entry_priority(&argc, &argv) != NO_ERROR)
+    if (parse_entry_priority(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
     if (argc > 0) {
@@ -396,7 +431,7 @@ int do_table_delete(int argc, char **argv)
     psabpf_table_entry_t entry;
     psabpf_table_entry_ctx_t ctx;
     psabpf_context_t psabpf_ctx;
-    int error_code = -EPERM;
+    int error_code = EPERM;
 
     psabpf_context_init(&psabpf_ctx);
     psabpf_table_entry_ctx_init(&ctx);
@@ -462,8 +497,8 @@ int do_table_help(int argc, char **argv)
              *   harder to write in a CLI (needs an escape sequence) */
             "       RANGE_KEY := { DATA_MIN..DATA_MAX }\n"
             /* note: by default '&&&' is used but it also will requires
-             *   an escape sequence in a CLI, so lets use '%' instead */
-            "       TERNARY_KEY := { DATA%%MASK }\n"
+             *   an escape sequence in a CLI, so lets use '^' instead */
+            "       TERNARY_KEY := { DATA^MASK }\n"
             "       ACTION_PARAMS := { DATA }\n"
             "",
             program_name);

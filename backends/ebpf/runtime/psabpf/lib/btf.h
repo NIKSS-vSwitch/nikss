@@ -14,6 +14,7 @@ typedef struct psabtf_struct_member_md {
     const struct btf_member * member;
     int index;
     uint32_t effective_type_id;
+    size_t bit_offset;
 } psabtf_struct_member_md_t;
 
 int psabtf_get_member_md_by_name(struct btf * btf, uint32_t type_id,
