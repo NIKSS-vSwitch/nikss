@@ -26,4 +26,9 @@ uint32_t psabtf_get_member_type_id_by_name(struct btf * btf, uint32_t type_id,
 
 size_t psabtf_get_type_size_by_id(struct btf * btf, uint32_t type_id);
 
+int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf);
+int open_bpf_map(psabpf_btf_t *btf, const char *name, const char *base_path, int *fd,
+                 uint32_t *key_size, uint32_t *value_size, uint32_t *map_type,
+                 uint32_t *btf_type_id, uint32_t *max_entries);
+
 #endif  // __PSABPF_BTF_H
