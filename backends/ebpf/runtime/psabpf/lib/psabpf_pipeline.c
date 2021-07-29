@@ -36,12 +36,16 @@ static int do_initialize_maps(int prog_fd)
                              out, &size, &retval, &duration);
 }
 
-static int xdp_port_add(__u32 pipeline_id, __u32 ifindex)
+static int xdp_port_add(__u32 pipeline_id, char *intf)
 {
     struct bpf_devmap_val devmap_val;
     char pinned_file[256];
     int ret;
     int ig_prog_fd, eg_prog_fd, devmap_fd;
+
+    int ifindex = if_nametoindex(intf);
+    if (!ifindex)
+        return EINVAL;
 
     snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
              PIPELINE_PREFIX, pipeline_id, XDP_INGRESS_PROG);
@@ -75,6 +79,19 @@ static int xdp_port_add(__u32 pipeline_id, __u32 ifindex)
     if (ret) {
         return ret;
     }
+
+    /* FIXME: using bash command only for the PoC purpose */
+    char cmd[256];
+    sprintf(cmd, "tc qdisc add dev %s clsact", intf);
+    system(cmd);
+    memset(cmd, 0, sizeof(cmd));
+    sprintf(cmd, "tc filter add dev %s ingress bpf da fd %s/%s%d/%s",
+            intf, BPF_FS, PIPELINE_PREFIX, pipeline_id, TC_INGRESS_PROG);
+    system(cmd);
+    memset(cmd, 0, sizeof(cmd));
+    sprintf(cmd, "tc filter add dev %s egress bpf da fd %s/%s%d/%s",
+            intf, BPF_FS, PIPELINE_PREFIX, pipeline_id, TC_EGRESS_PROG);
+    system(cmd);
 
     return 0;
 }
@@ -204,22 +221,16 @@ int psabpf_pipeline_unload(psabpf_pipeline_t *pipeline)
 
 int psabpf_pipeline_add_port(psabpf_pipeline_t *pipeline, char *intf)
 {
-    int ret;
     char pinned_file[256];
-    int ifindex;
     bool isXDP = false;
 
-    ifindex = if_nametoindex(intf);
-    if (!ifindex)
-        return EINVAL;
-
     /* Determine firstly if we have TC-based or XDP-based pipeline.
-     * We can do this by just checking if TC Ingress exists under a mount path. */
+     * We can do this by just checking if XDP helper exists under a mount path. */
     snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
-             PIPELINE_PREFIX, pipeline->id, TC_INGRESS_PROG);
+             PIPELINE_PREFIX, pipeline->id, XDP_HELPER_PROG);
     isXDP = access(pinned_file, F_OK) != 0;
 
-    return isXDP ? xdp_port_add(pipeline->id, ifindex) : tc_port_add(pipeline->id, intf);
+    return isXDP ? xdp_port_add(pipeline->id, intf) : tc_port_add(pipeline->id, intf);
 }
 
 int psabpf_pipeline_del_port(psabpf_pipeline_t *pipeline, char *intf)
