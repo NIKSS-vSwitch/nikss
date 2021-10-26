@@ -155,6 +155,10 @@ typedef struct psabpf_table_entry_context {
     int tuple_map_fd;
     uint32_t tuple_map_key_size, tuple_map_value_size;
 
+    /* for cache maintenance */
+    int cache_fd;
+    uint32_t cache_key_size;
+
     psabpf_btf_t btf_metadata;
 
     // below fields might be useful when iterating

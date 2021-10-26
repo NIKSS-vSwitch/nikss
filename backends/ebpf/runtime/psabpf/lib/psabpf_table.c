@@ -42,6 +42,7 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
     ctx->btf_metadata.associated_prog = -1;
     ctx->prefixes_fd = -1;
     ctx->tuple_map_fd = -1;
+    ctx->cache_fd = -1;
 }
 
 static void close_object_fd(int *fd)
@@ -64,6 +65,7 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     close_object_fd(&(ctx->prefixes_fd));
     close_object_fd(&(ctx->tuple_map_fd));
     close_object_fd(&(ctx->btf_metadata.associated_prog));
+    close_object_fd(&(ctx->cache_fd));
 }
 
 static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, const char *base_path)
@@ -125,6 +127,15 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open table %s: %s\n", name, strerror(ret));
         return ret;
+    }
+
+    /* open cache table, this is optional feature for table */
+    char cache_name[256];
+    snprintf(cache_name, sizeof(cache_name), "%s_cache", name);
+    ret = open_bpf_map(&ctx->btf_metadata, cache_name, base_path, &(ctx->cache_fd), &(ctx->cache_key_size),
+                       NULL, NULL, NULL, NULL);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "warning: cache for table %s not found: %s\n", name, strerror(ret));
     }
 
     return NO_ERROR;
@@ -618,7 +629,7 @@ static int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     psabtf_struct_member_md_t action_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_md) != NO_ERROR) {
         fprintf(stderr, "action id entry not found\n");
-        return ENOENT;
+        return EAGAIN;  /* Allow fallback to byte by byte mode */
     }
     return write_buffer_btf(buffer, ctx->value_size, action_md.bit_offset / 8,
                             &(entry->action->action_id), sizeof(entry->action->action_id),
@@ -1285,6 +1296,51 @@ static void post_ternary_table_write(psabpf_table_entry_ctx_t *ctx)
         close_object_fd(&(ctx->table_fd));
 }
 
+static int delete_all_table_entries(int fd, size_t key_size)
+{
+    fprintf(stderr, "removing all entries from table\n");
+
+    char * key = malloc(key_size);
+    char * next_key = malloc(key_size);
+    int error_code = NO_ERROR;
+
+    if (key == NULL || next_key == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        error_code = ENOMEM;
+        goto clean_up;
+    }
+
+    if (bpf_map_get_next_key(fd, NULL, next_key) != 0)
+        goto clean_up;  /* table empty */
+    do {
+        /* Swap buffers, so next_key will become key and next_key may be reused */
+        char * tmp_key = next_key;
+        next_key = key;
+        key = tmp_key;
+
+        /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exists
+         * but entry not exists (e.g. array map in map). So in any case we have to
+         * iterate over all keys and try delete it. */
+        bpf_map_delete_elem(fd, key);
+    } while (bpf_map_get_next_key(fd, key, next_key) == 0);
+
+    clean_up:
+    if (key)
+        free(key);
+    if (next_key)
+        free(next_key);
+    return error_code;
+}
+
+static int clear_table_cache(psabpf_table_entry_ctx_t *ctx)
+{
+    if (ctx->cache_fd < 0)
+        return NO_ERROR;
+
+    fprintf(stderr, "clearing table cache: ");
+    return delete_all_table_entries(ctx->cache_fd, ctx->cache_key_size);
+}
+
 int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
     char *key_buffer = NULL;
@@ -1353,6 +1409,11 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     if (return_code != 0) {
         return_code = errno;
         fprintf(stderr, "failed to set up entry: %s\n", strerror(errno));
+    } else {
+        return_code = clear_table_cache(ctx);
+        if (return_code != NO_ERROR) {
+            fprintf(stderr, "failed to clear cache: %s\n", strerror(return_code));
+        }
     }
 
 clean_up:
@@ -1377,42 +1438,6 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     return psabpf_table_entry_write(ctx, entry, BPF_EXIST);
-}
-
-static int delete_all_table_entries(int fd, size_t key_size)
-{
-    fprintf(stderr, "removing all entries from table\n");
-
-    char * key = malloc(key_size);
-    char * next_key = malloc(key_size);
-    int error_code = NO_ERROR;
-
-    if (key == NULL || next_key == NULL) {
-        fprintf(stderr, "not enough memory\n");
-        error_code = ENOMEM;
-        goto clean_up;
-    }
-
-    if (bpf_map_get_next_key(fd, NULL, next_key) != 0)
-        goto clean_up;  /* table empty */
-    do {
-        /* Swap buffers, so next_key will become key and next_key may be reused */
-        char * tmp_key = next_key;
-        next_key = key;
-        key = tmp_key;
-
-        /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exists
-         * but entry not exists (e.g. array map in map). So in any case we have to
-         * iterate over all keys and try delete it. */
-        bpf_map_delete_elem(fd, key);
-    } while (bpf_map_get_next_key(fd, key, next_key) == 0);
-
-clean_up:
-    if (key)
-        free(key);
-    if (next_key)
-        free(next_key);
-    return error_code;
 }
 
 static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, char **key_mask)
@@ -1579,7 +1604,14 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     if (entry->n_keys == 0) {
         if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
             fprintf(stderr, "removing entries from array map may take a while\n");
-        return delete_all_table_entries(ctx->table_fd, ctx->key_size);
+        return_code = delete_all_table_entries(ctx->table_fd, ctx->key_size);
+        if (return_code == NO_ERROR) {
+            return_code = clear_table_cache(ctx);
+            if (return_code != NO_ERROR) {
+                fprintf(stderr, "failed to clear table cache: %s\n", strerror(return_code));
+            }
+        }
+        return return_code;
     }
 
     /* prepare buffers for map key */
@@ -1602,9 +1634,14 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 
     /* delete pointed entry */
     return_code = bpf_map_delete_elem(ctx->table_fd, key_buffer);
-    if (return_code != NO_ERROR) {
+    if (return_code != 0) {
         return_code = errno;
         fprintf(stderr, "failed to delete entry: %s\n", strerror(errno));
+    } else {
+        return_code = clear_table_cache(ctx);
+        if (return_code != NO_ERROR) {
+            fprintf(stderr, "failed to clear cache: %s\n", strerror(return_code));
+        }
     }
 
 clean_up:

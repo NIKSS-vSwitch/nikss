@@ -257,8 +257,10 @@ int open_bpf_map(psabpf_btf_t *btf, const char *name, const char *base_path, int
     }
     if (map_type != NULL)
         *map_type = info.type;
-    *key_size = info.key_size;
-    *value_size = info.value_size;
+    if (key_size != NULL)
+        *key_size = info.key_size;
+    if (value_size != NULL)
+        *value_size = info.value_size;
     if (max_entries != NULL)
         *max_entries = info.max_entries;
 
