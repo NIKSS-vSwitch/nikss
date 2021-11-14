@@ -504,6 +504,23 @@ static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, p
     return NO_ERROR;
 }
 
+static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_type *key_type, uint32_t key_type_id) {
+    if (btf_kind(key_type) != BTF_KIND_STRUCT)
+        return false;
+
+    const struct btf_member *member = btf_members(key_type);
+    int entries = btf_vlen(key_type);
+
+    if (entries != 1)
+        return false;
+
+    psabtf_struct_member_md_t action_md = {};
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, key_type_id, "__dummy_table_key", &action_md) == NO_ERROR)
+        return true;
+
+    return false;
+}
+
 static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->btf_type_id, "key");
@@ -530,6 +547,11 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
 
         if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE)
             --expected_entries;  /* omit prefix length */
+        if (is_table_dummy_key(ctx, key_type, key_type_id)) {
+            /* Preserve zeroed bytes if table do not define key */
+            expected_entries = 0;
+            entries = 0;
+        }
         if (entry->n_keys != expected_entries) {
             fprintf(stderr, "expected %d keys, got %zu\n", expected_entries, entry->n_keys);
             return EAGAIN;

@@ -79,8 +79,8 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
 
         if (is_keyword(**argv, "none")) {
             if (!has_any_key) {
-                fprintf(stderr, "Support for table with empty key not implemented yet\n");
-                return ENOTSUP;
+                NEXT_ARGP();
+                return NO_ERROR;
             } else {
                 fprintf(stderr, "Unexpected none key\n");
                 return EPERM;
@@ -354,7 +354,7 @@ int do_table_help(int argc, char **argv)
             /* note: simple_switch_CLI uses '->' for range match, but this is
              *   harder to write in a CLI (needs an escape sequence) */
             "       RANGE_KEY := { DATA_MIN..DATA_MAX }\n"
-            /* note: by default '&&&' is used but it also will requires
+            /* note: by default '&&&' is used but it also will require
              *   an escape sequence in a CLI, so lets use '^' instead */
             "       TERNARY_KEY := { DATA^MASK }\n"
             "       ACTION_PARAMS := { DATA }\n"
