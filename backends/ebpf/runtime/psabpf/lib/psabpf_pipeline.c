@@ -41,7 +41,7 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
     struct bpf_devmap_val devmap_val;
     char pinned_file[256];
     int ret;
-    int ig_prog_fd, eg_prog_fd, devmap_fd;
+    int ig_prog_fd, eg_prog_fd, devmap_fd, jmpmap_fd;
 
     int ifindex = if_nametoindex(intf);
     if (!ifindex)
@@ -57,9 +57,7 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
     snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
              PIPELINE_PREFIX, pipeline_id, XDP_EGRESS_PROG);
     eg_prog_fd = bpf_obj_get(pinned_file);
-    if (eg_prog_fd < 0) {
-        return -1;
-    }
+
     __u32 flags = XDP_FLAGS_DRV_MODE;
     ret = bpf_set_link_xdp_fd(ifindex, ig_prog_fd, flags);
     if (ret) {
@@ -74,7 +72,11 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
         return -1;
     }
     devmap_val.ifindex = ifindex;
-    devmap_val.bpf_prog.fd = eg_prog_fd;
+    devmap_val.bpf_prog.fd = -1;
+    // install egress program only if it's found
+    if (eg_prog_fd >= 0) {
+        devmap_val.bpf_prog.fd = eg_prog_fd;
+    }
     if (ifindex > DEVMAP_SIZE) {
         fprintf(stderr,
             "Warning: the index(=%d) of the interface %s is higher than the DEVMAP size (=%d)\n"
@@ -84,6 +86,26 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
     ret = bpf_map_update_elem(devmap_fd, &index, &devmap_val, 0);
     if (ret) {
         return ret;
+    }
+
+    memset(pinned_file, 0, sizeof(pinned_file));
+    snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
+             PIPELINE_PREFIX, pipeline_id, XDP_EGRESS_PROG_OPTIMIZED);
+    eg_prog_fd = bpf_obj_get(pinned_file);
+    if (eg_prog_fd >= 0) {
+        memset(pinned_file, 0, sizeof(pinned_file));
+        snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
+                 PIPELINE_PREFIX, pipeline_id, XDP_JUMP_TBL);
+        jmpmap_fd = bpf_obj_get(pinned_file);
+        if (jmpmap_fd < 0) {
+            return -1;
+        }
+
+        index = 0;
+        ret = bpf_map_update_elem(jmpmap_fd, &index, &eg_prog_fd, 0);
+        if (ret) {
+            return ret;
+        }
     }
 
     /* FIXME: using bash command only for the PoC purpose */

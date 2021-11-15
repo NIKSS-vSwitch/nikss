@@ -44,13 +44,23 @@ static const char *XDP_HELPER_PROG = "xdp_xdp-ingress";
 static const char *XDP_INGRESS_PROG = "xdp_ingress_xdp-ingress";
 
 /**
- * The name of XDP egress program.
+ * The name of standard XDP egress program.
  */
 static const char *XDP_EGRESS_PROG = "xdp_devmap_xdp-egress";
+
+/**
+ * The name of optimized XDP egress program.
+ */
+static const char *XDP_EGRESS_PROG_OPTIMIZED = "xdp_xdp-egress";
 
 /**
  * The name of XDP devmap.
  */
 static const char *XDP_DEVMAP = "maps/tx_port";
+
+/**
+ * The name of BPF map used for tail calls.
+ */
+static const char *XDP_JUMP_TBL = "maps/egress_progs_table";
 
 #endif  /* P4C_BPF_DEFS_H */
