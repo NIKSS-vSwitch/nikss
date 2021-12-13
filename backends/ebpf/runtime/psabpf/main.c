@@ -5,6 +5,7 @@
 #include "CLI/clone_session.h"
 #include "CLI/pipeline.h"
 #include "CLI/table.h"
+#include "CLI/action_selector.h"
 #include "CLI/meter.h"
 
 static int last_argc;
@@ -45,7 +46,12 @@ static int do_help(int argc, char **argv)
             "Usage: %s [OPTIONS] OBJECT {COMMAND | help }\n"
             "       %s help\n"
             "\n"
-            "       OBJECT := { clone-session | multicast-group | pipeline | table | meter }\n"
+            "       OBJECT := { clone-session |\n"
+            "                   multicast-group |\n"
+            "                   pipeline |\n"
+            "                   table |\n"
+            "                   action-selector |\n"
+            "                   meter }\n"
             "       OPTIONS := {}\n"
             "",
             program_name, program_name);
@@ -78,12 +84,18 @@ static int do_meter(int argc, char **argv)
     return cmd_select(meter_cmds, argc, argv, do_meter_help);
 }
 
+static int do_action_selector(int argc, char **argv)
+{
+    return cmd_select(action_selector_cmds, argc, argv, do_action_selector_help);
+}
+
 static const struct cmd cmds[] = {
-        { "help",          do_help },
-        { "clone-session", do_clone_session },
-        { "pipeline",      do_pipeline },
-        { "table",         do_table },
-        { "meter",         do_meter },
+        { "help",            do_help },
+        { "clone-session",   do_clone_session },
+        { "pipeline",        do_pipeline },
+        { "table",           do_table },
+        { "action-selector", do_action_selector },
+        { "meter",           do_meter },
         { 0 }
 };
 

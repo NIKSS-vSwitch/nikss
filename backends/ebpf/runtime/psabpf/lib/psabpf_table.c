@@ -9,27 +9,11 @@
 
 #include "../include/psabpf.h"
 #include "btf.h"
+#include "common.h"
+#include "psabpf_table.h"
 
 #define COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES  1
 #define COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES 2
-
-static int str_ends_with(const char *str, const char *suffix)
-{
-    size_t len_str = strlen(str);
-    size_t len_suffix = strlen(suffix);
-    if (len_suffix >  len_str)
-        return 0;
-    return strncmp(str + len_str - len_suffix, suffix, len_suffix) == 0;
-}
-
-/* Data len must be aligned to 4B */
-static void mem_bitwise_and(uint32_t *dst, uint32_t *mask, size_t len)
-{
-    for (int i = 0; i < len / 4; i++) {
-        *dst = (uint32_t) ((*dst) & (*mask));
-        ++dst; ++mask;
-    }
-}
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
 {
@@ -38,18 +22,11 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
     memset(ctx, 0, sizeof(psabpf_table_entry_ctx_t));
 
     /* 0 is a valid file descriptor */
-    ctx->table_fd = -1;
+    ctx->table.fd = -1;
     ctx->btf_metadata.associated_prog = -1;
-    ctx->prefixes_fd = -1;
-    ctx->tuple_map_fd = -1;
-    ctx->cache_fd = -1;
-}
-
-static void close_object_fd(int *fd)
-{
-    if (*fd >= 0)
-        close(*fd);
-    *fd = -1;
+    ctx->prefixes.fd = -1;
+    ctx->tuple_map.fd = -1;
+    ctx->cache.fd = -1;
 }
 
 void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
@@ -57,15 +34,12 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     if (ctx == NULL)
         return;
 
-    if (ctx->btf_metadata.btf)
-        btf__free(ctx->btf_metadata.btf);
-    ctx->btf_metadata.btf = NULL;
+    free_btf(&ctx->btf_metadata);
 
-    close_object_fd(&(ctx->table_fd));
-    close_object_fd(&(ctx->prefixes_fd));
-    close_object_fd(&(ctx->tuple_map_fd));
-    close_object_fd(&(ctx->btf_metadata.associated_prog));
-    close_object_fd(&(ctx->cache_fd));
+    close_object_fd(&(ctx->table.fd));
+    close_object_fd(&(ctx->prefixes.fd));
+    close_object_fd(&(ctx->tuple_map.fd));
+    close_object_fd(&(ctx->cache.fd));
 }
 
 static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, const char *base_path)
@@ -74,25 +48,22 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, c
     char derived_name[256];
 
     snprintf(derived_name, sizeof(derived_name), "%s_prefixes", name);
-    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &(ctx->prefixes_fd), &(ctx->prefixes_key_size),
-                       &(ctx->prefixes_value_size), NULL, &(ctx->prefixes_btf_type_id), NULL);
+    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &ctx->prefixes);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuples_map", name);
-    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &(ctx->tuple_map_fd), &(ctx->tuple_map_key_size),
-                       &(ctx->tuple_map_value_size), NULL, NULL, NULL);
+    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &ctx->tuple_map);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuple", name);
-    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
-                       &(ctx->table_type), &(ctx->btf_type_id), &(ctx->tuple_max_entries));
-    close_object_fd(&(ctx->table_fd));  /* We need only metadata from this map */
+    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &ctx->table);
+    close_object_fd(&(ctx->table.fd));  /* We need only metadata from this map */
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
@@ -106,19 +77,16 @@ static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, c
 int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
 {
     if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
-        return EPERM;
+        return EINVAL;
 
     char base_path[256];
-    snprintf(base_path, sizeof(base_path), "%s/%s%u/maps",
-             BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx));
-    snprintf(ctx->base_name, sizeof(ctx->base_name), "%s", name);
+    build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx);
 
     /* get the BTF, it is optional so print only warning */
     if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR)
         fprintf(stderr, "warning: couldn't find BTF info\n");
 
-    int ret = open_bpf_map(&ctx->btf_metadata, name, base_path, &(ctx->table_fd), &(ctx->key_size), &(ctx->value_size),
-                           &(ctx->table_type), &(ctx->btf_type_id), NULL);
+    int ret = open_bpf_map(&ctx->btf_metadata, name, base_path, &ctx->table);
 
     /* if map does not exist, try the ternary table */
     if (ret == ENOENT)
@@ -132,8 +100,7 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     /* open cache table, this is optional feature for table */
     char cache_name[256];
     snprintf(cache_name, sizeof(cache_name), "%s_cache", name);
-    ret = open_bpf_map(&ctx->btf_metadata, cache_name, base_path, &(ctx->cache_fd), &(ctx->cache_key_size),
-                       NULL, NULL, NULL, NULL);
+    ret = open_bpf_map(&ctx->btf_metadata, cache_name, base_path, &ctx->cache);
     if (ret != NO_ERROR) {
         fprintf(stderr, "warning: cache for table %s not found: %s\n", name, strerror(ret));
     }
@@ -143,6 +110,8 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
 
 void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx)
 {
+    if (ctx == NULL)
+        return;
     ctx->is_indirect = true;
 }
 
@@ -223,6 +192,16 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
     return NO_ERROR;
 }
 
+void move_action(psabpf_action_t *dst, psabpf_action_t *src) {
+    if (dst == NULL || src == NULL)
+        return;
+
+    /* stole action data from src */
+    memcpy(dst, src, sizeof(psabpf_action_t));
+    src->params = NULL;
+    src->n_params = 0;
+}
+
 void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act)
 {
     if (entry == NULL || act == NULL)
@@ -234,16 +213,14 @@ void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act
     entry->action = malloc(sizeof(psabpf_action_t));
     if (entry->action == NULL)
         return;
-    memcpy(entry->action, act, sizeof(psabpf_action_t));
-
-    /* stole action data */
-    act->params = NULL;
-    act->n_params = 0;
+    move_action(entry->action, act);
 }
 
 /* only for ternary */
 void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority)
 {
+    if (entry == NULL)
+        return;
     entry->priority = priority;
 }
 
@@ -279,8 +256,8 @@ void psabpf_matchkey_type(psabpf_match_key_t *mk, enum psabpf_matchkind_t type)
 
 int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
 {
-    if (mk == NULL)
-        return EFAULT;
+    if (mk == NULL || data == NULL)
+        return EINVAL;
     if (mk->data != NULL)
         return EEXIST;
 
@@ -297,7 +274,7 @@ int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
 int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
 {
     if (mk == NULL)
-        return ENODATA;
+        return EINVAL;
     if (mk->type != PSABPF_LPM)
         return EINVAL;
 
@@ -310,7 +287,7 @@ int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
 int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size)
 {
     if (mk == NULL || mask == NULL)
-        return ENODATA;
+        return EINVAL;
     if (mk->type != PSABPF_TERNARY)
         return EINVAL;
     if (mk->u.ternary.mask != NULL)
@@ -339,6 +316,9 @@ int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end)
 
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size)
 {
+    if (param == NULL || data == NULL)
+        return EINVAL;
+
     param->is_group_reference = false;
     param->len = size;
     if (size == 0) {
@@ -355,6 +335,8 @@ int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, s
 
 void psabpf_action_param_free(psabpf_action_param_t *param)
 {
+    if (param == NULL)
+        return;
     if (param->data != NULL)
         free(param->data);
     param->data = NULL;
@@ -362,6 +344,8 @@ void psabpf_action_param_free(psabpf_action_param_t *param)
 
 void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param)
 {
+    if (param == NULL)
+        return;
     param->is_group_reference = true;
 }
 
@@ -458,13 +442,13 @@ static int write_buffer_btf(char * buffer, size_t buffer_len, size_t offset,
 
 static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    size_t bytes_to_write = ctx->key_size;
+    size_t bytes_to_write = ctx->table.key_size;
     uint32_t *lpm_prefix = NULL;
 
-    if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE) {
+    if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
         const size_t prefix_size = 4;
         lpm_prefix = (uint32_t *) buffer;
-        if (ctx->key_size < prefix_size) {
+        if (ctx->table.key_size < prefix_size) {
             fprintf(stderr, "key size for LPM key is lower than prefix size (4B). BUG???\n");
             return EPERM;
         }
@@ -479,7 +463,7 @@ static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, p
             return EPERM;
         }
 
-        if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
+        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
             /* copy data in network byte order (in reverse order) */
             for (size_t k = 0; k < mk->key_size; ++k)
                 buffer[k] = ((char *) (mk->data))[mk->key_size - k - 1];
@@ -488,7 +472,7 @@ static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, p
         }
 
         /* write prefix length */
-        if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
+        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
             *lpm_prefix = (buffer - ((char *) lpm_prefix) - 4) * 8 + mk->u.lpm.prefix_len;
         }
 
@@ -523,7 +507,7 @@ static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_t
 
 static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->btf_type_id, "key");
+    uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "key");
     if (key_type_id == 0)
         return EAGAIN;
     const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, key_type_id);
@@ -535,7 +519,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
             fprintf(stderr, "expected 1 key\n");
             return EAGAIN;
         }
-        if (entry->match_keys[0]->key_size > ctx->key_size) {
+        if (entry->match_keys[0]->key_size > ctx->table.key_size) {
             fprintf(stderr, "too much data in key\n");
             return EPERM;  /* byte by byte mode will not fix this */
         }
@@ -545,7 +529,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
         int entries = btf_vlen(key_type);
         int expected_entries = entries;
 
-        if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE)
+        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE)
             --expected_entries;  /* omit prefix length */
         if (is_table_dummy_key(ctx, key_type, key_type_id)) {
             /* Preserve zeroed bytes if table do not define key */
@@ -558,7 +542,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
         }
 
         for (int member_idx = 0, key_idx = 0; member_idx < entries; member_idx++, member++) {
-            if (member_idx == 0 && ctx->table_type == BPF_MAP_TYPE_LPM_TRIE)
+            if (member_idx == 0 && ctx->table.type == BPF_MAP_TYPE_LPM_TRIE)
                 continue;  /* skip prefix length */
 
             /* assume that every field is byte aligned */
@@ -566,20 +550,20 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
             psabpf_match_key_t *mk = entry->match_keys[key_idx];
             int ret = 0, flags = WRITE_HOST_ORDER;
 
-            if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM)
+            if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM)
                 flags = WRITE_NETWORK_ORDER;
-            ret = write_buffer_btf(buffer, ctx->key_size, offset, mk->data, mk->key_size,
+            ret = write_buffer_btf(buffer, ctx->table.key_size, offset, mk->data, mk->key_size,
                                    ctx, member->type, "key", flags);
             if (ret != NO_ERROR)
                 return ret;
 
             /* write prefix value for LPM field */
-            if (ctx->table_type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
+            if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
                 uint32_t prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
                 psabtf_struct_member_md_t prefix_md;
                 if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, key_type_id, 0, &prefix_md) != NO_ERROR)
                     return EAGAIN;
-                ret = write_buffer_btf(buffer, ctx->key_size, prefix_md.bit_offset / 8,
+                ret = write_buffer_btf(buffer, ctx->table.key_size, prefix_md.bit_offset / 8,
                                        &prefix_value, sizeof(prefix_value), ctx,
                                        prefix_md.effective_type_id, "prefix", WRITE_HOST_ORDER);
                 if (ret != NO_ERROR)
@@ -598,7 +582,7 @@ static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
 
 static int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    size_t bytes_to_write = ctx->value_size;
+    size_t bytes_to_write = ctx->table.value_size;
 
     /* write action ID */
     if (ctx->is_indirect == false) {
@@ -653,7 +637,7 @@ static int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
         fprintf(stderr, "action id entry not found\n");
         return EAGAIN;  /* Allow fallback to byte by byte mode */
     }
-    return write_buffer_btf(buffer, ctx->value_size, action_md.bit_offset / 8,
+    return write_buffer_btf(buffer, ctx->table.value_size, action_md.bit_offset / 8,
                             &(entry->action->action_id), sizeof(entry->action->action_id),
                             ctx, action_md.effective_type_id, "action id", WRITE_HOST_ORDER);
 }
@@ -669,7 +653,7 @@ static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_ta
         fprintf(stderr, "priority entry not found\n");
         return ENOENT;
     }
-    return write_buffer_btf(buffer, ctx->value_size, priority_md.bit_offset / 8,
+    return write_buffer_btf(buffer, ctx->table.value_size, priority_md.bit_offset / 8,
                             &(entry->priority), sizeof(entry->priority),
                             ctx, priority_md.effective_type_id, "priority", WRITE_HOST_ORDER);
 }
@@ -710,7 +694,7 @@ static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf
     const struct btf_member *member = btf_members(data_type);
     for (int i = 0; i < entries; i++, member++) {
         offset = btf_member_bit_offset(data_type, i) / 8;
-        ret = write_buffer_btf(buffer, ctx->value_size, base_offset + offset,
+        ret = write_buffer_btf(buffer, ctx->table.value_size, base_offset + offset,
                                entry->action->params[i].data, entry->action->params[i].len,
                                ctx, member->type, "value", WRITE_HOST_ORDER);
         if (ret != NO_ERROR)
@@ -745,7 +729,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, 
 
         if (str_ends_with(member_name, "_is_group_ref")) {
             offset = btf_member_bit_offset(value_type, i) / 8;
-            ret = write_buffer_btf(buffer, ctx->value_size, offset,
+            ret = write_buffer_btf(buffer, ctx->table.value_size, offset,
                                    &(current_data->is_group_reference),
                                    sizeof(current_data->is_group_reference),
                                    ctx, member->type, "reference type", WRITE_HOST_ORDER);
@@ -763,7 +747,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx, 
         }
         /* now we can write reference, hurrah!!! */
         offset = btf_member_bit_offset(value_type, i) / 8;
-        ret = write_buffer_btf(buffer, ctx->value_size, offset, current_data->data,
+        ret = write_buffer_btf(buffer, ctx->table.value_size, offset, current_data->data,
                                current_data->len, ctx, member->type, "reference", WRITE_HOST_ORDER);
         if (ret != NO_ERROR)
             return ret;
@@ -784,7 +768,7 @@ static int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psa
     size_t offset, base_offset;
     int ret;
 
-    uint32_t value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->btf_type_id, "value");
+    uint32_t value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value");
     if (value_type_id == 0)
         return EAGAIN;
     const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_type_id);
@@ -840,7 +824,7 @@ static int lpm_prefix_to_mask(char * buffer, size_t buffer_len, uint32_t prefix,
 
 static int fill_key_mask_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    size_t bytes_to_write = ctx->prefixes_key_size;
+    size_t bytes_to_write = ctx->prefixes.key_size;
     for (size_t i = 0; i < entry->n_keys; i++) {
         psabpf_match_key_t *mk = entry->match_keys[i];
         size_t data_len = 0;
@@ -885,7 +869,7 @@ static int fill_key_mask_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *c
 static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     /* Use key type to generate mask */
-    uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->btf_type_id, "key");
+    uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "key");
     if (key_type_id == 0)
         return EAGAIN;
 
@@ -903,7 +887,7 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
     }
 
     /* Prepare temporary mask buffer for current field. Every field size <= key_size */
-    char * tmp_mask = malloc(ctx->key_size);
+    char * tmp_mask = malloc(ctx->table.key_size);
     if (tmp_mask == NULL)
         return ENOMEM;
 
@@ -914,12 +898,12 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
         size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
 
         ret = EAGAIN;
-        memset(tmp_mask, 0, ctx->key_size);
+        memset(tmp_mask, 0, ctx->table.key_size);
         if (mk->type == PSABPF_EXACT) {
-            if (size > ctx->key_size)
+            if (size > ctx->table.key_size)
                 break;
             memset(tmp_mask, 0xFF, size);
-            ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, tmp_mask, size,
+            ret = write_buffer_btf(buffer, ctx->prefixes.key_size, offset, tmp_mask, size,
                                    ctx, member->type, "exact mask key", WRITE_HOST_ORDER);
         } else if (mk->type == PSABPF_LPM) {
             ret = lpm_prefix_to_mask(tmp_mask, size, mk->u.lpm.prefix_len, size);
@@ -927,10 +911,10 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
                 ret = EAGAIN;
                 break;
             }
-            ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, tmp_mask, size,
+            ret = write_buffer_btf(buffer, ctx->prefixes.key_size, offset, tmp_mask, size,
                                    ctx, member->type, "lpm mask key", WRITE_HOST_ORDER);
         } else if (mk->type == PSABPF_TERNARY) {
-            ret = write_buffer_btf(buffer, ctx->prefixes_key_size, offset, mk->u.ternary.mask,
+            ret = write_buffer_btf(buffer, ctx->prefixes.key_size, offset, mk->u.ternary.mask,
                                    mk->u.ternary.mask_size, ctx, member->type, "ternary mask key", WRITE_HOST_ORDER);
         } else {
             fprintf(stderr, "unsupported key mask type\n");
@@ -952,7 +936,7 @@ static int construct_buffer(char * buffer, size_t buffer_len,
 {
     /* When BTF info mode fails we can fallback to byte by byte mode */
     int return_code = EAGAIN;
-    if (ctx->btf_metadata.btf != NULL && ctx->btf_type_id != 0) {
+    if (ctx->btf_metadata.btf != NULL && ctx->table.btf_type_id != 0) {
         memset(buffer, 0, buffer_len);
         return_code = btf_info_func(buffer, ctx, entry);
         if (return_code == EAGAIN)
@@ -995,13 +979,13 @@ static bool member_is_counter(psabpf_table_entry_ctx_t *ctx, const struct btf_me
 static int handle_counters(const char *key, char *value_buffer,
                            psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    if (ctx->is_indirect || ctx->btf_metadata.btf == NULL || ctx->btf_type_id == 0) {
+    if (ctx->is_indirect || ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0) {
         fprintf(stderr, "unable to handle counters; resetting them to 0 if exist\n");
         return NO_ERROR;
     }
 
     psabtf_struct_member_md_t value_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->btf_type_id, "value", &value_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value", &value_md) != NO_ERROR)
         return ENOENT;
 
     const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_md.effective_type_id);
@@ -1026,10 +1010,10 @@ static int handle_counters(const char *key, char *value_buffer,
         return NO_ERROR;
 
     /* Read current counters value */
-    char * reference_buffer = malloc(ctx->value_size);
+    char * reference_buffer = malloc(ctx->table.value_size);
     if (reference_buffer == NULL)
         return ENOMEM;
-    int err = bpf_map_lookup_elem(ctx->table_fd, key, reference_buffer);
+    int err = bpf_map_lookup_elem(ctx->table.fd, key, reference_buffer);
     if (err != 0) {
         fprintf(stderr, "entry with counters not found\n");
         goto clean_up;
@@ -1043,9 +1027,9 @@ static int handle_counters(const char *key, char *value_buffer,
 
         size_t offset = btf_member_bit_offset(value_type, i) / 8;
         size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
-        if (offset + size > ctx->value_size) {
+        if (offset + size > ctx->table.value_size) {
             fprintf(stderr, "can't write counter at offset %zu and size %zu (entry size %u)\n",
-                    offset, size, ctx->value_size);
+                    offset, size, ctx->table.value_size);
             err = EPERM;
             goto clean_up;
         }
@@ -1071,17 +1055,17 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
     psabtf_struct_member_md_t member;
 
     md->tuple_id_size = sizeof(uint32_t);
-    md->next_mask_size = ctx->key_size;
+    md->next_mask_size = ctx->table.key_size;
     md->has_next_size = sizeof(uint8_t);
     /* Lets guess offsets (they will be fixed with BTF if available) */
     md->tuple_id_offset = 0;  /* at the beginning of the structure */
-    md->next_mask_offset = ctx->key_size > 4 ? 8 : 4;  /* after tuple_id field */
+    md->next_mask_offset = ctx->table.key_size > 4 ? 8 : 4;  /* after tuple_id field */
     md->has_next_offset = md->next_mask_offset + md->next_mask_size;  /* after next_mask field */
 
-    if (ctx->btf_metadata.btf == NULL || ctx->prefixes_btf_type_id == 0)
+    if (ctx->btf_metadata.btf == NULL || ctx->prefixes.btf_type_id == 0)
         return NO_ERROR;
 
-    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->prefixes_btf_type_id, "value");
+    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->prefixes.btf_type_id, "value");
     if (type_id == 0)
         return EPERM;
 
@@ -1104,10 +1088,10 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
     md->has_next_offset = member.bit_offset / 8;
 
     /* validate size and offset */
-    if (md->tuple_id_offset + md->tuple_id_size > ctx->prefixes_value_size ||
-        md->next_mask_offset + md->next_mask_size > ctx->prefixes_value_size ||
-        md->has_next_offset + md->has_next_size > ctx->prefixes_value_size ||
-        md->next_mask_size != ctx->key_size) {
+    if (md->tuple_id_offset + md->tuple_id_size > ctx->prefixes.value_size ||
+        md->next_mask_offset + md->next_mask_size > ctx->prefixes.value_size ||
+        md->has_next_offset + md->has_next_size > ctx->prefixes.value_size ||
+        md->next_mask_size != ctx->table.key_size) {
         fprintf(stderr, "BUG: invalid size or offset in the mask\n");
         return EPERM;
     }
@@ -1127,8 +1111,8 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
         return EPERM;
     }
 
-    char *key = malloc(ctx->prefixes_key_size);
-    char *value = malloc(ctx->prefixes_value_size);
+    char *key = malloc(ctx->prefixes.key_size);
+    char *value = malloc(ctx->prefixes.value_size);
     if (key == NULL || value == NULL) {
         fprintf(stderr, "not enough memory\n");
         err = ENOMEM;
@@ -1136,11 +1120,11 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
     }
 
     /* Process head */
-    memset(key, 0, ctx->prefixes_key_size);
-    err = bpf_map_lookup_elem(ctx->prefixes_fd, key, value);
+    memset(key, 0, ctx->prefixes.key_size);
+    err = bpf_map_lookup_elem(ctx->prefixes.fd, key, value);
     if (err != 0) {
         /* Construct head, it will be added later */
-        memset(value, 0, ctx->prefixes_value_size);
+        memset(value, 0, ctx->prefixes.value_size);
         *((uint32_t *) (value + prefix_md.tuple_id_offset)) = tuple_id;
     }
 
@@ -1152,7 +1136,7 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
 
         /* Get next prefix */
         memcpy(key, value + prefix_md.next_mask_offset, prefix_md.next_mask_size);
-        err = bpf_map_lookup_elem(ctx->prefixes_fd, key, value);
+        err = bpf_map_lookup_elem(ctx->prefixes.fd, key, value);
         if (err != 0) {
             err = errno;
             fprintf(stderr, "detected data inconsistency in prefixes, aborting\n");
@@ -1166,16 +1150,16 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
     }
 
     /* First add new prefix to avoid data inconsistency */
-    memset(prefix_value, 0, ctx->prefixes_value_size);
+    memset(prefix_value, 0, ctx->prefixes.value_size);
     *((uint32_t *) (prefix_value + prefix_md.tuple_id_offset)) = ++tuple_id;
-    err = bpf_map_update_elem(ctx->prefixes_fd, new_prefix, prefix_value, BPF_NOEXIST);
+    err = bpf_map_update_elem(ctx->prefixes.fd, new_prefix, prefix_value, BPF_NOEXIST);
     if (err != 0)
         goto clean_up;
 
     /* Update previous node */
     memcpy(value + prefix_md.next_mask_offset, new_prefix, prefix_md.next_mask_size);
     *((uint8_t *) (value + prefix_md.has_next_offset)) = 1;
-    err = bpf_map_update_elem(ctx->prefixes_fd, key, value, BPF_ANY);
+    err = bpf_map_update_elem(ctx->prefixes.fd, key, value, BPF_ANY);
     if (err != 0)
         goto clean_up;
 
@@ -1193,29 +1177,26 @@ clean_up:
 static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const uint32_t tuple_id)
 {
     int err;
-    char map_name[264];
-    snprintf(map_name, sizeof(map_name), "%s_tuple_%u", ctx->base_name, tuple_id);
 
     struct bpf_create_map_attr attr = {
-            .key_size = ctx->key_size,
-            .value_size = ctx->value_size,
-            .max_entries = ctx->tuple_max_entries,
-            .map_type = ctx->table_type,
-            .name = map_name,
+            .key_size = ctx->table.key_size,
+            .value_size = ctx->table.value_size,
+            .max_entries = ctx->table.max_entries,
+            .map_type = ctx->table.type,
     };
-    ctx->table_fd = bpf_create_map_xattr(&attr);
-    if (ctx->table_fd < 0) {
+    ctx->table.fd = bpf_create_map_xattr(&attr);
+    if (ctx->table.fd < 0) {
         err = errno;
         fprintf(stderr, "failed to create tuple %u: %s\n", tuple_id, strerror(err));
         return err;
     }
 
     /* add tuple to tuples map */
-    err = bpf_map_update_elem(ctx->tuple_map_fd, &tuple_id, &(ctx->table_fd), 0);
+    err = bpf_map_update_elem(ctx->tuple_map.fd, &tuple_id, &(ctx->table.fd), 0);
     if (err != 0) {
         err = errno;
         fprintf(stderr, "failed to add tuple %u: %s\n", tuple_id, strerror(err));
-        close_object_fd(&(ctx->table_fd));
+        close_object_fd(&(ctx->table.fd));
     }
 
     return err;
@@ -1224,39 +1205,39 @@ static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const
 static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
                                     char **key_mask, uint64_t bpf_flags)
 {
-    if (ctx->prefixes_fd < 0 || ctx->tuple_map_fd < 0 || ctx->table_fd >= 0) {
+    if (ctx->prefixes.fd < 0 || ctx->tuple_map.fd < 0 || ctx->table.fd >= 0) {
         fprintf(stderr, "ternary table not properly opened. BUG?\n");
         return EINVAL;
     }
-    if (ctx->key_size != ctx->prefixes_key_size) {
+    if (ctx->table.key_size != ctx->prefixes.key_size) {
         fprintf(stderr, "key and its mask have different length. BUG?\n");
         return EINVAL;
     }
-    if (ctx->tuple_map_key_size != 4 || ctx->tuple_map_value_size != 4) {
+    if (ctx->tuple_map.key_size != 4 || ctx->tuple_map.value_size != 4) {
         fprintf(stderr, "key/value size of tuples map have to be 4B.\n");
         return EINVAL;
     }
 
     int err = NO_ERROR;
-    char *value_mask = malloc(ctx->prefixes_value_size);
-    *key_mask = malloc(ctx->prefixes_key_size);
+    char *value_mask = malloc(ctx->prefixes.value_size);
+    *key_mask = malloc(ctx->prefixes.key_size);
 
     if (*key_mask == NULL || value_mask == NULL) {
         fprintf(stderr, "not enough memory\n");
         err = ENOMEM;
         goto clean_up;
     }
-    memset(*key_mask, 0, ctx->prefixes_key_size);
-    memset(value_mask, 0, ctx->prefixes_value_size);
+    memset(*key_mask, 0, ctx->prefixes.key_size);
+    memset(value_mask, 0, ctx->prefixes.value_size);
 
-    err = construct_buffer(*key_mask, ctx->prefixes_key_size, ctx, entry,
+    err = construct_buffer(*key_mask, ctx->prefixes.key_size, ctx, entry,
                            fill_key_mask_btf, fill_key_mask_byte_by_byte);
     if (err != NO_ERROR)
         goto clean_up;
 
     /* prefixes head protection - check whether mask is different from all 0 */
     bool mask_is_valid = false;
-    for (int i = 0; i < ctx->prefixes_key_size; i++) {
+    for (int i = 0; i < ctx->prefixes.key_size; i++) {
         if ((*key_mask)[i] != 0) {
             mask_is_valid = true;
             break;
@@ -1268,7 +1249,7 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         goto clean_up;
     }
 
-    err = bpf_map_lookup_elem(ctx->prefixes_fd, *key_mask, value_mask);
+    err = bpf_map_lookup_elem(ctx->prefixes.fd, *key_mask, value_mask);
     /* It is not allowed to add new prefix when updating existing entry */
     if (err != 0 && bpf_flags != BPF_EXIST) {
         err = add_ternary_table_prefix(*key_mask, value_mask, ctx, bpf_flags);
@@ -1291,9 +1272,9 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     uint32_t tuple_id = *((uint32_t *) (value_mask + prefix_md.tuple_id_offset));
     uint32_t inner_map_id;
 
-    err = bpf_map_lookup_elem(ctx->tuple_map_fd, &tuple_id, &inner_map_id);
+    err = bpf_map_lookup_elem(ctx->tuple_map.fd, &tuple_id, &inner_map_id);
     if (err == 0) {
-        ctx->table_fd = bpf_map_get_fd_by_id(inner_map_id);
+        ctx->table.fd = bpf_map_get_fd_by_id(inner_map_id);
         err = NO_ERROR;
     } else {
         if (bpf_flags == BPF_EXIST) {
@@ -1315,7 +1296,7 @@ static void post_ternary_table_write(psabpf_table_entry_ctx_t *ctx)
 {
     /* Allow for reuse table context with the same table but other tuple (inner map). */
     if (ctx->is_ternary)
-        close_object_fd(&(ctx->table_fd));
+        close_object_fd(&(ctx->table.fd));
 }
 
 static int delete_all_table_entries(int fd, size_t key_size)
@@ -1340,13 +1321,13 @@ static int delete_all_table_entries(int fd, size_t key_size)
         next_key = key;
         key = tmp_key;
 
-        /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exists
+        /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exist
          * but entry not exists (e.g. array map in map). So in any case we have to
-         * iterate over all keys and try delete it. */
+         * iterate over all keys and try to delete it. */
         bpf_map_delete_elem(fd, key);
     } while (bpf_map_get_next_key(fd, key, next_key) == 0);
 
-    clean_up:
+clean_up:
     if (key)
         free(key);
     if (next_key)
@@ -1354,21 +1335,24 @@ static int delete_all_table_entries(int fd, size_t key_size)
     return error_code;
 }
 
-static int clear_table_cache(psabpf_table_entry_ctx_t *ctx)
+int clear_table_cache(psabpf_bpf_map_descriptor_t *map)
 {
-    if (ctx->cache_fd < 0)
+    if (map == NULL || map->fd < 0)
         return NO_ERROR;
 
     fprintf(stderr, "clearing table cache: ");
-    return delete_all_table_entries(ctx->cache_fd, ctx->cache_key_size);
+    return delete_all_table_entries(map->fd, map->key_size);
 }
 
-int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
+static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
     char *key_buffer = NULL;
     char *key_mask_buffer = NULL;
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
+
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
 
     if (ctx->is_ternary) {
         return_code = ternary_table_open_tuple(ctx, entry, &key_mask_buffer, bpf_flags);
@@ -1376,11 +1360,11 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
             goto clean_up;
     }
 
-    if (ctx->table_fd < 0) {
+    if (ctx->table.fd < 0) {
         fprintf(stderr, "can't add entry: table not opened\n");
         return EBADF;
     }
-    if (ctx->key_size == 0 || ctx->value_size == 0) {
+    if (ctx->table.key_size == 0 || ctx->table.value_size == 0) {
         fprintf(stderr, "zero-size key or value is not supported\n");
         return ENOTSUP;
     }
@@ -1390,22 +1374,22 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     }
 
     /* prepare buffers for map key/value */
-    key_buffer = malloc(ctx->key_size);
-    value_buffer = malloc(ctx->value_size);
+    key_buffer = malloc(ctx->table.key_size);
+    value_buffer = malloc(ctx->table.value_size);
     if (key_buffer == NULL || value_buffer == NULL) {
         fprintf(stderr, "not enough memory\n");
         return_code = ENOMEM;
         goto clean_up;
     }
 
-    return_code = construct_buffer(key_buffer, ctx->key_size, ctx, entry,
+    return_code = construct_buffer(key_buffer, ctx->table.key_size, ctx, entry,
                                    fill_key_btf_info, fill_key_byte_by_byte);
     if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to construct key\n");
         goto clean_up;
     }
 
-    return_code = construct_buffer(value_buffer, ctx->value_size, ctx, entry,
+    return_code = construct_buffer(value_buffer, ctx->table.value_size, ctx, entry,
                                    fill_value_btf_info, fill_value_byte_by_byte);
     if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to construct value\n");
@@ -1413,7 +1397,7 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     }
 
     if (ctx->is_ternary == true && key_mask_buffer != NULL)
-        mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->key_size);
+        mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->table.key_size);
 
     /* Handle direct objects */
     if (bpf_flags == BPF_EXIST) {
@@ -1425,14 +1409,14 @@ int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     }
 
     /* update map */
-    if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
+    if (ctx->table.type == BPF_MAP_TYPE_ARRAY)
         bpf_flags = BPF_ANY;
-    return_code = bpf_map_update_elem(ctx->table_fd, key_buffer, value_buffer, bpf_flags);
+    return_code = bpf_map_update_elem(ctx->table.fd, key_buffer, value_buffer, bpf_flags);
     if (return_code != 0) {
         return_code = errno;
         fprintf(stderr, "failed to set up entry: %s\n", strerror(errno));
     } else {
-        return_code = clear_table_cache(ctx);
+        return_code = clear_table_cache(&ctx->cache);
         if (return_code != NO_ERROR) {
             fprintf(stderr, "failed to clear cache: %s\n", strerror(return_code));
         }
@@ -1467,9 +1451,9 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     if (entry->n_keys != 0)
         return ternary_table_open_tuple(ctx, entry, key_mask, BPF_EXIST);
 
-    delete_all_table_entries(ctx->prefixes_fd, ctx->prefixes_key_size);
+    delete_all_table_entries(ctx->prefixes.fd, ctx->prefixes.key_size);
     fprintf(stderr, "removing entries from tuples_map, this may take a while\n");
-    delete_all_table_entries(ctx->tuple_map_fd, ctx->tuple_map_key_size);
+    delete_all_table_entries(ctx->tuple_map.fd, ctx->tuple_map.key_size);
 
     /* Unpinning inner maps for our table is not required
      * because they are not pinned by this tool. */
@@ -1480,9 +1464,9 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
 static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *key_mask)
 {
     int err = NO_ERROR;
-    char *prev_key_mask = malloc(ctx->prefixes_key_size);
-    char *prev_value_mask = malloc(ctx->prefixes_value_size);
-    char *value_mask = malloc(ctx->prefixes_value_size);
+    char *prev_key_mask = malloc(ctx->prefixes.key_size);
+    char *prev_value_mask = malloc(ctx->prefixes.value_size);
+    char *value_mask = malloc(ctx->prefixes.value_size);
 
     if (prev_key_mask == NULL || prev_value_mask == NULL || value_mask == NULL) {
         fprintf(stderr, "not enough memory\n");
@@ -1490,7 +1474,7 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
         goto clean_up;
     }
 
-    if (bpf_map_lookup_elem(ctx->prefixes_fd, key_mask, value_mask) != 0) {
+    if (bpf_map_lookup_elem(ctx->prefixes.fd, key_mask, value_mask) != 0) {
         err = errno;
         fprintf(stderr, "unable to obtain prefix: %s\n", strerror(err));
         goto clean_up;
@@ -1504,8 +1488,8 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
 
     /* find previous prefix */
     bool prev_prefix_found = false;
-    memset(prev_key_mask, 0, ctx->prefixes_key_size);
-    err = bpf_map_lookup_elem(ctx->prefixes_fd, prev_key_mask, prev_value_mask);
+    memset(prev_key_mask, 0, ctx->prefixes.key_size);
+    err = bpf_map_lookup_elem(ctx->prefixes.fd, prev_key_mask, prev_value_mask);
     if (err != 0) {
         err = errno;
         fprintf(stderr, "head not found: %s\n", strerror(err));
@@ -1524,7 +1508,7 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
         if (has_next == 0)
             break;
         memcpy(prev_key_mask, prev_value_mask + prefix_md.next_mask_offset, prefix_md.next_mask_size);
-        if (bpf_map_lookup_elem(ctx->prefixes_fd, prev_key_mask, prev_value_mask) != 0)
+        if (bpf_map_lookup_elem(ctx->prefixes.fd, prev_key_mask, prev_value_mask) != 0)
             break;
     }
 
@@ -1537,7 +1521,7 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
         memcpy(prev_value_mask + prefix_md.has_next_offset,
                value_mask + prefix_md.has_next_offset, prefix_md.has_next_size);
 
-        err = bpf_map_update_elem(ctx->prefixes_fd, prev_key_mask, prev_value_mask, BPF_EXIST);
+        err = bpf_map_update_elem(ctx->prefixes.fd, prev_key_mask, prev_value_mask, BPF_EXIST);
         if (err != 0) {
             err = errno;
             fprintf(stderr, "failed to update previous prefix: %s\n", strerror(err));
@@ -1546,12 +1530,12 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, psabpf_tab
     }
 
     /* there are no prefixes that points to removing prefix, so it can be safely removed now */
-    if (bpf_map_delete_elem(ctx->prefixes_fd, key_mask) != 0)
+    if (bpf_map_delete_elem(ctx->prefixes.fd, key_mask) != 0)
         fprintf(stderr, "warning: failed to remove prefix from prefixes list\n");
 
     /* also remove tuple from tuple_map */
     uint32_t tuple_id = *((uint32_t *) (value_mask + prefix_md.tuple_id_offset));
-    if (bpf_map_delete_elem(ctx->tuple_map_fd, &tuple_id) != 0)
+    if (bpf_map_delete_elem(ctx->tuple_map.fd, &tuple_id) != 0)
         fprintf(stderr, "warning: failed to remove tuple from tuples_map\n");
 
     /* unpinning not required - inner map is not pinned by this tool*/
@@ -1571,13 +1555,13 @@ clean_up:
 
 static int post_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *key_mask)
 {
-    if (ctx->is_ternary == false || ctx->table_fd < 0)
+    if (ctx->is_ternary == false || ctx->table.fd < 0)
         return NO_ERROR;
     if (key_mask == NULL)
         return ENODATA;
 
     int err = NO_ERROR;
-    char *tuple_next_key = malloc(ctx->key_size);
+    char *tuple_next_key = malloc(ctx->table.key_size);
 
     if (tuple_next_key == NULL) {
         fprintf(stderr, "not enough memory\n");
@@ -1585,7 +1569,7 @@ static int post_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_table
         goto clean_up;
     }
 
-    if (bpf_map_get_next_key(ctx->table_fd, NULL, tuple_next_key) != 0) {
+    if (bpf_map_get_next_key(ctx->table.fd, NULL, tuple_next_key) != 0) {
         err = ternary_table_remove_prefix(ctx, entry, key_mask);
     }
 
@@ -1593,7 +1577,7 @@ clean_up:
     if (tuple_next_key != NULL)
         free(tuple_next_key);
 
-    close_object_fd(&(ctx->table_fd));
+    close_object_fd(&(ctx->table.fd));
     return err;
 }
 
@@ -1602,6 +1586,9 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     char *key_buffer = NULL;
     char *key_mask_buffer = NULL;
     int return_code = NO_ERROR;
+
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
 
     if (ctx->is_ternary) {
         return_code = prepare_ternary_table_delete(ctx, entry, &key_mask_buffer);
@@ -1613,22 +1600,22 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
             goto clean_up;
     }
 
-    if (ctx->table_fd < 0) {
+    if (ctx->table.fd < 0) {
         fprintf(stderr, "can't delete entry: table not opened\n");
         return EBADF;
     }
-    if (ctx->key_size == 0) {
+    if (ctx->table.key_size == 0) {
         fprintf(stderr, "zero-size key is not supported\n");
         return ENOTSUP;
     }
 
     /* remove all entries from table if key is not present */
     if (entry->n_keys == 0) {
-        if (ctx->table_type == BPF_MAP_TYPE_ARRAY)
+        if (ctx->table.type == BPF_MAP_TYPE_ARRAY)
             fprintf(stderr, "removing entries from array map may take a while\n");
-        return_code = delete_all_table_entries(ctx->table_fd, ctx->key_size);
+        return_code = delete_all_table_entries(ctx->table.fd, ctx->table.key_size);
         if (return_code == NO_ERROR) {
-            return_code = clear_table_cache(ctx);
+            return_code = clear_table_cache(&ctx->cache);
             if (return_code != NO_ERROR) {
                 fprintf(stderr, "failed to clear table cache: %s\n", strerror(return_code));
             }
@@ -1637,14 +1624,14 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     }
 
     /* prepare buffers for map key */
-    key_buffer = malloc(ctx->key_size);
+    key_buffer = malloc(ctx->table.key_size);
     if (key_buffer == NULL) {
         fprintf(stderr, "not enough memory\n");
         return_code = ENOMEM;
         goto clean_up;
     }
 
-    return_code = construct_buffer(key_buffer, ctx->key_size, ctx, entry,
+    return_code = construct_buffer(key_buffer, ctx->table.key_size, ctx, entry,
                                    fill_key_btf_info, fill_key_byte_by_byte);
     if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to construct key\n");
@@ -1652,15 +1639,15 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     }
 
     if (ctx->is_ternary == true && key_mask_buffer != NULL)
-        mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->key_size);
+        mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->table.key_size);
 
     /* delete pointed entry */
-    return_code = bpf_map_delete_elem(ctx->table_fd, key_buffer);
+    return_code = bpf_map_delete_elem(ctx->table.fd, key_buffer);
     if (return_code != 0) {
         return_code = errno;
         fprintf(stderr, "failed to delete entry: %s\n", strerror(errno));
     } else {
-        return_code = clear_table_cache(ctx);
+        return_code = clear_table_cache(&ctx->cache);
         if (return_code != NO_ERROR) {
             fprintf(stderr, "failed to clear cache: %s\n", strerror(return_code));
         }

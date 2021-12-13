@@ -13,8 +13,8 @@
  * Command line parsing functions
  *****************************************************************************/
 
-int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
-                    psabpf_table_entry_ctx_t *ctx, bool can_be_last)
+static int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
+                           psabpf_table_entry_ctx_t *ctx, bool can_be_last)
 {
     if (is_keyword(**argv, "id")) {
         NEXT_ARGP_RET();
@@ -39,8 +39,8 @@ int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
     return NO_ERROR;
 }
 
-int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
-                       psabpf_action_t * action, bool * indirect_table)
+static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
+                              psabpf_action_t * action, bool * indirect_table)
 {
     *indirect_table = false;
 
@@ -64,7 +64,7 @@ int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
     return NO_ERROR;
 }
 
-int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
+static int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
     bool has_any_key = false;
     int error_code = EPERM;
@@ -142,8 +142,8 @@ int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
     return NO_ERROR;
 }
 
-int parse_action_data(int *argc, char ***argv,
-                      psabpf_action_t *action, bool indirect_table)
+static int parse_action_data(int *argc, char ***argv,
+                             psabpf_action_t *action, bool indirect_table)
 {
     if (!is_keyword(**argv, "data")) {
         if (indirect_table) {
@@ -183,7 +183,7 @@ int parse_action_data(int *argc, char ***argv,
     return NO_ERROR;
 }
 
-int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *entry)
+static int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
     if (!is_keyword(**argv, "priority"))
         return NO_ERROR;

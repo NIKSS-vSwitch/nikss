@@ -8,6 +8,7 @@
 
 #include "../include/psabpf.h"
 #include "btf.h"
+#include "common.h"
 
 uint32_t follow_typedefs(struct btf * btf, uint32_t type_id)
 {
@@ -235,40 +236,50 @@ int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
     return NO_ERROR;
 }
 
-int open_bpf_map(psabpf_btf_t *btf, const char *name, const char *base_path, int *fd, uint32_t *key_size,
-                 uint32_t *value_size, uint32_t *map_type, uint32_t *btf_type_id, uint32_t *max_entries)
+void free_btf(psabpf_btf_t *btf)
+{
+    if (btf == NULL)
+        return;
+
+    if (btf->btf)
+        btf__free(btf->btf);
+    btf->btf = NULL;
+    close_object_fd(&btf->associated_prog);
+}
+
+int open_bpf_map(psabpf_btf_t *btf, const char *name, const char *base_path, psabpf_bpf_map_descriptor_t *md)
 {
     char buffer[257];
     int errno_val;
 
+    if (md == NULL)
+        return EPERM;
+
     snprintf(buffer, sizeof(buffer), "%s/%s", base_path, name);
-    *fd = bpf_obj_get(buffer);
-    if (*fd < 0)
+    md->fd = bpf_obj_get(buffer);
+    if (md->fd < 0)
         return errno;
 
     /* get key/value size */
     struct bpf_map_info info = {};
     uint32_t len = sizeof(info);
-    errno_val = bpf_obj_get_info_by_fd(*fd, &info, &len);
+    errno_val = bpf_obj_get_info_by_fd(md->fd, &info, &len);
     if (errno_val) {
         errno_val = errno;
         fprintf(stderr, "can't get info for table %s: %s\n", name, strerror(errno_val));
         return errno_val;
     }
-    if (map_type != NULL)
-        *map_type = info.type;
-    if (key_size != NULL)
-        *key_size = info.key_size;
-    if (value_size != NULL)
-        *value_size = info.value_size;
-    if (max_entries != NULL)
-        *max_entries = info.max_entries;
+
+    md->type = info.type;
+    md->key_size = info.key_size;
+    md->value_size = info.value_size;
+    md->max_entries = info.max_entries;
 
     /* Find entry in BTF for our map */
-    if (btf != NULL && btf->btf != NULL && btf_type_id != NULL) {
+    if (btf != NULL && btf->btf != NULL) {
         snprintf(buffer, sizeof(buffer), ".maps.%s", name);
-        *btf_type_id = psabtf_get_type_id_by_name(btf->btf, buffer);
-        if (*btf_type_id == 0)
+        md->btf_type_id = psabtf_get_type_id_by_name(btf->btf, buffer);
+        if (md->btf_type_id == 0)
             fprintf(stderr, "can't get BTF info for %s\n", name);
     }
 
