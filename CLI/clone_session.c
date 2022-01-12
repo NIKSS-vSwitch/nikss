@@ -9,8 +9,6 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-#include "backends/ebpf/runtime/psa.h"
-
 #include "clone_session.h"
 #include "../include/psabpf.h"
 #include "../include/psabpf_clone_session.h"
@@ -23,7 +21,7 @@ struct list_key_t {
 typedef struct list_key_t elem_t;
 
 struct element {
-    struct clone_session_entry entry;
+    struct psabpf_clone_session_entry entry;
     elem_t next_id;
 } __attribute__((aligned(4)));
 
