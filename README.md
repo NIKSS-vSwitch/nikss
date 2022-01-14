@@ -5,7 +5,7 @@
 2. Get the code with submodules:
    ```shell
    git clone --recursive https://github.com/P4-Research/psabpf.git
-   cd libbpf
+   cd psabpf
    ```
 3. Build dependencies:
    ```shell
