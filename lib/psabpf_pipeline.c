@@ -9,6 +9,8 @@
 
 #include "../include/psabpf_pipeline.h"
 #include "../include/bpf_defs.h"
+#include "common.h"
+#include "btf.h"
 
 #define XDP_FLAGS_DRV_MODE		(1U << 2)
 
@@ -17,7 +19,7 @@
 	     (pos) != NULL;				\
 	     (pos) = bpf_program__next((pos), (obj)))
 
-static char *__bpf_program__pin_name(struct bpf_program *prog)
+static char *program_pin_name(struct bpf_program *prog)
 {
     char *name, *p;
 
@@ -36,75 +38,107 @@ static int do_initialize_maps(int prog_fd)
                              out, &size, &retval, &duration);
 }
 
-static int xdp_port_add(__u32 pipeline_id, char *intf)
+static int open_obj_by_name(psabpf_pipeline_id_t pipeline_id, const char *prog)
 {
-    struct bpf_devmap_val devmap_val;
     char pinned_file[256];
-    int ret;
-    int ig_prog_fd, eg_prog_fd, devmap_fd, jmpmap_fd;
+    snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s",
+             BPF_FS, PIPELINE_PREFIX, pipeline_id, prog);
 
-    int ifindex = if_nametoindex(intf);
-    if (!ifindex)
-        return EINVAL;
+    return bpf_obj_get(pinned_file);  // error in errno
+}
 
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
-             PIPELINE_PREFIX, pipeline_id, XDP_INGRESS_PROG);
-    ig_prog_fd = bpf_obj_get(pinned_file);
-    if (ig_prog_fd < 0) {
-        return -1;
-    }
-    memset(pinned_file, 0, sizeof(pinned_file));
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
-             PIPELINE_PREFIX, pipeline_id, XDP_EGRESS_PROG);
-    eg_prog_fd = bpf_obj_get(pinned_file);
+static int xdp_attach_prog_to_port(int *fd, psabpf_pipeline_id_t pipeline_id, int ifindex, const char *prog)
+{
+    *fd = open_obj_by_name(pipeline_id, prog);
+    if (*fd < 0)
+        return errno;  // from sys_call
 
     __u32 flags = XDP_FLAGS_DRV_MODE;
-    ret = bpf_set_link_xdp_fd(ifindex, ig_prog_fd, flags);
-    if (ret) {
-        return ret;
+    int ret = bpf_set_link_xdp_fd(ifindex, *fd, flags);
+    if (ret < 0) {
+        close_object_fd(fd);
+        return -ret;
     }
 
-    memset(pinned_file, 0, sizeof(pinned_file));
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
-             PIPELINE_PREFIX, pipeline_id, XDP_DEVMAP);
-    devmap_fd = bpf_obj_get(pinned_file);
-    if (devmap_fd < 0) {
-        return -1;
-    }
+    return NO_ERROR;
+}
+
+static int update_prog_devmap(psabpf_bpf_map_descriptor_t *devmap, int ifindex, const char *intf, int egress_prog_fd)
+{
+    struct bpf_devmap_val devmap_val;
+
     devmap_val.ifindex = ifindex;
     devmap_val.bpf_prog.fd = -1;
-    // install egress program only if it's found
-    if (eg_prog_fd >= 0) {
-        devmap_val.bpf_prog.fd = eg_prog_fd;
+
+    /* install egress program only if it's found */
+    if (egress_prog_fd >= 0) {
+        devmap_val.bpf_prog.fd = egress_prog_fd;
     }
-    if (ifindex > DEVMAP_SIZE) {
+    if (ifindex > (int) devmap->max_entries) {
         fprintf(stderr,
-            "Warning: the index(=%d) of the interface %s is higher than the DEVMAP size (=%d)\n"
-            "Applying modulo ... \n", ifindex, intf, DEVMAP_SIZE);
+                "Warning: the index(=%d) of the interface %s is higher than the DEVMAP size (=%d)\n"
+                "Applying modulo ... \n", ifindex, intf, devmap->max_entries);
     }
-    int index = ifindex % DEVMAP_SIZE;
-    ret = bpf_map_update_elem(devmap_fd, &index, &devmap_val, 0);
-    if (ret) {
+    int index = ifindex % ((int) devmap->max_entries);
+    int ret = bpf_map_update_elem(devmap->fd, &index, &devmap_val, 0);
+    if (ret)
+        return errno;
+
+    return NO_ERROR;
+}
+
+static int xdp_port_add(psabpf_pipeline_id_t pipeline_id, char *intf)
+{
+    int ret;
+    int ig_prog_fd, eg_prog_fd;
+
+    char base_map_path[256];
+    build_ebpf_map_path(base_map_path, sizeof(base_map_path), pipeline_id);
+
+    int ifindex = (int) if_nametoindex(intf);
+    if (!ifindex) {
+        return EINVAL;
+    }
+
+    /* TODO: Should we attach ingress pipeline at the end of whole procedure?
+     *  For short time packets will be served only in ingress but not in egress pipeline. */
+    ret = xdp_attach_prog_to_port(&ig_prog_fd, pipeline_id, ifindex, XDP_INGRESS_PROG);
+    if (ret != NO_ERROR)
+        return ret;
+    close_object_fd(&ig_prog_fd);
+
+    /* may not exist, ignore errors */
+    eg_prog_fd = open_obj_by_name(pipeline_id, XDP_EGRESS_PROG);
+
+    psabpf_bpf_map_descriptor_t devmap;
+    ret = open_bpf_map(NULL, XDP_DEVMAP, base_map_path, &devmap);
+    if (ret != NO_ERROR) {
+        close_object_fd(&eg_prog_fd);
         return ret;
     }
 
-    memset(pinned_file, 0, sizeof(pinned_file));
-    snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
-             PIPELINE_PREFIX, pipeline_id, XDP_EGRESS_PROG_OPTIMIZED);
-    eg_prog_fd = bpf_obj_get(pinned_file);
+    ret = update_prog_devmap(&devmap, ifindex, intf, eg_prog_fd);
+    close_object_fd(&eg_prog_fd);
+    close_object_fd(&devmap.fd);
+    if (ret != NO_ERROR) {
+        return ret;
+    }
+
+    eg_prog_fd = open_obj_by_name(pipeline_id, XDP_EGRESS_PROG_OPTIMIZED);
     if (eg_prog_fd >= 0) {
-        memset(pinned_file, 0, sizeof(pinned_file));
-        snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
-                 PIPELINE_PREFIX, pipeline_id, XDP_JUMP_TBL);
-        jmpmap_fd = bpf_obj_get(pinned_file);
-        if (jmpmap_fd < 0) {
-            return -1;
+        psabpf_bpf_map_descriptor_t jmpmap;
+        ret = open_bpf_map(NULL, XDP_JUMP_TBL, base_map_path, &jmpmap);
+        if (ret != NO_ERROR) {
+            close_object_fd(&eg_prog_fd);
+            return ENOENT;
         }
 
-        index = 0;
-        ret = bpf_map_update_elem(jmpmap_fd, &index, &eg_prog_fd, 0);
+        int index = 0;
+        ret = bpf_map_update_elem(jmpmap.fd, &index, &eg_prog_fd, 0);
+        close_object_fd(&eg_prog_fd);
+        close_object_fd(&jmpmap.fd);
         if (ret) {
-            return ret;
+            return errno;
         }
     }
 
@@ -124,13 +158,22 @@ static int xdp_port_add(__u32 pipeline_id, char *intf)
     return 0;
 }
 
-static int tc_port_add(__u32 pipeline_id, char *intf)
+static int tc_port_add(psabpf_pipeline_id_t pipeline_id, char *intf)
 {
+    int xdp_helper_fd;
+
+    int ifindex = (int) if_nametoindex(intf);
+    if (!ifindex) {
+        return EINVAL;
+    }
+
+    int ret = xdp_attach_prog_to_port(&xdp_helper_fd, pipeline_id, ifindex, XDP_HELPER_PROG);
+    if (ret != NO_ERROR)
+        return ret;
+    close_object_fd(&xdp_helper_fd);
+
     /* FIXME: using bash command only for the PoC purpose */
     char cmd[256];
-    sprintf(cmd, "bpftool net attach xdp pinned %s/%s%d/%s dev %s overwrite",
-            BPF_FS, PIPELINE_PREFIX, pipeline_id, XDP_HELPER_PROG, intf);
-    system(cmd);
     sprintf(cmd, "tc qdisc add dev %s clsact", intf);
     system(cmd);
     memset(cmd, 0, sizeof(cmd));
@@ -204,7 +247,7 @@ int psabpf_pipeline_load(psabpf_pipeline_t *pipeline)
         }
 
         snprintf(pinned_file, sizeof(pinned_file), "%s/%s%d/%s", BPF_FS,
-                 PIPELINE_PREFIX, pipeline->id, __bpf_program__pin_name(pos));
+                 PIPELINE_PREFIX, pipeline->id, program_pin_name(pos));
 
         ret = bpf_program__pin(pos, pinned_file);
         if (ret < 0) {

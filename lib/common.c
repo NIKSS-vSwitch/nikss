@@ -15,7 +15,7 @@ int str_ends_with(const char *str, const char *suffix)
 
 void mem_bitwise_and(uint32_t *dst, uint32_t *mask, size_t len)
 {
-    for (int i = 0; i < len / 4; i++) {
+    for (size_t i = 0; i < len / 4; i++) {
         *dst = (uint32_t) ((*dst) & (*mask));
         ++dst; ++mask;
     }
@@ -28,8 +28,8 @@ void close_object_fd(int *fd)
     *fd = -1;
 }
 
-int build_ebpf_map_path(char *buffer, size_t maxlen, psabpf_context_t *psabpf_ctx)
+int build_ebpf_map_path(char *buffer, size_t maxlen, psabpf_pipeline_id_t pipeline_id)
 {
     return snprintf(buffer, maxlen, "%s/%s%u/maps",
-                    BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx));
+                    BPF_FS, PIPELINE_PREFIX, pipeline_id);
 }

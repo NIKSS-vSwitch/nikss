@@ -42,6 +42,7 @@ int cmd_select(const struct cmd *cmds, int argc, char **argv,
 
 static int do_help(int argc, char **argv)
 {
+    (void) argc; (void) argv;
     fprintf(stderr,
             "Usage: %s [OPTIONS] OBJECT {COMMAND | help }\n"
             "       %s help\n"
@@ -101,7 +102,6 @@ static const struct cmd cmds[] = {
 
 int main(int argc, char **argv)
 {
-    int ret;
     program_name = argv[0];
 
     // TODO: parse program options

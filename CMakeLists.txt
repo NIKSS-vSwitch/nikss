@@ -3,6 +3,9 @@ project(psabpf C)
 
 set(CMAKE_C_STANDARD 11)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
+
 set(PSABPFCTL_SRCS
         lib/btf.c
         lib/common.c
