@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <net/if.h>
 #include <unistd.h>
+#include <linux/if_link.h>
 #include "bpf/bpf.h"
 #include "bpf/libbpf.h"
 #include <string.h>
@@ -11,8 +12,6 @@
 #include "../include/bpf_defs.h"
 #include "common.h"
 #include "btf.h"
-
-#define XDP_FLAGS_DRV_MODE		(1U << 2)
 
 #define bpf_object__for_each_program(pos, obj)		\
 	for ((pos) = bpf_program__next(NULL, (obj));	\
@@ -49,12 +48,28 @@ static int open_obj_by_name(psabpf_pipeline_id_t pipeline_id, const char *prog)
 
 static int xdp_attach_prog_to_port(int *fd, psabpf_pipeline_id_t pipeline_id, int ifindex, const char *prog)
 {
+    __u32 flags;
+    int ret;
+
     *fd = open_obj_by_name(pipeline_id, prog);
     if (*fd < 0)
         return errno;  // from sys_call
 
-    __u32 flags = XDP_FLAGS_DRV_MODE;
-    int ret = bpf_set_link_xdp_fd(ifindex, *fd, flags);
+    /* TODO: add support for hardware offload mode (XDP_FLAGS_HW_MODE) */
+
+    flags = XDP_FLAGS_DRV_MODE;
+    ret = bpf_set_link_xdp_fd(ifindex, *fd, flags);
+    if (ret != -EOPNOTSUPP) {
+        if (ret < 0) {
+            close_object_fd(fd);
+            return -ret;
+        }
+        return NO_ERROR;
+    }
+
+    fprintf(stderr, "XDP native mode not supported by driver, retrying with generic SKB mode\n");
+    flags = XDP_FLAGS_SKB_MODE;
+    ret = bpf_set_link_xdp_fd(ifindex, *fd, flags);
     if (ret < 0) {
         close_object_fd(fd);
         return -ret;
@@ -87,7 +102,7 @@ static int update_prog_devmap(psabpf_bpf_map_descriptor_t *devmap, int ifindex, 
     return NO_ERROR;
 }
 
-static int xdp_port_add(psabpf_pipeline_id_t pipeline_id, char *intf)
+static int xdp_port_add(psabpf_pipeline_id_t pipeline_id, const char *intf)
 {
     int ret;
     int ig_prog_fd, eg_prog_fd;
@@ -158,7 +173,7 @@ static int xdp_port_add(psabpf_pipeline_id_t pipeline_id, char *intf)
     return 0;
 }
 
-static int tc_port_add(psabpf_pipeline_id_t pipeline_id, char *intf)
+static int tc_port_add(psabpf_pipeline_id_t pipeline_id, const char *intf)
 {
     int xdp_helper_fd;
 
@@ -205,7 +220,7 @@ void psabpf_pipeline_setid(psabpf_pipeline_t *pipeline, int pipeline_id)
     pipeline->id = pipeline_id;
 }
 
-void psabpf_pipeline_setobj(psabpf_pipeline_t *pipeline, char *obj)
+void psabpf_pipeline_setobj(psabpf_pipeline_t *pipeline, const char *obj)
 {
     pipeline->obj = obj;
 }
@@ -290,7 +305,7 @@ int psabpf_pipeline_unload(psabpf_pipeline_t *pipeline)
     return system(cmd);
 }
 
-int psabpf_pipeline_add_port(psabpf_pipeline_t *pipeline, char *intf)
+int psabpf_pipeline_add_port(psabpf_pipeline_t *pipeline, const char *intf)
 {
     char pinned_file[256];
     bool isXDP = false;
@@ -304,7 +319,7 @@ int psabpf_pipeline_add_port(psabpf_pipeline_t *pipeline, char *intf)
     return isXDP ? xdp_port_add(pipeline->id, intf) : tc_port_add(pipeline->id, intf);
 }
 
-int psabpf_pipeline_del_port(psabpf_pipeline_t *pipeline, char *intf)
+int psabpf_pipeline_del_port(psabpf_pipeline_t *pipeline, const char *intf)
 {
     char cmd[256];
     __u32 flags = 0;
