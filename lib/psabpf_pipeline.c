@@ -150,10 +150,11 @@ static int xdp_port_add(psabpf_pipeline_id_t pipeline_id, const char *intf)
 
         int index = 0;
         ret = bpf_map_update_elem(jmpmap.fd, &index, &eg_prog_fd, 0);
+        int errno_val = errno;
         close_object_fd(&eg_prog_fd);
         close_object_fd(&jmpmap.fd);
         if (ret) {
-            return errno;
+            return errno_val;
         }
     }
 
