@@ -80,7 +80,7 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
         return EINVAL;
 
     char base_path[256];
-    build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx->pipeline_id);
+    build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx);
 
     /* get the BTF, it is optional so print only warning */
     if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR)

@@ -171,7 +171,7 @@ int psabpf_action_selector_ctx_open(psabpf_context_t *psabpf_ctx, psabpf_action_
         fprintf(stderr, "warning: couldn't find BTF info\n");
 
     char base_path[256];
-    build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx->pipeline_id);
+    build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx);
 
     int ret = do_open_action_selector(ctx, base_path, name);
     if (ret != NO_ERROR) {

@@ -28,8 +28,26 @@ void close_object_fd(int *fd)
     *fd = -1;
 }
 
-int build_ebpf_map_path(char *buffer, size_t maxlen, psabpf_pipeline_id_t pipeline_id)
+int build_ebpf_map_filename(char *buffer, size_t maxlen, psabpf_context_t *ctx, const char *name)
+{
+    return snprintf(buffer, maxlen, "%s/%s%u/maps/%s",
+                    BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, name);
+}
+
+int build_ebpf_map_path(char *buffer, size_t maxlen, psabpf_context_t *ctx)
 {
     return snprintf(buffer, maxlen, "%s/%s%u/maps",
-                    BPF_FS, PIPELINE_PREFIX, pipeline_id);
+                    BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id);
+}
+
+int build_ebpf_prog_filename(char *buffer, size_t maxlen, psabpf_context_t *ctx, const char *name)
+{
+    return snprintf(buffer, maxlen, "%s/%s%u/%s",
+                    BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, name);
+}
+
+int build_ebpf_pipeline_path(char *buffer, size_t maxlen, psabpf_context_t *ctx)
+{
+    return snprintf(buffer, maxlen, "%s/%s%u",
+                    BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id);
 }

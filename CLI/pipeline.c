@@ -32,25 +32,23 @@ int do_load(int argc, char **argv)
 
     char *file = *argv;
 
-    psabpf_pipeline_t pipeline;
-    psabpf_pipeline_init(&pipeline);
-    psabpf_pipeline_setid(&pipeline, id);
+    psabpf_context_t pipeline;
+    psabpf_context_init(&pipeline);
+    psabpf_context_set_pipeline(&pipeline, id);
 
     if (psabpf_pipeline_exists(&pipeline)) {
         fprintf(stderr, "pipeline id %d already exists\n", id);
-        psabpf_pipeline_free(&pipeline);
+        psabpf_context_free(&pipeline);
         return EEXIST;
     }
 
-    psabpf_pipeline_setobj(&pipeline, file);
-
-    if (psabpf_pipeline_load(&pipeline)) {
-        psabpf_pipeline_free(&pipeline);
+    if (psabpf_pipeline_load(&pipeline, file)) {
+        psabpf_context_free(&pipeline);
         return -1;
     }
 
     fprintf(stdout, "Pipeline id %d successfully loaded!\n", id);
-    psabpf_pipeline_free(&pipeline);
+    psabpf_context_free(&pipeline);
     return 0;
 }
 
@@ -69,9 +67,9 @@ int do_unload(int argc, char **argv)
         return -1;
     }
 
-    psabpf_pipeline_t pipeline;
-    psabpf_pipeline_init(&pipeline);
-    psabpf_pipeline_setid(&pipeline, id);
+    psabpf_context_t pipeline;
+    psabpf_context_init(&pipeline);
+    psabpf_context_set_pipeline(&pipeline, id);
 
     if (!psabpf_pipeline_exists(&pipeline)) {
         fprintf(stderr, "pipeline with given id %d does not exist\n", id);
@@ -86,7 +84,7 @@ int do_unload(int argc, char **argv)
 
     fprintf(stdout, "Pipeline id %d successfully unloaded!\n", id);
 err:
-    psabpf_pipeline_free(&pipeline);
+    psabpf_context_free(&pipeline);
     return error;
 }
 
@@ -111,23 +109,23 @@ int do_port_add(int argc, char **argv)
     }
     char *intf = *argv;
 
-    psabpf_pipeline_t pipeline;
-    psabpf_pipeline_init(&pipeline);
-    psabpf_pipeline_setid(&pipeline, id);
+    psabpf_context_t pipeline;
+    psabpf_context_init(&pipeline);
+    psabpf_context_set_pipeline(&pipeline, id);
 
     if (!psabpf_pipeline_exists(&pipeline)) {
-        psabpf_pipeline_free(&pipeline);
+        psabpf_context_free(&pipeline);
         return EEXIST;
     }
 
     int ret = psabpf_pipeline_add_port(&pipeline, intf);
     if (ret) {
         fprintf(stderr, "failed to add port: %s\n", strerror(ret));
-        psabpf_pipeline_free(&pipeline);
+        psabpf_context_free(&pipeline);
         return ret;
     }
 
-    psabpf_pipeline_free(&pipeline);
+    psabpf_context_free(&pipeline);
     return 0;
 }
 
@@ -152,23 +150,23 @@ int do_port_del(int argc, char **argv)
     }
     char *intf = *argv;
 
-    psabpf_pipeline_t pipeline;
-    psabpf_pipeline_init(&pipeline);
-    psabpf_pipeline_setid(&pipeline, id);
+    psabpf_context_t pipeline;
+    psabpf_context_init(&pipeline);
+    psabpf_context_set_pipeline(&pipeline, id);
 
     if (!psabpf_pipeline_exists(&pipeline)) {
-        psabpf_pipeline_free(&pipeline);
+        psabpf_context_free(&pipeline);
         return EEXIST;
     }
 
     int ret = psabpf_pipeline_del_port(&pipeline, intf);
     if (ret) {
         fprintf(stderr, "failed to delete port: %s\n", strerror(ret));
-        psabpf_pipeline_free(&pipeline);
+        psabpf_context_free(&pipeline);
         return ret;
     }
 
-    psabpf_pipeline_free(&pipeline);
+    psabpf_context_free(&pipeline);
     return 0;
 }
 
