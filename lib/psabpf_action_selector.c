@@ -118,13 +118,13 @@ void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx)
     close_object_fd(&ctx->cache.fd);
 }
 
-static int do_open_action_selector(psabpf_action_selector_context_t *ctx, const char *base_path, const char *name)
+static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
 {
     int ret;
     char derived_name[256];
 
     snprintf(derived_name, sizeof(derived_name), "%s_groups_inner", name);
-    ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->group);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->group);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
@@ -132,28 +132,28 @@ static int do_open_action_selector(psabpf_action_selector_context_t *ctx, const 
     close_object_fd(&ctx->group.fd);
 
     snprintf(derived_name, sizeof(derived_name), "%s_groups", name);
-    ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->map_of_groups);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->map_of_groups);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_actions", name);
-    ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->map_of_members);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->map_of_members);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_defaultActionGroup", name);
-    ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->default_group_action);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->default_group_action);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_cache", name);
-    ret = open_bpf_map(&ctx->btf, derived_name, base_path, &ctx->cache);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->cache);
     if (ret != NO_ERROR) {
         fprintf(stderr, "warning: couldn't find ActionSelector cache: %s\n", strerror(ret));
     }
@@ -170,10 +170,7 @@ int psabpf_action_selector_ctx_open(psabpf_context_t *psabpf_ctx, psabpf_action_
     if (load_btf(psabpf_ctx, &ctx->btf) != NO_ERROR)
         fprintf(stderr, "warning: couldn't find BTF info\n");
 
-    char base_path[256];
-    build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx);
-
-    int ret = do_open_action_selector(ctx, base_path, name);
+    int ret = do_open_action_selector(psabpf_ctx, ctx, name);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open ActionSelector %s: %s\n", name, strerror(ret));
         return ret;

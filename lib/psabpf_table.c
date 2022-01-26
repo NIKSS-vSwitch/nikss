@@ -42,27 +42,27 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     close_object_fd(&(ctx->cache.fd));
 }
 
-static int open_ternary_table(psabpf_table_entry_ctx_t *ctx, const char *name, const char *base_path)
+static int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
 {
     int ret;
     char derived_name[256];
 
     snprintf(derived_name, sizeof(derived_name), "%s_prefixes", name);
-    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &ctx->prefixes);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf_metadata, &ctx->prefixes);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuples_map", name);
-    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &ctx->tuple_map);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf_metadata, &ctx->tuple_map);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuple", name);
-    ret = open_bpf_map(&ctx->btf_metadata, derived_name, base_path, &ctx->table);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf_metadata, &ctx->table);
     close_object_fd(&(ctx->table.fd));  /* We need only metadata from this map */
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
@@ -79,18 +79,15 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
         return EINVAL;
 
-    char base_path[256];
-    build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx);
-
     /* get the BTF, it is optional so print only warning */
     if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR)
         fprintf(stderr, "warning: couldn't find BTF info\n");
 
-    int ret = open_bpf_map(&ctx->btf_metadata, name, base_path, &ctx->table);
+    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->table);
 
     /* if map does not exist, try the ternary table */
     if (ret == ENOENT)
-        ret = open_ternary_table(ctx, name, base_path);
+        ret = open_ternary_table(psabpf_ctx, ctx, name);
 
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open table %s: %s\n", name, strerror(ret));
@@ -100,7 +97,7 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     /* open cache table, this is optional feature for table */
     char cache_name[256];
     snprintf(cache_name, sizeof(cache_name), "%s_cache", name);
-    ret = open_bpf_map(&ctx->btf_metadata, cache_name, base_path, &ctx->cache);
+    ret = open_bpf_map(psabpf_ctx, cache_name, &ctx->btf_metadata, &ctx->cache);
     if (ret != NO_ERROR) {
         fprintf(stderr, "warning: cache for table %s not found: %s\n", name, strerror(ret));
     }

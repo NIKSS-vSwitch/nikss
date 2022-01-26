@@ -13,11 +13,6 @@
 #include "common.h"
 #include "btf.h"
 
-#define bpf_object__for_each_program(pos, obj)		\
-	for ((pos) = bpf_program__next(NULL, (obj));	\
-	     (pos) != NULL;				\
-	     (pos) = bpf_program__next((pos), (obj)))
-
 static char *program_pin_name(struct bpf_program *prog)
 {
     char *name, *p;
@@ -105,9 +100,6 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf)
     int ret;
     int ig_prog_fd, eg_prog_fd;
 
-    char base_map_path[256];
-    build_ebpf_map_path(base_map_path, sizeof(base_map_path), ctx);
-
     int ifindex = (int) if_nametoindex(intf);
     if (!ifindex) {
         return EINVAL;
@@ -124,7 +116,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf)
     eg_prog_fd = open_prog_by_name(ctx, XDP_EGRESS_PROG);
 
     psabpf_bpf_map_descriptor_t devmap;
-    ret = open_bpf_map(NULL, XDP_DEVMAP, base_map_path, &devmap);
+    ret = open_bpf_map(ctx, XDP_DEVMAP, NULL, &devmap);
     if (ret != NO_ERROR) {
         close_object_fd(&eg_prog_fd);
         return ret;
@@ -140,7 +132,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf)
     eg_prog_fd = open_prog_by_name(ctx, XDP_EGRESS_PROG_OPTIMIZED);
     if (eg_prog_fd >= 0) {
         psabpf_bpf_map_descriptor_t jmpmap;
-        ret = open_bpf_map(NULL, XDP_JUMP_TBL, base_map_path, &jmpmap);
+        ret = open_bpf_map(ctx, XDP_JUMP_TBL, NULL, &jmpmap);
         if (ret != NO_ERROR) {
             close_object_fd(&eg_prog_fd);
             return ENOENT;

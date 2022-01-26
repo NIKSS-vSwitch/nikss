@@ -336,7 +336,7 @@ int do_table_help(int argc, char **argv)
             "Usage: %1$s table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
             "       %1$s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "       %1$s table del pipe ID TABLE [key MATCH_KEY]\n"
+            "       %1$s table delete pipe ID TABLE [key MATCH_KEY]\n"
             "Unimplemented commands:\n"
             "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
             "       %1$s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"

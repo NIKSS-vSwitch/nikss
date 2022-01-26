@@ -12,7 +12,6 @@ void mem_bitwise_and(uint32_t *dst, uint32_t *mask, size_t len);
 void close_object_fd(int *fd);
 
 int build_ebpf_map_filename(char *buffer, size_t maxlen, psabpf_context_t *ctx, const char *name);
-int build_ebpf_map_path(char *buffer, size_t maxlen, psabpf_context_t *ctx);
 int build_ebpf_prog_filename(char *buffer, size_t maxlen, psabpf_context_t *ctx, const char *name);
 int build_ebpf_pipeline_path(char *buffer, size_t maxlen, psabpf_context_t *ctx);
 
