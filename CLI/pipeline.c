@@ -1,7 +1,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -40,19 +39,21 @@ int do_pipeline_load(int argc, char **argv)
     psabpf_context_set_pipeline(&pipeline, id);
 
     if (psabpf_pipeline_exists(&pipeline)) {
-        fprintf(stderr, "pipeline id %d already exists\n", id);
+        fprintf(stderr, "pipeline id %u already exists\n", id);
         psabpf_context_free(&pipeline);
         return EEXIST;
     }
 
-    if (psabpf_pipeline_load(&pipeline, file)) {
+    int ret = psabpf_pipeline_load(&pipeline, file);
+    if (ret) {
+        fprintf(stdout, "An error occurred during pipeline load id %u\n", id);
         psabpf_context_free(&pipeline);
-        return -1;
+        return ret;
     }
 
-    fprintf(stdout, "Pipeline id %d successfully loaded!\n", id);
+    fprintf(stdout, "Pipeline id %u successfully loaded!\n", id);
     psabpf_context_free(&pipeline);
-    return 0;
+    return NO_ERROR;
 }
 
 int do_pipeline_unload(int argc, char **argv)
@@ -60,14 +61,14 @@ int do_pipeline_unload(int argc, char **argv)
     int error = NO_ERROR;
     if (!is_keyword(*argv, "id")) {
         fprintf(stderr, "expected 'id', got: %s\n", *argv != NULL ? *argv : "");
-        return -1;
+        return EINVAL;
     }
     NEXT_ARG_RET();
     char *endptr;
     uint32_t id = strtoul(*argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
+        return EINVAL;
     }
 
     if (argc > 1) {
@@ -80,17 +81,18 @@ int do_pipeline_unload(int argc, char **argv)
     psabpf_context_set_pipeline(&pipeline, id);
 
     if (!psabpf_pipeline_exists(&pipeline)) {
-        fprintf(stderr, "pipeline with given id %d does not exist\n", id);
-        error = EINVAL;
+        fprintf(stderr, "pipeline with given id %u does not exist\n", id);
+        error = ENOENT;
         goto err;
     }
 
-    if (psabpf_pipeline_unload(&pipeline)) {
-        error = -1;
+    error = psabpf_pipeline_unload(&pipeline);
+    if (error) {
+        fprintf(stdout, "An error occurred during pipeline unload id %u\n", id);
         goto err;
     }
 
-    fprintf(stdout, "Pipeline id %d successfully unloaded!\n", id);
+    fprintf(stdout, "Pipeline id %u successfully unloaded!\n", id);
 err:
     psabpf_context_free(&pipeline);
     return error;
@@ -180,5 +182,5 @@ int do_pipeline_help(int argc, char **argv)
             "       %1$s del-port pipe id ID dev DEV\n"
             "",
             program_name);
-    return 0;
+    return NO_ERROR;
 }

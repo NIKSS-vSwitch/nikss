@@ -27,6 +27,7 @@ static char *program_pin_name(struct bpf_program *prog)
 static int do_initialize_maps(int prog_fd)
 {
     char in[128], out[128];
+    /* error in errno (sys call) */
     return bpf_prog_test_run(prog_fd, 1, &in[0], 128,
                              out, NULL, NULL, NULL);
 }
@@ -45,8 +46,11 @@ static int xdp_attach_prog_to_port(int *fd, psabpf_context_t *ctx, int ifindex, 
     int ret;
 
     *fd = open_prog_by_name(ctx, prog);
-    if (*fd < 0)
-        return errno;  // from sys_call
+    if (*fd < 0) {
+        ret = errno;  // from sys_call
+        fprintf(stderr, "failed to open program %s: %s\n", prog, strerror(ret));
+        return ret;
+    }
 
     /* TODO: add support for hardware offload mode (XDP_FLAGS_HW_MODE) */
 
@@ -54,6 +58,7 @@ static int xdp_attach_prog_to_port(int *fd, psabpf_context_t *ctx, int ifindex, 
     ret = bpf_set_link_xdp_fd(ifindex, *fd, flags);
     if (ret != -EOPNOTSUPP) {
         if (ret < 0) {
+            fprintf(stderr, "failed to attach XDP program in driver mode: %s\n", strerror(-ret));
             close_object_fd(fd);
             return -ret;
         }
@@ -64,6 +69,7 @@ static int xdp_attach_prog_to_port(int *fd, psabpf_context_t *ctx, int ifindex, 
     flags = XDP_FLAGS_SKB_MODE;
     ret = bpf_set_link_xdp_fd(ifindex, *fd, flags);
     if (ret < 0) {
+        fprintf(stderr, "failed to attach XDP program in SKB mode: %s\n", strerror(-ret));
         close_object_fd(fd);
         return -ret;
     }
@@ -89,21 +95,19 @@ static int update_prog_devmap(psabpf_bpf_map_descriptor_t *devmap, int ifindex, 
     }
     int index = ifindex % ((int) devmap->max_entries);
     int ret = bpf_map_update_elem(devmap->fd, &index, &devmap_val, 0);
-    if (ret)
-        return errno;
+    if (ret) {
+        ret = errno;
+        fprintf(stderr, "failed to update devmap: %s\n", strerror(ret));
+        return ret;
+    }
 
     return NO_ERROR;
 }
 
-static int xdp_port_add(psabpf_context_t *ctx, const char *intf)
+static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
 {
     int ret;
     int ig_prog_fd, eg_prog_fd;
-
-    int ifindex = (int) if_nametoindex(intf);
-    if (!ifindex) {
-        return EINVAL;
-    }
 
     /* TODO: Should we attach ingress pipeline at the end of whole procedure?
      *  For short time packets will be served only in ingress but not in egress pipeline. */
@@ -118,6 +122,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf)
     psabpf_bpf_map_descriptor_t devmap;
     ret = open_bpf_map(ctx, XDP_DEVMAP, NULL, &devmap);
     if (ret != NO_ERROR) {
+        fprintf(stderr, "failed to open DEVMAP: %s\n", strerror(ret));
         close_object_fd(&eg_prog_fd);
         return ret;
     }
@@ -134,6 +139,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf)
         psabpf_bpf_map_descriptor_t jmpmap;
         ret = open_bpf_map(ctx, XDP_JUMP_TBL, NULL, &jmpmap);
         if (ret != NO_ERROR) {
+            fprintf(stderr, "failed to open map %s: %s\n", XDP_JUMP_TBL, strerror(errno));
             close_object_fd(&eg_prog_fd);
             return ENOENT;
         }
@@ -144,6 +150,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf)
         close_object_fd(&eg_prog_fd);
         close_object_fd(&jmpmap.fd);
         if (ret) {
+            fprintf(stderr, "failed to update map %s: %s\n", XDP_JUMP_TBL, strerror(errno_val));
             return errno_val;
         }
     }
@@ -161,17 +168,12 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf)
             intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_EGRESS_PROG);
     system(cmd);
 
-    return 0;
+    return NO_ERROR;
 }
 
-static int tc_port_add(psabpf_context_t *ctx, const char *intf)
+static int tc_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
 {
     int xdp_helper_fd;
-
-    int ifindex = (int) if_nametoindex(intf);
-    if (!ifindex) {
-        return EINVAL;
-    }
 
     int ret = xdp_attach_prog_to_port(&xdp_helper_fd, ctx, ifindex, XDP_HELPER_PROG);
     if (ret != NO_ERROR)
@@ -190,7 +192,7 @@ static int tc_port_add(psabpf_context_t *ctx, const char *intf)
     sprintf(cmd, "tc filter add dev %s egress bpf da fd %s/%s%u/%s",
             intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_EGRESS_PROG);
     system(cmd);
-    return 0;
+    return NO_ERROR;
 }
 
 bool psabpf_pipeline_exists(psabpf_context_t *ctx)
@@ -211,8 +213,9 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
     ret = bpf_prog_load(file, BPF_PROG_TYPE_UNSPEC, &obj, &fd);
     /* Do not close fd obtained from above call, it is maintained by obj */
     if (ret < 0 || obj == NULL) {
-        fprintf(stderr, "cannot load the BPF program, code = %d\n", ret);
-        return -1;
+        ret = errno;
+        fprintf(stderr, "cannot load the BPF program: %s\n", strerror(ret));
+        return ret;
     }
 
     bpf_object__for_each_program(pos, obj) {
@@ -221,6 +224,8 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
         if (!strcmp(sec_name, TC_INIT_PROG) || !strcmp(sec_name, XDP_INIT_PROG)) {
             ret = do_initialize_maps(fd);
             if (ret) {
+                ret = -errno;
+                fprintf(stderr, "failed to initialize maps: %s\n", strerror(errno));
                 goto err_close_obj;
             }
             // do not pin map initializer
@@ -232,6 +237,8 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 
         ret = bpf_program__pin(pos, pinned_file);
         if (ret < 0) {
+            fprintf(stderr, "failed to pin %s at %s: %s\n",
+                    sec_name, pinned_file, strerror(-ret));
             goto err_close_obj;
         }
     }
@@ -239,18 +246,29 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
     struct bpf_map *map;
     bpf_object__for_each_map(map, obj) {
         if (bpf_map__is_pinned(map)) {
-            if (bpf_map__unpin(map, NULL)) {
+            ret = bpf_map__unpin(map, NULL);
+            if (ret) {
+                fprintf(stderr, "failed to remove old map pin file: %s\n", strerror(-ret));
                 goto err_close_obj;
             }
         }
 
-        build_ebpf_map_filename(pinned_file, sizeof(pinned_file),
-                                ctx, bpf_map__name(map));
-        if (bpf_map__set_pin_path(map, pinned_file)) {
+        const char *map_name = bpf_map__name(map);
+
+        /* Pinned file name cannot contain a dot */
+        if (strstr(map_name, ".") != NULL)
+            continue;
+
+        build_ebpf_map_filename(pinned_file, sizeof(pinned_file), ctx, map_name);
+        ret = bpf_map__set_pin_path(map, pinned_file);
+        if (ret) {
+            fprintf(stderr, "failed to pin map at %s: %s\n", pinned_file, strerror(-ret));
             goto err_close_obj;
         }
 
-        if (bpf_map__pin(map, pinned_file)) {
+        ret = bpf_map__pin(map, pinned_file);
+        if (ret) {
+            fprintf(stderr, "failed to pin map at %s: %s\n", pinned_file, strerror(-ret));
             goto err_close_obj;
         }
     }
@@ -258,7 +276,7 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 err_close_obj:
     bpf_object__close(obj);
 
-    return ret;
+    return -ret;
 }
 
 int psabpf_pipeline_unload(psabpf_context_t *ctx)
@@ -280,7 +298,13 @@ int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface)
     build_ebpf_prog_filename(pinned_file, sizeof(pinned_file), ctx, XDP_HELPER_PROG);
     isXDP = access(pinned_file, F_OK) != 0;
 
-    return isXDP ? xdp_port_add(ctx, interface) : tc_port_add(ctx, interface);
+    int ifindex = (int) if_nametoindex(interface);
+    if (!ifindex) {
+        fprintf(stderr, "no such interface: %s\n", interface);
+        return ENODEV;
+    }
+
+    return isXDP ? xdp_port_add(ctx, interface, ifindex) : tc_port_add(ctx, interface, ifindex);
 }
 
 int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
@@ -291,20 +315,24 @@ int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
     int ifindex;
 
     ifindex = (int) if_nametoindex(interface);
-    if (!ifindex)
-        return EINVAL;
+    if (!ifindex) {
+        fprintf(stderr, "no such interface: %s\n", interface);
+        return ENODEV;
+    }
 
     int ret = bpf_set_link_xdp_fd(ifindex, -1, flags);
     if (ret) {
-        return ret;
+        fprintf(stderr, "failed to detach XDP program: %s\n", strerror(-ret));
+        return -ret;
     }
 
     // FIXME: temporary solution [PoC-only].
     sprintf(cmd, "tc qdisc del dev %s clsact", interface);
     ret = system(cmd);
     if (ret) {
+        fprintf(stderr, "failed to detach TC program: %s\n", strerror(ret));
         return ret;
     }
 
-    return 0;
+    return NO_ERROR;
 }
