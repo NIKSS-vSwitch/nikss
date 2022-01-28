@@ -34,25 +34,25 @@ int do_pipeline_load(int argc, char **argv)
 
     char *file = *argv;
 
-    psabpf_context_t pipeline;
-    psabpf_context_init(&pipeline);
-    psabpf_context_set_pipeline(&pipeline, id);
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, id);
 
-    if (psabpf_pipeline_exists(&pipeline)) {
+    if (psabpf_pipeline_exists(&ctx)) {
         fprintf(stderr, "pipeline id %u already exists\n", id);
-        psabpf_context_free(&pipeline);
+        psabpf_context_free(&ctx);
         return EEXIST;
     }
 
-    int ret = psabpf_pipeline_load(&pipeline, file);
+    int ret = psabpf_pipeline_load(&ctx, file);
     if (ret) {
         fprintf(stdout, "An error occurred during pipeline load id %u\n", id);
-        psabpf_context_free(&pipeline);
+        psabpf_context_free(&ctx);
         return ret;
     }
 
     fprintf(stdout, "Pipeline id %u successfully loaded!\n", id);
-    psabpf_context_free(&pipeline);
+    psabpf_context_free(&ctx);
     return NO_ERROR;
 }
 
@@ -76,17 +76,17 @@ int do_pipeline_unload(int argc, char **argv)
         return EINVAL;
     }
 
-    psabpf_context_t pipeline;
-    psabpf_context_init(&pipeline);
-    psabpf_context_set_pipeline(&pipeline, id);
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, id);
 
-    if (!psabpf_pipeline_exists(&pipeline)) {
+    if (!psabpf_pipeline_exists(&ctx)) {
         fprintf(stderr, "pipeline with given id %u does not exist\n", id);
         error = ENOENT;
         goto err;
     }
 
-    error = psabpf_pipeline_unload(&pipeline);
+    error = psabpf_pipeline_unload(&ctx);
     if (error) {
         fprintf(stdout, "An error occurred during pipeline unload id %u\n", id);
         goto err;
@@ -94,7 +94,7 @@ int do_pipeline_unload(int argc, char **argv)
 
     fprintf(stdout, "Pipeline id %u successfully unloaded!\n", id);
 err:
-    psabpf_context_free(&pipeline);
+    psabpf_context_free(&ctx);
     return error;
 }
 
@@ -118,10 +118,10 @@ int do_pipeline_port_add(int argc, char **argv)
 {
     int ret;
     const char *intf;
-    psabpf_context_t pipeline;
-    psabpf_context_init(&pipeline);
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
 
-    if ((ret = parse_pipeline_id(&argc, &argv, &pipeline)) != NO_ERROR)
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
         goto err;
 
     if ((ret = parse_interface(&argc, &argv, &intf)) != NO_ERROR)
@@ -133,13 +133,13 @@ int do_pipeline_port_add(int argc, char **argv)
         goto err;
     }
 
-    ret = psabpf_pipeline_add_port(&pipeline, intf);
+    ret = psabpf_pipeline_add_port(&ctx, intf);
     if (ret) {
         fprintf(stderr, "failed to add port: %s\n", strerror(ret));
     }
 
 err:
-    psabpf_context_free(&pipeline);
+    psabpf_context_free(&ctx);
     return ret;
 }
 
@@ -147,10 +147,10 @@ int do_pipeline_port_del(int argc, char **argv)
 {
     int ret;
     const char *intf;
-    psabpf_context_t pipeline;
-    psabpf_context_init(&pipeline);
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
 
-    if ((ret = parse_pipeline_id(&argc, &argv, &pipeline)) != NO_ERROR)
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
         goto err;
 
     if ((ret = parse_interface(&argc, &argv, &intf)) != NO_ERROR)
@@ -162,13 +162,13 @@ int do_pipeline_port_del(int argc, char **argv)
         goto err;
     }
 
-    ret = psabpf_pipeline_del_port(&pipeline, intf);
+    ret = psabpf_pipeline_del_port(&ctx, intf);
     if (ret) {
         fprintf(stderr, "failed to delete port: %s\n", strerror(ret));
     }
 
 err:
-    psabpf_context_free(&pipeline);
+    psabpf_context_free(&ctx);
     return ret;
 }
 

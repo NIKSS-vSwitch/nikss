@@ -155,7 +155,8 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
         }
     }
 
-    /* FIXME: using bash command only for the PoC purpose */
+    /* FIXME: using bash command only for the PoC purpose
+     *   use libbpf for installing TC programs, instead of 'tc filter' */
     char cmd[256];
     sprintf(cmd, "tc qdisc add dev %s clsact", intf);
     system(cmd);
@@ -180,7 +181,8 @@ static int tc_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
         return ret;
     close_object_fd(&xdp_helper_fd);
 
-    /* FIXME: using bash command only for the PoC purpose */
+    /* FIXME: using bash command only for the PoC purpose
+     *   use libbpf for installing TC programs, instead of 'tc filter' */
     char cmd[256];
     sprintf(cmd, "tc qdisc add dev %s clsact", intf);
     system(cmd);
@@ -276,6 +278,7 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 err_close_obj:
     bpf_object__close(obj);
 
+    /* ret is negative value from returned libbpf, but we should return positive ones */
     return -ret;
 }
 
