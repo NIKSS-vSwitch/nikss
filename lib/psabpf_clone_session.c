@@ -41,6 +41,7 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
 // TODO: implement
 int psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
+    (void) ctx; (void) session;
     return 0;
 }
 
@@ -159,13 +160,13 @@ void psabpf_clone_session_entry_cos(psabpf_clone_session_entry_t *entry, uint8_t
     entry->class_of_service = class_of_service;
 }
 
-int psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes)
+void psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes)
 {
     entry->truncate = true;
     entry->packet_length_bytes = packet_length_bytes;
 }
 
-int psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry)
+void psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry)
 {
     entry->truncate = false;
     entry->packet_length_bytes = 0;

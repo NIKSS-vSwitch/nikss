@@ -3,6 +3,11 @@
 
 // TODO: make this file private for library (move to lib/ directory)
 
+#ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-variable"
+#endif
+
 /**
  * When PIN_GLOBAL_NS is used, this is default global namespace that is loaded.
  */
@@ -56,11 +61,15 @@ static const char *XDP_EGRESS_PROG_OPTIMIZED = "xdp_xdp-egress";
 /**
  * The name of XDP devmap.
  */
-static const char *XDP_DEVMAP = "maps/tx_port";
+static const char *XDP_DEVMAP = "tx_port";
 
 /**
  * The name of BPF map used for tail calls.
  */
-static const char *XDP_JUMP_TBL = "maps/egress_progs_table";
+static const char *XDP_JUMP_TBL = "egress_progs_table";
+
+#ifdef __GNUC__
+    #pragma GCC diagnostic pop
+#endif
 
 #endif  /* P4C_BPF_DEFS_H */

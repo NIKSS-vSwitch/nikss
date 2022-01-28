@@ -247,15 +247,15 @@ void free_btf(psabpf_btf_t *btf)
     close_object_fd(&btf->associated_prog);
 }
 
-int open_bpf_map(psabpf_btf_t *btf, const char *name, const char *base_path, psabpf_bpf_map_descriptor_t *md)
+int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *btf, psabpf_bpf_map_descriptor_t *md)
 {
-    char buffer[257];
+    char buffer[256];
     int errno_val;
 
     if (md == NULL)
         return EPERM;
 
-    snprintf(buffer, sizeof(buffer), "%s/%s", base_path, name);
+    build_ebpf_map_filename(buffer, sizeof(buffer), psabpf_ctx, name);
     md->fd = bpf_obj_get(buffer);
     if (md->fd < 0)
         return errno;

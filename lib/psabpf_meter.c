@@ -94,12 +94,8 @@ static int convert_meter_entry_to_data(psabpf_meter_entry_t *entry, psabpf_meter
 }
 
 static int open_meter(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name) {
-    char base_path[256];
-    snprintf(base_path, sizeof(base_path), "%s/%s%u/maps",
-             BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx));
-
     psabpf_bpf_map_descriptor_t metadata;
-    int ret = open_bpf_map(NULL, name, base_path, &metadata);
+    int ret = open_bpf_map(psabpf_ctx, name, NULL, &metadata);
 
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open meter %s: %s\n", name, strerror(ret));

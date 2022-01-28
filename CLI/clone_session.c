@@ -261,7 +261,6 @@ int clone_session_del_member(__u32 clone_session_id, __u32 egress_port, __u16 in
     }
 
     start_time = get_current_time();
-    int error = 0;
 
     char pinned_file[256];
     snprintf(pinned_file, sizeof(pinned_file), "%s/%s", BPF_FS,
@@ -333,6 +332,7 @@ int clone_session_del_member(__u32 clone_session_id, __u32 egress_port, __u16 in
     fprintf(stdout, "Clone session member (egress_port=%d, instance=%d) successfully deleted.\n",
             egress_port, instance);
 
+    return 0;
 }
 
 int do_del_member(int argc, char **argv)
@@ -380,6 +380,7 @@ int do_del_member(int argc, char **argv)
 
 int do_clone_session_help(int argc, char **argv)
 {
+    (void) argc; (void) argv;
     fprintf(stderr,
     "Usage: %1$s clone-session create SESSION\n"
     "       %1$s clone-session delete SESSION\n"

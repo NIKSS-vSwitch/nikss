@@ -12,6 +12,8 @@
 
 #define NEXT_ARG_EXIT()  ({ argc--; argv++; if (argc < 1) { fprintf(stderr, "too few parameters\n"); exit(1); }})
 #define NEXT_ARGP_EXIT() ({ (*argc)--; (*argv)++; if ((*argc) < 1) { fprintf(stderr, "too few parameters\n"); exit(1); }})
+
+#define NEXT_ARG_RET()  ({ argc--; argv++; if (argc < 1) { fprintf(stderr, "too few parameters\n"); return 1; }})
 #define NEXT_ARGP_RET()  ({ (*argc)--; (*argv)++; if ((*argc) < 1) { fprintf(stderr, "too few parameters\n"); return 1; }})
 
 struct cmd {

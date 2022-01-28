@@ -14,7 +14,7 @@ static int (*last_do_help)(int argc, char **argv);
 const char *program_name;
 
 int cmd_select(const struct cmd *cmds, int argc, char **argv,
-               int (*help)(int argc, char **argv))
+               int (*help)(int, char **))
 {
     unsigned int i;
 
@@ -42,6 +42,7 @@ int cmd_select(const struct cmd *cmds, int argc, char **argv,
 
 static int do_help(int argc, char **argv)
 {
+    (void) argc; (void) argv;
     fprintf(stderr,
             "Usage: %s [OPTIONS] OBJECT {COMMAND | help }\n"
             "       %s help\n"
@@ -49,6 +50,8 @@ static int do_help(int argc, char **argv)
             "       OBJECT := { clone-session |\n"
             "                   multicast-group |\n"
             "                   pipeline |\n"
+            "                   add-port |\n"
+            "                   del-port |\n"
             "                   table |\n"
             "                   action-selector |\n"
             "                   meter }\n"
@@ -59,6 +62,27 @@ static int do_help(int argc, char **argv)
     return 0;
 }
 
+static int do_pipeline(int argc, char **argv)
+{
+    return cmd_select(pipeline_cmds, argc, argv, do_pipeline_help);
+}
+
+static int do_port_add(int argc, char **argv)
+{
+    if (is_keyword(*argv, "help") || argc < 1)
+        return do_pipeline_help(argc, argv);
+
+    return do_pipeline_port_add(argc, argv);
+}
+
+static int do_port_del(int argc, char **argv)
+{
+    if (is_keyword(*argv, "help") || argc < 1)
+        return do_pipeline_help(argc, argv);
+
+    return do_pipeline_port_del(argc, argv);
+}
+
 static int do_clone_session(int argc, char **argv)
 {
     if (argc < 3) {
@@ -67,11 +91,6 @@ static int do_clone_session(int argc, char **argv)
     }
 
     return cmd_select(clone_session_cmds, argc, argv, do_clone_session_help);
-}
-
-static int do_pipeline(int argc, char **argv)
-{
-    return cmd_select(pipeline_cmds, argc, argv, do_pipeline_help);
 }
 
 static int do_table(int argc, char **argv)
@@ -91,8 +110,10 @@ static int do_action_selector(int argc, char **argv)
 
 static const struct cmd cmds[] = {
         { "help",            do_help },
-        { "clone-session",   do_clone_session },
         { "pipeline",        do_pipeline },
+        { "add-port",        do_port_add },
+        { "del-port",        do_port_del },
+        { "clone-session",   do_clone_session },
         { "table",           do_table },
         { "action-selector", do_action_selector },
         { "meter",           do_meter },
@@ -101,7 +122,6 @@ static const struct cmd cmds[] = {
 
 int main(int argc, char **argv)
 {
-    int ret;
     program_name = argv[0];
 
     // TODO: parse program options

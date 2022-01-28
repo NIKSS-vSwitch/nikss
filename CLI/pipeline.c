@@ -1,7 +1,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -10,13 +9,13 @@
 #include "common.h"
 
 
-int do_load(int argc, char **argv)
+int do_pipeline_load(int argc, char **argv)
 {
     if (!is_keyword(*argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", *argv);
+        fprintf(stderr, "expected 'id', got: %s\n", *argv != NULL ? *argv : "");
         return EINVAL;
     }
-    NEXT_ARG();
+    NEXT_ARG_RET();
     char *endptr;
     uint32_t id = strtoul(*argv, &endptr, 0);
     if (*endptr) {
@@ -28,148 +27,149 @@ int do_load(int argc, char **argv)
     if (argc < 1) {
         fprintf(stderr, "expected path to the ELF file\n");
         return EINVAL;
+    } else if (argc > 1) {
+        fprintf(stderr, "too many arguments\n");
+        return EINVAL;
     }
 
     char *file = *argv;
 
-    psabpf_pipeline_t pipeline;
-    psabpf_pipeline_init(&pipeline);
-    psabpf_pipeline_setid(&pipeline, id);
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, id);
 
-    if (psabpf_pipeline_exists(&pipeline)) {
-        fprintf(stderr, "pipeline id %d already exists\n", id);
-        psabpf_pipeline_free(&pipeline);
+    if (psabpf_pipeline_exists(&ctx)) {
+        fprintf(stderr, "pipeline id %u already exists\n", id);
+        psabpf_context_free(&ctx);
         return EEXIST;
     }
 
-    psabpf_pipeline_setobj(&pipeline, file);
-
-    if (psabpf_pipeline_load(&pipeline)) {
-        psabpf_pipeline_free(&pipeline);
-        return -1;
+    int ret = psabpf_pipeline_load(&ctx, file);
+    if (ret) {
+        fprintf(stdout, "An error occurred during pipeline load id %u\n", id);
+        psabpf_context_free(&ctx);
+        return ret;
     }
 
-    fprintf(stdout, "Pipeline id %d successfully loaded!\n", id);
-    psabpf_pipeline_free(&pipeline);
-    return 0;
+    fprintf(stdout, "Pipeline id %u successfully loaded!\n", id);
+    psabpf_context_free(&ctx);
+    return NO_ERROR;
 }
 
-int do_unload(int argc, char **argv)
+int do_pipeline_unload(int argc, char **argv)
 {
     int error = NO_ERROR;
     if (!is_keyword(*argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", *argv);
-        return -1;
+        fprintf(stderr, "expected 'id', got: %s\n", *argv != NULL ? *argv : "");
+        return EINVAL;
     }
-    NEXT_ARG();
+    NEXT_ARG_RET();
     char *endptr;
     uint32_t id = strtoul(*argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
+        return EINVAL;
     }
 
-    psabpf_pipeline_t pipeline;
-    psabpf_pipeline_init(&pipeline);
-    psabpf_pipeline_setid(&pipeline, id);
+    if (argc > 1) {
+        fprintf(stderr, "too many arguments\n");
+        return EINVAL;
+    }
 
-    if (!psabpf_pipeline_exists(&pipeline)) {
-        fprintf(stderr, "pipeline with given id %d does not exist\n", id);
-        error = EINVAL;
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, id);
+
+    if (!psabpf_pipeline_exists(&ctx)) {
+        fprintf(stderr, "pipeline with given id %u does not exist\n", id);
+        error = ENOENT;
         goto err;
     }
 
-    if (psabpf_pipeline_unload(&pipeline)) {
-        error = -1;
+    error = psabpf_pipeline_unload(&ctx);
+    if (error) {
+        fprintf(stdout, "An error occurred during pipeline unload id %u\n", id);
         goto err;
     }
 
-    fprintf(stdout, "Pipeline id %d successfully unloaded!\n", id);
+    fprintf(stdout, "Pipeline id %u successfully unloaded!\n", id);
 err:
-    psabpf_pipeline_free(&pipeline);
+    psabpf_context_free(&ctx);
     return error;
 }
 
-int do_port_add(int argc, char **argv)
+static int parse_interface(int *argc, char ***argv, const char **interface)
 {
-    if (!is_keyword(*argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
-    char *endptr;
-    uint32_t id = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
-
-    if (argc < 1) {
-        fprintf(stderr, "expected interface name\n");
+    if (!is_keyword(**argv, "dev")) {
+        fprintf(stderr, "expected 'dev', got: %s\n", **argv != NULL ? **argv : "");
         return EINVAL;
     }
-    char *intf = *argv;
 
-    psabpf_pipeline_t pipeline;
-    psabpf_pipeline_init(&pipeline);
-    psabpf_pipeline_setid(&pipeline, id);
+    NEXT_ARGP_RET();
 
-    if (!psabpf_pipeline_exists(&pipeline)) {
-        psabpf_pipeline_free(&pipeline);
-        return EEXIST;
-    }
+    *interface = **argv;
 
-    int ret = psabpf_pipeline_add_port(&pipeline, intf);
-    if (ret) {
-        fprintf(stderr, "failed to add port: %s\n", strerror(ret));
-        psabpf_pipeline_free(&pipeline);
-        return ret;
-    }
+    NEXT_ARGP();
 
-    psabpf_pipeline_free(&pipeline);
-    return 0;
+    return NO_ERROR;
 }
 
-int do_port_del(int argc, char **argv)
+int do_pipeline_port_add(int argc, char **argv)
 {
-    if (!is_keyword(*argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
-    char *endptr;
-    uint32_t id = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
+    int ret;
+    const char *intf;
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
 
-    if (argc < 1) {
-        fprintf(stderr, "expected interface name\n");
-        return EINVAL;
-    }
-    char *intf = *argv;
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+        goto err;
 
-    psabpf_pipeline_t pipeline;
-    psabpf_pipeline_init(&pipeline);
-    psabpf_pipeline_setid(&pipeline, id);
+    if ((ret = parse_interface(&argc, &argv, &intf)) != NO_ERROR)
+        goto err;
 
-    if (!psabpf_pipeline_exists(&pipeline)) {
-        psabpf_pipeline_free(&pipeline);
-        return EEXIST;
+    if (argc != 0) {
+        fprintf(stderr, "too many arguments\n");
+        ret = EINVAL;
+        goto err;
     }
 
-    int ret = psabpf_pipeline_del_port(&pipeline, intf);
+    ret = psabpf_pipeline_add_port(&ctx, intf);
+    if (ret) {
+        fprintf(stderr, "failed to add port: %s\n", strerror(ret));
+    }
+
+err:
+    psabpf_context_free(&ctx);
+    return ret;
+}
+
+int do_pipeline_port_del(int argc, char **argv)
+{
+    int ret;
+    const char *intf;
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+        goto err;
+
+    if ((ret = parse_interface(&argc, &argv, &intf)) != NO_ERROR)
+        goto err;
+
+    if (argc != 0) {
+        fprintf(stderr, "too many arguments\n");
+        ret = EINVAL;
+        goto err;
+    }
+
+    ret = psabpf_pipeline_del_port(&ctx, intf);
     if (ret) {
         fprintf(stderr, "failed to delete port: %s\n", strerror(ret));
-        psabpf_pipeline_free(&pipeline);
-        return ret;
     }
 
-    psabpf_pipeline_free(&pipeline);
-    return 0;
+err:
+    psabpf_context_free(&ctx);
+    return ret;
 }
 
 int do_pipeline_help(int argc, char **argv)
@@ -178,7 +178,9 @@ int do_pipeline_help(int argc, char **argv)
     fprintf(stderr,
             "Usage: %1$s pipeline load id ID PATH\n"
             "       %1$s pipeline unload id ID\n"
+            "       %1$s add-port pipe id ID dev DEV\n"
+            "       %1$s del-port pipe id ID dev DEV\n"
             "",
             program_name);
-    return 0;
+    return NO_ERROR;
 }

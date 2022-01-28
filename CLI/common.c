@@ -4,6 +4,7 @@
 #include <errno.h>
 
 #include "common.h"
+#include <psabpf_pipeline.h>
 
 bool is_keyword(const char *word, const char *str)
 {
@@ -37,6 +38,11 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
         return EINVAL;
     }
     psabpf_context_set_pipeline(psabpf_ctx, id);
+
+    if (!psabpf_pipeline_exists(psabpf_ctx)) {
+        fprintf(stderr, "pipeline with given id %u does not exist\n", id);
+        return ENOENT;
+    }
 
     NEXT_ARGP();
 

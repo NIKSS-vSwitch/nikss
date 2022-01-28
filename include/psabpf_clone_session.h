@@ -46,9 +46,9 @@ void psabpf_clone_session_entry_free(psabpf_clone_session_entry_t *entry);
 void psabpf_clone_session_entry_port(psabpf_clone_session_entry_t *entry, uint32_t egress_port);
 void psabpf_clone_session_entry_instance(psabpf_clone_session_entry_t *entry, uint16_t instance);
 void psabpf_clone_session_entry_cos(psabpf_clone_session_entry_t *entry, uint8_t class_of_service);
-int psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes);
+void psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes);
 // The function to set 'truncate' to false.
-int psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry);
+void psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry);
 
 int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry);
 int psabpf_clone_session_entry_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry);
