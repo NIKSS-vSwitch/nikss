@@ -3,19 +3,28 @@
 
 #include <psabpf.h>
 
-typedef struct psabpf_digest_context {
-    psabpf_bpf_map_descriptor_t queue;
-    psabpf_btf_t btf_metadata;
-
-    uint32_t btf_type_id;
-} psabpf_digest_context_t;
-
 typedef enum psabpf_digest_field_type {
-    DIGEST_FIELD_TYPE_DATA = 0,
+    DIGEST_FIELD_TYPE_UNKNOWN = 0,
+    DIGEST_FIELD_TYPE_DATA,
     /* For nested structures */
     DIGEST_FIELD_TYPE_STRUCT_START,
     DIGEST_FIELD_TYPE_STRUCT_END
 } psabpf_digest_field_type_t;
+
+typedef struct psabpf_digest_field_descriptor {
+    psabpf_digest_field_type_t type;
+    size_t data_offset;
+    size_t data_len;
+    const char *name;
+} psabpf_digest_field_descriptor_t;
+
+typedef struct psabpf_digest_context {
+    psabpf_bpf_map_descriptor_t queue;
+    psabpf_btf_t btf_metadata;
+
+    size_t n_fields;
+    psabpf_digest_field_descriptor_t *fields;
+} psabpf_digest_context_t;
 
 /* Used to iterate over fields of a single message */
 typedef struct psabpf_digest_field {
@@ -23,18 +32,14 @@ typedef struct psabpf_digest_field {
     void *data;
     size_t data_len;
     const char *name;
-
-    /* used for tree-list like data structure */
-    struct psabpf_digest_field *parent;
-    struct psabpf_digest_field *children;
 } psabpf_digest_field_t;
 
 /* Used to read a next Digest message. */
 typedef struct psabpf_digest {
     void *raw_data;  /* stores data from map as a single block */
 
-    psabpf_digest_field_t *current;
-    psabpf_digest_field_t tree;
+    size_t current_field_id;
+    psabpf_digest_field_t current;
 } psabpf_digest_t;
 
 void psabpf_digest_context_init(psabpf_digest_context_t *ctx);
