@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+
 #include <jansson.h>
 
 #include <psabpf_digest.h>
@@ -46,6 +47,40 @@ char * convert_data_to_hexstr(const void *data, size_t len)
     return buff;
 }
 
+static int build_struct_json(json_t *parent, psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
+{
+    psabpf_digest_field_t *field;
+    while ((field = psabpf_digest_get_next_field(ctx, digest)) != NULL) {
+        /* To build flat structure of output JSON just remove this and next conditional
+         * statement. In other words, preserve only condition and instructions below it:
+         *      if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA) continue; */
+        if (psabpf_digest_get_field_type(field) == DIGEST_FIELD_TYPE_STRUCT_START) {
+            json_t *sub_struct = json_object();
+            json_object_set(parent, psabpf_digest_get_field_name(field), sub_struct);
+
+            build_struct_json(sub_struct, ctx, digest);
+
+            json_decref(sub_struct);
+            continue;
+        }
+
+        if (psabpf_digest_get_field_type(field) == DIGEST_FIELD_TYPE_STRUCT_END)
+            return 0;
+
+        if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA)
+            continue;
+
+        const char *encoded_data = convert_data_to_hexstr(psabpf_digest_get_field_data(field),
+                                                          psabpf_digest_get_field_data_len(field));
+        if (encoded_data == NULL)
+            continue;
+        json_object_set_new(parent, psabpf_digest_get_field_name(field), json_string(encoded_data));
+        free((void *) encoded_data);
+    }
+
+    return 0;
+}
+
 int do_digest_get(int argc, char **argv)
 {
     (void) argc; (void) argv;
@@ -72,20 +107,7 @@ int do_digest_get(int argc, char **argv)
     psabpf_digest_t digest;
     while (psabpf_digest_get_next(&ctx, &digest) == NO_ERROR) {
         json_t *entry = json_object();
-        psabpf_digest_field_t *field;
-
-        while ((field = psabpf_digest_get_next_field(&ctx, &digest)) != NULL) {
-            if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA)
-                continue;
-
-            const char *encoded_data = convert_data_to_hexstr(psabpf_digest_get_field_data(field),
-                                                              psabpf_digest_get_field_data_len(field));
-            if (encoded_data == NULL)
-                continue;
-            json_t *data = json_string(encoded_data);
-            json_object_set_new(entry, psabpf_digest_get_field_name(field), data);
-            free((void *) encoded_data);
-        }
+        build_struct_json(entry, &ctx, &digest);
         json_array_append_new(entries, entry);
 
         psabpf_digest_free(&digest);
