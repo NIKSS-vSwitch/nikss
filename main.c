@@ -7,6 +7,7 @@
 #include "CLI/table.h"
 #include "CLI/action_selector.h"
 #include "CLI/meter.h"
+#include "CLI/digest.h"
 
 static int last_argc;
 static char **last_argv;
@@ -54,7 +55,8 @@ static int do_help(int argc, char **argv)
             "                   del-port |\n"
             "                   table |\n"
             "                   action-selector |\n"
-            "                   meter }\n"
+            "                   meter |\n"
+            "                   digest }\n"
             "       OPTIONS := {}\n"
             "",
             program_name, program_name);
@@ -108,6 +110,11 @@ static int do_action_selector(int argc, char **argv)
     return cmd_select(action_selector_cmds, argc, argv, do_action_selector_help);
 }
 
+static int do_digest(int argc, char **argv)
+{
+    return cmd_select(digest_cmds, argc, argv, do_digest_help);
+}
+
 static const struct cmd cmds[] = {
         { "help",            do_help },
         { "pipeline",        do_pipeline },
@@ -117,6 +124,7 @@ static const struct cmd cmds[] = {
         { "table",           do_table },
         { "action-selector", do_action_selector },
         { "meter",           do_meter },
+        { "digest",          do_digest },
         { 0 }
 };
 

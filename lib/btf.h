@@ -8,8 +8,6 @@
 
 const struct btf_type * psabtf_get_type_by_id(struct btf * btf, uint32_t type_id);
 
-uint32_t psabtf_get_type_id_by_name(struct btf * btf, const char * name);
-
 typedef struct psabtf_struct_member_md {
     const struct btf_member * member;
     int index;

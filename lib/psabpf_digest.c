@@ -68,9 +68,10 @@ static size_t count_total_fields(psabpf_digest_context_t *ctx, uint32_t type_id)
     if (!btf_is_struct(type))
         return 1;
 
-    unsigned entries = btf_vlen(type);
+    unsigned struct_entries = btf_vlen(type);
+    unsigned total_entries = struct_entries;
 
-    for (unsigned i = 0; i < entries; i++) {
+    for (unsigned i = 0; i < struct_entries; i++) {
         psabtf_struct_member_md_t md;
         if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, type_id, i, &md) != NO_ERROR) {
             fprintf(stderr, "invalid field or type\n");
@@ -81,11 +82,11 @@ static size_t count_total_fields(psabpf_digest_context_t *ctx, uint32_t type_id)
         if (btf_is_struct(member_type)) {
             /* We need two additional entries per struct - for struct start and struct end,
              * but first one is already included as member of parent structure */
-            entries = entries + count_total_fields(ctx, md.effective_type_id) + 1;
+            total_entries = total_entries + count_total_fields(ctx, md.effective_type_id) + 1;
         }
     }
 
-    return entries;
+    return total_entries;
 }
 
 static int parse_digest_struct(psabpf_digest_context_t *ctx, uint32_t type_id, unsigned *field_idx, const size_t base_offset)
@@ -136,7 +137,8 @@ static int parse_digest_struct(psabpf_digest_context_t *ctx, uint32_t type_id, u
 
             if (*field_idx >= ctx->n_fields)
                 goto too_many_fields;
-            /* field_idx should point outside the last inserted entry, now add marker for struct end */
+            /* field_idx should point outside the last inserted entry, now add marker
+             * for struct end. For now offset, len and name are not set */
             ctx->fields[*field_idx].type = DIGEST_FIELD_TYPE_STRUCT_END;
         }
 
@@ -167,7 +169,6 @@ static int parse_digest_btf(psabpf_digest_context_t *ctx)
     }
 
     unsigned field_idx = 0;
-
     return parse_digest_struct(ctx, type_id, &field_idx, 0);
 }
 
@@ -180,9 +181,7 @@ int psabpf_digest_open(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ct
     if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR)
         fprintf(stderr, "warning: couldn't find BTF info\n");
 
-    char base_path[256];
-    build_ebpf_map_path(base_path, sizeof(base_path), psabpf_ctx);
-    int ret = open_bpf_map(&ctx->btf_metadata, name, base_path, &ctx->queue);
+    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->queue);
     if (ret != NO_ERROR)
         return ret;
 
