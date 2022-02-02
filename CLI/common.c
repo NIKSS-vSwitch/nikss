@@ -3,6 +3,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include <gmp.h>  /* GNU LGPL v3 or GNU GPL v2, used only by function convert_number_to_bytes() */
+
 #include "common.h"
 #include <psabpf_pipeline.h>
 
@@ -40,7 +42,7 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
     psabpf_context_set_pipeline(psabpf_ctx, id);
 
     if (!psabpf_pipeline_exists(psabpf_ctx)) {
-        fprintf(stderr, "pipeline with given id %u does not exist\n", id);
+        fprintf(stderr, "pipeline with given id %u does not exist or is inaccessible\n", id);
         return ENOENT;
     }
 
@@ -184,4 +186,46 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
 
     /* Last chance: parse as number */
     return convert_number_to_bytes(data, ctx, ctx_type);
+}
+
+char * convert_data_to_hexstr(const void *data, size_t len)
+{
+    if (data == NULL)
+        return NULL;
+
+    size_t buff_len = len * 2 + 2 + 1; /* 2 characters per byte, prefix, null terminator */
+    char *buff = malloc(buff_len);
+    if (buff == NULL)
+        return NULL;
+
+    memset(buff, 0, buff_len);
+    buff[0] = '0';
+    if (len < 1) {
+        return buff;
+    }
+    buff[1] = 'x';
+
+    const char *half_byte_map = "0123456789abcdef";
+    size_t buff_pos = 2;
+    size_t data_pos = len;
+    bool zero_skip_allowed = true;
+
+    for (size_t i = 0; i < len; i++) {
+        --data_pos;
+        unsigned char byte = ((const unsigned char *) data)[data_pos];
+        char upper = half_byte_map[(byte >> 4) & 0xF];
+        char lower = half_byte_map[byte & 0xF];
+
+        if (upper != '0' || !zero_skip_allowed) {
+            zero_skip_allowed = false;
+            buff[buff_pos++] = upper;
+        }
+
+        if (lower != '0' || !zero_skip_allowed || data_pos == 0) {
+            zero_skip_allowed = false;
+            buff[buff_pos++] = lower;
+        }
+    }
+
+    return buff;
 }

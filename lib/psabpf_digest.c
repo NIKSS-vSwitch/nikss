@@ -221,6 +221,7 @@ int psabpf_digest_get_next(psabpf_digest_context_t *ctx, psabpf_digest_t *digest
         ret = errno;
         if (ret != ENOENT)
             fprintf(stderr, "failed to pop element from queue: %s\n", strerror(ret));
+        psabpf_digest_free(digest);
         return ret;
     }
 

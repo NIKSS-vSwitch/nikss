@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include "../include/psabpf.h"
-#include <gmp.h>  /* GNU LGPL v3 or GNU GPL v2, used only by function convert_number_to_bytes() */
 #include <arpa/inet.h>
 #include <ctype.h>
 
@@ -35,5 +34,6 @@ enum destination_ctx_type_t {
 };
 
 int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type);
+char * convert_data_to_hexstr(const void *data, size_t len);
 
 #endif //P4C_COMMON_H

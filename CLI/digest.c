@@ -1,50 +1,38 @@
 #include <stdio.h>
-#include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 
 #include <jansson.h>
 
 #include <psabpf_digest.h>
 #include "digest.h"
 
-/* TODO: use GMP */
-char * convert_data_to_hexstr(const void *data, size_t len)
+static int parse_digest(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
+                        psabpf_digest_context_t *ctx, const char **instance_name)
 {
-    size_t buff_len = len * 2 + 2 + 1; /* 2 characters per byte, prefix, null terminator */
-    char *buff = malloc(buff_len);
-    if (buff == NULL)
-        return NULL;
-
-    memset(buff, 0, buff_len);
-    buff[0] = '0';
-    if (len < 1) {
-        return buff;
+    if (*argc < 1) {
+        fprintf(stderr, "too few parameters\n");
+        return EPERM;
     }
-    buff[1] = 'x';
-
-    const char *half_byte_map = "0123456789abcdef";
-    size_t buff_pos = 2;
-    size_t data_pos = len;
-    bool zero_skip_allowed = true;
-
-    for (size_t i = 0; i < len; i++) {
-        --data_pos;
-        unsigned char byte = ((const unsigned char *) data)[data_pos];
-        char upper = half_byte_map[(byte >> 4) & 0xF];
-        char lower = half_byte_map[byte & 0xF];
-
-        if (upper != '0' || !zero_skip_allowed) {
-            zero_skip_allowed = false;
-            buff[buff_pos++] = upper;
+    if (is_keyword(**argv, "id")) {
+        NEXT_ARGP_RET();
+        fprintf(stderr, "id: digest access not supported\n");
+        return ENOTSUP;
+    } else if (is_keyword(**argv, "name")) {
+        NEXT_ARGP_RET();
+        fprintf(stderr, "name: digest access not supported yet\n");
+        return ENOTSUP;
+    } else {
+        int error_code = psabpf_digest_open(psabpf_ctx, ctx, **argv);
+        if (error_code != NO_ERROR) {
+            fprintf(stderr, "failed to open digest %s: %s\n", **argv, strerror(error_code));
+            return error_code;
         }
-
-        if (lower != '0' || !zero_skip_allowed || data_pos == 0) {
-            zero_skip_allowed = false;
-            buff[buff_pos++] = lower;
-        }
+        *instance_name = **argv;
     }
+    NEXT_ARGP();
 
-    return buff;
+    return NO_ERROR;
 }
 
 static int build_struct_json(json_t *parent, psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
@@ -56,76 +44,123 @@ static int build_struct_json(json_t *parent, psabpf_digest_context_t *ctx, psabp
          *      if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA) continue; */
         if (psabpf_digest_get_field_type(field) == DIGEST_FIELD_TYPE_STRUCT_START) {
             json_t *sub_struct = json_object();
-            json_object_set(parent, psabpf_digest_get_field_name(field), sub_struct);
+            if (sub_struct == NULL) {
+                fprintf(stderr, "failed to prepare message sub-object JSON\n");
+                return ENOMEM;
+            }
+            if (json_object_set(parent, psabpf_digest_get_field_name(field), sub_struct)) {
+                fprintf(stderr, "failed to add message sub-object JSON\n");
+                json_decref(sub_struct);
+                return EPERM;
+            }
 
-            build_struct_json(sub_struct, ctx, digest);
-
+            int ret = build_struct_json(sub_struct, ctx, digest);
             json_decref(sub_struct);
+            if (ret != NO_ERROR)
+                return ret;
+
             continue;
         }
 
         if (psabpf_digest_get_field_type(field) == DIGEST_FIELD_TYPE_STRUCT_END)
-            return 0;
+            return NO_ERROR;
 
         if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA)
             continue;
 
         const char *encoded_data = convert_data_to_hexstr(psabpf_digest_get_field_data(field),
                                                           psabpf_digest_get_field_data_len(field));
-        if (encoded_data == NULL)
-            continue;
-        json_object_set_new(parent, psabpf_digest_get_field_name(field), json_string(encoded_data));
+        const char *field_name = psabpf_digest_get_field_name(field);
+        if (encoded_data == NULL) {
+            fprintf(stderr, "not enough memory\n");
+            return ENOMEM;
+        }
+        if (field_name == NULL)
+            field_name = "";
+        json_object_set_new(parent, field_name, json_string(encoded_data));
         free((void *) encoded_data);
     }
 
-    return 0;
+    return NO_ERROR;
 }
 
 int do_digest_get(int argc, char **argv)
 {
-    (void) argc; (void) argv;
-
     psabpf_context_t psabpf_ctx;
     psabpf_digest_context_t ctx;
+    int error_code = EPERM;
+    const char *digest_instance_name = NULL;
 
     psabpf_context_init(&psabpf_ctx);
     psabpf_digest_context_init(&ctx);
 
-    psabpf_context_set_pipeline(&psabpf_ctx, 999);
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up_psabpf;
 
-    psabpf_digest_open(&psabpf_ctx, &ctx, "mac_learn_digest_0");
+    if (parse_digest(&argc, &argv, &psabpf_ctx, &ctx, &digest_instance_name) != NO_ERROR)
+        goto clean_up_psabpf;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up_psabpf;
+    }
 
     json_t *root = json_object();
     json_t *extern_type = json_object();
     json_t *instance_name = json_object();
     json_t *entries = json_array();
+    if (root == NULL || extern_type == NULL || instance_name == NULL || entries == NULL) {
+        fprintf(stderr, "failed to prepare JSON\n");
+        goto clean_up;
+    }
 
     json_object_set(instance_name, "digests", entries);
-    json_object_set_new(extern_type, "mac_learn_digest_0", instance_name);
-    json_object_set_new(root, "Digest", extern_type);
+    if (json_object_set(extern_type, digest_instance_name, instance_name)) {
+        fprintf(stderr, "failed to add JSON key %s\n", digest_instance_name);
+        goto clean_up;
+    }
+    json_object_set(root, "Digest", extern_type);
 
     psabpf_digest_t digest;
     while (psabpf_digest_get_next(&ctx, &digest) == NO_ERROR) {
         json_t *entry = json_object();
-        build_struct_json(entry, &ctx, &digest);
+        if (entry == NULL) {
+            fprintf(stderr, "failed to prepare digest message in JSON\n");
+            goto clean_up;
+        }
+        int ret = build_struct_json(entry, &ctx, &digest);
         json_array_append_new(entries, entry);
-
         psabpf_digest_free(&digest);
+
+        if (ret != NO_ERROR)
+            break;
     }
-    psabpf_digest_free(&digest);
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+
+    error_code = 0;
+
+clean_up:
+    json_decref(extern_type);
+    json_decref(instance_name);
     json_decref(entries);
     json_decref(root);
 
+clean_up_psabpf:
     psabpf_digest_context_free(&ctx);
     psabpf_context_free(&psabpf_ctx);
 
-    return 0;
+    return error_code;
 }
 
 int do_digest_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
+    fprintf(stderr,
+            "Usage: %1$s digest get pipe ID DIGEST\n"
+            "\n"
+            "       DIGEST := { id DIGEST_ID | name FILE | DIGEST_FILE }\n"
+            "",
+            program_name);
     return 0;
 }
