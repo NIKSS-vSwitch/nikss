@@ -68,13 +68,13 @@ static int build_struct_json(json_t *parent, psabpf_digest_context_t *ctx, psabp
         if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA)
             continue;
 
-        const char *encoded_data = convert_data_to_hexstr(psabpf_digest_get_field_data(field),
-                                                          psabpf_digest_get_field_data_len(field));
-        const char *field_name = psabpf_digest_get_field_name(field);
+        const char *encoded_data = convert_bin_data_to_hexstr(psabpf_digest_get_field_data(field),
+                                                              psabpf_digest_get_field_data_len(field));
         if (encoded_data == NULL) {
             fprintf(stderr, "not enough memory\n");
             return ENOMEM;
         }
+        const char *field_name = psabpf_digest_get_field_name(field);
         if (field_name == NULL)
             field_name = "";
         json_object_set_new(parent, field_name, json_string(encoded_data));

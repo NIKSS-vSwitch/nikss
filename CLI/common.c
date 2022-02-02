@@ -188,7 +188,7 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
     return convert_number_to_bytes(data, ctx, ctx_type);
 }
 
-char * convert_data_to_hexstr(const void *data, size_t len)
+char * convert_bin_data_to_hexstr(const void *data, size_t len)
 {
     if (data == NULL)
         return NULL;
