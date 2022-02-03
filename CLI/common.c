@@ -194,11 +194,10 @@ char * convert_bin_data_to_hexstr(const void *data, size_t len)
         return NULL;
 
     size_t buff_len = len * 2 + 2 + 1; /* 2 characters per byte, prefix, null terminator */
-    char *buff = malloc(buff_len);
+    char *buff = calloc(1, buff_len);
     if (buff == NULL)
         return NULL;
 
-    memset(buff, 0, buff_len);
     buff[0] = '0';
     if (len < 1) {
         return buff;
