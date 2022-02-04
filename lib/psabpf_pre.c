@@ -100,7 +100,16 @@ static int open_session_map(psabpf_bpf_map_descriptor_t *pr_map,
         return ret;
     }
 
-    return update_map_info(session_map);
+    ret = update_map_info(session_map);
+    if (ret != NO_ERROR)
+        return ret;
+
+    if (session_map->key_size != sizeof(elem_t) || session_map->value_size != sizeof(struct element)) {
+        fprintf(stderr, "invalid session/group inner map\n");
+        return EINVAL;
+    }
+
+    return NO_ERROR;
 }
 
 static int do_create_pre_session(psabpf_bpf_map_descriptor_t *pr_map,
@@ -180,12 +189,76 @@ err:
     return ret;
 }
 
-static int insert_pre_session_entry(psabpf_bpf_map_descriptor_t *pr_map, uint32_t session)
+static int insert_pre_session_entry(psabpf_context_t *ctx, const char *pr_map_name,
+                                    uint32_t session, psabpf_clone_session_entry_t *entry)
 {
-    psabpf_bpf_map_descriptor_t session_map;
+    if (ctx == NULL || entry == NULL) {
+        return EINVAL;
+    }
+    if (entry->instance == 0 && entry->egress_port == 0) {
+        fprintf(stderr, "instance and egress port not set\n");
+        return EINVAL;
+    }
+
+    psabpf_bpf_map_descriptor_t session_map, pr_map;
     int ret;
 
-    return NO_ERROR;
+    ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
+    if (ret != 0)
+        goto err;
+
+    ret = open_session_map(&pr_map, &session_map, session);
+    if (ret != NO_ERROR)
+        goto err;
+
+    /* 1. Gead head. */
+    elem_t head_idx = { 0 };
+    struct element head;
+    ret = bpf_map_lookup_elem(pr_map.fd, &head_idx, &head);
+    if (ret != 0) {
+        ret = errno;
+        fprintf(stderr, "error getting head of list: %s\n", strerror(ret));
+        goto err;
+    }
+
+    /* 2. Allocate new element and put in the data. */
+    struct element new_node_value = {
+            .entry = *entry,
+            /* 3. Make next of new node as next of head */
+            .next_id = head.next_id,
+    };
+    elem_t new_node_key = {
+            .port = entry->egress_port,
+            .instance = entry->instance,
+    };
+    ret = bpf_map_update_elem(session_map.fd, &new_node_key, &new_node_value, BPF_NOEXIST);
+    if (ret != 0) {
+        ret = errno;
+        if (ret == EEXIST) {
+            fprintf(stderr, "Clone session/multicast member [port=%d, instance=%d] already exists. "
+                            "Increment 'instance' to clone more than one packet to the same port.\n",
+                    entry->egress_port,
+                    entry->instance);
+        } else if (ret < 0) {
+            printf("error creating list element: %s\n", strerror(ret));
+        }
+        goto err;
+    }
+
+    /* 4. move the head to point to the new node */
+    head.next_id = new_node_key;
+    ret = bpf_map_update_elem(session_map.fd, &head_idx, &head, 0);
+    if (ret < 0) {
+        ret = errno;
+        printf("error updating head: %s\n", strerror(ret));
+        goto err;
+    }
+
+err:
+    close_object_fd(&pr_map.fd);
+    close_object_fd(&session_map.fd);
+
+    return ret;
 }
 
 /******************************************************************************
@@ -268,76 +341,10 @@ void psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *e
 
 int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
 {
-    if ( entry == NULL || ( entry->instance == 0 && entry->egress_port == 0 ) ) {
+    if (session == NULL)
         return EINVAL;
-    }
 
-    printf("egress port %u", entry->egress_port);
-
-    psabpf_clone_session_id_t clone_session_id = session->id;
-
-    char pinned_file[256];
-    snprintf(pinned_file, sizeof(pinned_file), "%s/pipeline%d/maps/%s", BPF_FS,
-             ctx->pipeline_id, CLONE_SESSION_TABLE);
-
-    long outer_map_fd = bpf_obj_get(pinned_file);
-    if (outer_map_fd < 0) {
-        fprintf(stderr, "could not find map %s. Clone session doesn't exists? [%s].\n",
-                CLONE_SESSION_TABLE, strerror(errno));
-        return -1;
-    }
-
-    uint32_t inner_map_id;
-    int ret = bpf_map_lookup_elem(outer_map_fd, &clone_session_id, &inner_map_id);
-    if (ret < 0) {
-        fprintf(stderr, "could not find inner map [%s]\n", strerror(errno));
-        return -1;
-    }
-
-    int inner_fd = bpf_map_get_fd_by_id(inner_map_id);
-
-    /* 1. Gead head. */
-    elem_t head_idx = {0, 0};
-    struct element head;
-    ret = bpf_map_lookup_elem(inner_fd, &head_idx, &head);
-    if (ret < 0) {
-        fprintf(stderr, "error getting head of list, err = %d, errno = %d\n", ret, errno);
-        return -1;
-    }
-
-    /* 2. Allocate new element and put in the data. */
-    struct element el = {
-            .entry = *entry,
-            /* 3. Make next of new node as next of head */
-            .next_id = head.next_id,
-    };
-    elem_t idx;
-    idx.port = entry->egress_port;
-    idx.instance = entry->instance;
-    ret = bpf_map_update_elem(inner_fd, &idx, &el, BPF_NOEXIST);
-    if (ret < 0 && errno == EEXIST) {
-        fprintf(stderr, "Clone session member [port=%d, instance=%d] already exists. "
-                        "Increment 'instance' to clone more than one packet to the same port.\n",
-                entry->egress_port,
-                entry->instance);
-        return -1;
-    } else if (ret < 0) {
-        printf("error creating list element, err = %d, errno = %d\n", ret, errno);
-        return -1;
-    }
-
-    /* 4. move the head to point to the new node */
-    head.next_id = idx;
-    ret = bpf_map_update_elem(inner_fd, &head_idx, &head, 0);
-    if (ret < 0) {
-        printf("error updating head, err = %d [%s]\n", ret, strerror(errno));
-        return -1;
-    }
-
-    fprintf(stdout, "New member of clone session %d added successfully\n",
-            clone_session_id);
-
-    return 0;
+    return insert_pre_session_entry(ctx, CLONE_SESSION_TABLE, session->id, entry);
 }
 
 int psabpf_clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
@@ -455,7 +462,15 @@ void psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_
 
 int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
 {
-    return NO_ERROR;
+    if (group == NULL || member == NULL)
+        return EINVAL;
+
+    psabpf_clone_session_entry_t entry = {
+            .egress_port = member->egress_port,
+            .instance = member->instance,
+    };
+
+    return insert_pre_session_entry(ctx, MULTICAST_GROUP_TABLE, group->id, &entry);
 }
 
 int psabpf_mcast_grp_member_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
