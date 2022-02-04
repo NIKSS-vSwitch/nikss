@@ -25,7 +25,7 @@ set(PSABPFCTL_SRCS
         lib/btf.c
         lib/common.c
         lib/psabpf.c
-        lib/psabpf_clone_session.c
+        lib/psabpf_pre.c
         lib/psabpf_digest.c
         lib/psabpf_pipeline.c
         lib/psabpf_table.c

@@ -22,8 +22,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "bpf_defs.h"
-
 #define NO_ERROR 0
 
 typedef uint32_t psabpf_pipeline_id_t;
@@ -56,40 +54,6 @@ void psabpf_context_free(psabpf_context_t *ctx);
 void psabpf_context_set_pipeline(psabpf_context_t *ctx, psabpf_pipeline_id_t pipeline_id);
 psabpf_pipeline_id_t psabpf_context_get_pipeline(psabpf_context_t *ctx);
 
-
-/*
- * PRE - Multicast Groups
- */
-typedef uint32_t psabpf_mcast_grp_id_t;
-
-typedef struct psabpf_mcast_grp_context {
-    psabpf_mcast_grp_id_t id;
-} psabpf_mcast_grp_ctx_t;
-
-typedef struct psabpf_mcast_grp_member {
-    uint32_t egress_port;
-    uint16_t instance;
-} psabpf_mcast_grp_member_t;
-
-void psabpf_mcast_grp_context_init(psabpf_mcast_grp_ctx_t *ctx);
-void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *ctx);
-
-void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_id_t mcast_grp_id);
-
-int psabpf_mcast_grp_create(psabpf_mcast_grp_ctx_t *ctx);
-int psabpf_mcast_grp_exists(psabpf_mcast_grp_ctx_t *ctx);
-int psabpf_mcast_grp_delete(psabpf_mcast_grp_ctx_t *ctx);
-
-int psabpf_mcast_grp_member_init(psabpf_mcast_grp_member_t *member);
-int psabpf_mcast_grp_member_free(psabpf_mcast_grp_member_t *member);
-
-int psabpf_mcast_grp_member_port(psabpf_mcast_grp_member_t *member, uint32_t egress_port);
-int psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_t instance);
-
-int psabpf_mcast_grp_member_update(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
-int psabpf_mcast_grp_member_exists(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
-int psabpf_mcast_grp_member_delete(psabpf_mcast_grp_ctx_t *ctx, psabpf_mcast_grp_member_t *member);
-// psabpf_mcast_grp_member_get does not make sense as mcast grp member does not have additional parameters
 
 ////// TableEntry
 enum psabpf_matchkind_t {

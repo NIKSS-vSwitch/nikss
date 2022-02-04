@@ -27,8 +27,7 @@
 #include <sys/time.h>
 
 #include "clone_session.h"
-#include "../include/psabpf.h"
-#include "../include/psabpf_clone_session.h"
+#include <psabpf_pre.h>
 #include "../include/bpf_defs.h"
 
 struct list_key_t {

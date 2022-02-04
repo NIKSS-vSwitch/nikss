@@ -85,6 +85,18 @@ static const char *XDP_DEVMAP = "tx_port";
  */
 static const char *XDP_JUMP_TBL = "egress_progs_table";
 
+/**
+ * The name of the BPF MAP storing clone sessions.
+ */
+static const char *CLONE_SESSION_TABLE = "clone_session_tbl";
+static const char *CLONE_SESSION_TABLE_INNER = "clone_session_tbl_inner";
+
+/**
+ * The name of the BPF MAP storing multicast groups.
+ */
+static const char *MULTICAST_GROUP_TABLE = "multicast_grp_tbl";
+static const char *MULTICAST_GROUP_TABLE_INNER = "multicast_grp_tbl_inner";
+
 #ifdef __GNUC__
     #pragma GCC diagnostic pop
 #endif
