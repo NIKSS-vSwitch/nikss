@@ -290,8 +290,7 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
 
     /* Find entry in BTF for our map */
     if (btf != NULL && btf->btf != NULL) {
-        snprintf(buffer, sizeof(buffer), ".maps.%s", name);
-        md->btf_type_id = psabtf_get_map_type_id_by_name(btf->btf, buffer);
+        md->btf_type_id = psabtf_get_map_type_id_by_name(btf->btf, name);
         if (md->btf_type_id == 0)
             fprintf(stderr, "can't get BTF info for %s\n", name);
     }
