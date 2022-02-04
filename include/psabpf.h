@@ -18,6 +18,7 @@
 #ifndef __PSABPF_H
 #define __PSABPF_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -372,17 +373,6 @@ int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
 
 ////// P4 Registers
 // TODO: to be implemented
-
-////// P4 Digests
-/* Used to read a next Digest message. */
-typedef struct psabpf_digest {
-    size_t size;  // size of Digest message.
-} psabpf_digest_t;
-
-int psabpf_digest_init(psabpf_digest_t *digest, size_t size);
-int psabpf_digest_free(psabpf_digest_t *digest);
-int psabpf_digest_setname(psabpf_digest_t *digest, const char *name);
-int psabpf_digest_get_next(psabpf_digest_t *digest, void **data);
 
 ////// PacketIn / PacketOut
 // TODO: to be implemented

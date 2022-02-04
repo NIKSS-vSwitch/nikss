@@ -1,6 +1,6 @@
 1. Make sure you have installed dependencies:
    ```shell
-   sudo apt install iproute2 make cmake gcc git libgmp-dev libelf-dev zlib1g-dev
+   sudo apt install iproute2 make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev
    ```
 2. Get the code with submodules:
    ```shell
