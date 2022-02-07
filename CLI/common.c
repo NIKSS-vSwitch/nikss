@@ -68,6 +68,39 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
     return NO_ERROR;
 }
 
+int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair_t *kv_pairs)
+{
+    for (int i = 0; kv_pairs[i].keyword != NULL; i++) {
+        if (is_keyword(**argv, kv_pairs[i].keyword)) {
+            NEXT_ARGP_RET();
+
+            char *ptr;
+            uint32_t value = strtoul(**argv, &ptr, 0);
+            if (*ptr) {
+                fprintf(stderr, "%s: can't parse '%s'\n", kv_pairs[i].comment, **argv);
+                return EINVAL;
+            }
+
+            if (kv_pairs[i].dst_size == 4)
+                *((uint32_t *) kv_pairs[i].destination) = (uint32_t) value;
+            else if (kv_pairs[i].dst_size == 2)
+                *((uint16_t *) kv_pairs[i].destination) = (uint16_t) value;
+            else {
+                fprintf(stderr, "BUG: type width not supported\n");
+                return EPERM;
+            }
+
+            NEXT_ARGP();
+        } else if (kv_pairs[i].required == true) {
+            fprintf(stderr, "%s: expected keyword '%s', got '%s'\n",
+                    kv_pairs[i].comment, kv_pairs[i].keyword, (**argv != NULL) ? **argv : "");
+            return EINVAL;
+        }
+    }
+
+    return NO_ERROR;
+}
+
 /******************************************************************************
  * Data translation functions to byte stream
  *****************************************************************************/

@@ -23,6 +23,7 @@
 
 #include "clone_session.h"
 #include <psabpf_pre.h>
+#include "common.h"
 
 int clone_session_create(__u32 pipeline_id, __u32 clone_session_id)
 {
@@ -122,6 +123,39 @@ int clone_session_add_member(psabpf_pipeline_id_t pipeline_id,
 
 err:
     psabpf_context_free(&ctx);
+    psabpf_clone_session_context_free(&session);
+    psabpf_clone_session_entry_free(&entry);
+
+    return error;
+}
+
+int clone_session_del_member(psabpf_context_t *ctx,
+                             psabpf_clone_session_id_t clone_session_id,
+                             uint32_t  egress_port,
+                             uint16_t  instance)
+{
+    int error;
+    psabpf_clone_session_ctx_t session;
+    psabpf_clone_session_entry_t entry;
+
+    psabpf_clone_session_context_init(&session);
+    psabpf_clone_session_id(&session, clone_session_id);
+
+//    if (psabpf_clone_session_exists(&ctx, &session)) {
+//        error = EEXIST;
+//        goto err;
+//    }
+
+    psabpf_clone_session_entry_init(&entry);
+    psabpf_clone_session_entry_port(&entry, egress_port);
+    psabpf_clone_session_entry_instance(&entry, instance);
+
+    error = psabpf_clone_session_entry_delete(ctx, &session, &entry);
+    if (error) {
+        goto err;
+    }
+
+err:
     psabpf_clone_session_context_free(&session);
     psabpf_clone_session_entry_free(&entry);
 
@@ -245,45 +279,35 @@ int do_add_member(int argc, char **argv)
 
 int do_del_member(int argc, char **argv)
 {
-    if (!is_keyword(*argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", *argv);
-        return -1;
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+    int ret = EINVAL;
+
+    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
+        goto err;
+
+    uint32_t session_id, egress_port, instance;
+    parser_keyword_value_pair_t kv[] = {
+            {"id",          &session_id,  sizeof(session_id),  true, "session id"},
+            {"egress-port", &egress_port, sizeof(egress_port), true, "egress port"},
+            {"instance",    &instance,    sizeof(instance),    true, "egress port instance"},
+            { 0 },
+    };
+
+    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+        goto err;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto err;
     }
 
-    NEXT_ARG();
+    ret = clone_session_del_member(&ctx, session_id, egress_port, instance);
 
-    char *endptr;
-    __u32 id = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
+err:
+    psabpf_context_free(&ctx);
 
-    NEXT_ARG();
-    if (!is_keyword(*argv, "egress-port")) {
-        fprintf(stderr, "expected 'egress-port', got: %s\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
-    __u32 egress_port = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-
-    NEXT_ARG();
-    if (!is_keyword(*argv, "instance")) {
-        fprintf(stderr, "expected 'instance', got: %s\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
-    __u32 instance = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-
-    return 0; //clone_session_del_member(, egress_port, instance);
+    return ret;
 }
 
 int do_clone_session_help(int argc, char **argv)

@@ -104,7 +104,7 @@ static int do_port_del(int argc, char **argv)
 
 static int do_clone_session(int argc, char **argv)
 {
-    if (argc < 3) {
+    if (argc < 2) {
         do_clone_session_help(argc, argv);
         return -1;
     }
