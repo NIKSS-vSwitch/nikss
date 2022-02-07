@@ -85,6 +85,8 @@ int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair
                 *((uint32_t *) kv_pairs[i].destination) = (uint32_t) value;
             else if (kv_pairs[i].dst_size == 2)
                 *((uint16_t *) kv_pairs[i].destination) = (uint16_t) value;
+            else if (kv_pairs[i].dst_size == 1)
+                *((uint8_t *) kv_pairs[i].destination) = (uint8_t) value;
             else {
                 fprintf(stderr, "BUG: type width not supported\n");
                 return EPERM;

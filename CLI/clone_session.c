@@ -17,74 +17,61 @@
 
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
-#include <bpf/bpf.h>
 
 #include "clone_session.h"
 #include <psabpf_pre.h>
 #include "common.h"
 
-int clone_session_create(__u32 pipeline_id, __u32 clone_session_id)
+int clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
 {
-    int error = 0;
-    psabpf_context_t ctx;
+    int error;
     psabpf_clone_session_ctx_t session;
-
-    psabpf_context_init(&ctx);
-    psabpf_context_set_pipeline(&ctx, pipeline_id);
 
     psabpf_clone_session_context_init(&session);
     psabpf_clone_session_id(&session, clone_session_id);
 
-    if (psabpf_clone_session_exists(&ctx, &session)) {
+    if (psabpf_clone_session_exists(ctx, &session)) {
+        fprintf(stderr, "clone session %u already exists\n", clone_session_id);
         error = EEXIST;
         goto err;
     }
 
-    if (psabpf_clone_session_create(&ctx, &session)) {
-        error = -1;
+    error = psabpf_clone_session_create(ctx, &session);
+    if (error)
         goto err;
-    }
 
 err:
-    psabpf_context_free(&ctx);
     psabpf_clone_session_context_free(&session);
 
     return error;
 }
 
-int clone_session_delete(__u32 pipeline_id, __u32 clone_session_id)
+int clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
 {
-    int error = 0;
-    psabpf_context_t ctx;
+    int error;
     psabpf_clone_session_ctx_t session;
-
-    psabpf_context_init(&ctx);
-    psabpf_context_set_pipeline(&ctx, pipeline_id);
 
     psabpf_clone_session_context_init(&session);
     psabpf_clone_session_id(&session, clone_session_id);
 
-    if (!psabpf_clone_session_exists(&ctx, &session)) {
+    if (!psabpf_clone_session_exists(ctx, &session)) {
         fprintf(stderr, "no such clone session %u\n", clone_session_id);
         error = ENOENT;
         goto err;
     }
 
-    if (psabpf_clone_session_delete(&ctx, &session)) {
-        error = -1;
+    error = psabpf_clone_session_delete(ctx, &session);
+    if (error)
         goto err;
-    }
 
 err:
-    psabpf_context_free(&ctx);
     psabpf_clone_session_context_free(&session);
 
     return error;
 }
 
-int clone_session_add_member(psabpf_pipeline_id_t pipeline_id,
+int clone_session_add_member(psabpf_context_t *ctx,
                              psabpf_clone_session_id_t clone_session_id,
                              uint32_t  egress_port,
                              uint16_t  instance,
@@ -93,17 +80,13 @@ int clone_session_add_member(psabpf_pipeline_id_t pipeline_id,
                              uint16_t  packet_length_bytes)
 {
     int error;
-    psabpf_context_t ctx;
     psabpf_clone_session_ctx_t session;
     psabpf_clone_session_entry_t entry;
-
-    psabpf_context_init(&ctx);
-    psabpf_context_set_pipeline(&ctx, pipeline_id);
 
     psabpf_clone_session_context_init(&session);
     psabpf_clone_session_id(&session, clone_session_id);
 
-    if (!psabpf_clone_session_exists(&ctx, &session)) {
+    if (!psabpf_clone_session_exists(ctx, &session)) {
         fprintf(stderr, "no such clone session %u\n", clone_session_id);
         error = ENOENT;
         goto err;
@@ -118,13 +101,12 @@ int clone_session_add_member(psabpf_pipeline_id_t pipeline_id,
         psabpf_clone_session_entry_truncate_enable(&entry, packet_length_bytes);
     }
 
-    error = psabpf_clone_session_entry_update(&ctx, &session, &entry);
+    error = psabpf_clone_session_entry_update(ctx, &session, &entry);
     if (error) {
         goto err;
     }
 
 err:
-    psabpf_context_free(&ctx);
     psabpf_clone_session_context_free(&session);
     psabpf_clone_session_entry_free(&entry);
 
@@ -164,119 +146,114 @@ err:
     return error;
 }
 
-// TODO: remove
-static int parse_pipe_and_id(int *argc, char ***argv, __u32 *pipe, __u32 *id)
-{
-    if (!is_keyword(**argv, "pipe")) {
-        fprintf(stderr, "expected 'pipe', got: %s\n", **argv);
-        return -1;
-    }
-    NEXT_ARGP();
-    char *endptr;
-    *pipe = strtoul(**argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", **argv);
-        return -1;
-    }
-    NEXT_ARGP();
-
-    if (!is_keyword(**argv, "id")) {
-        fprintf(stderr, "expected 'id', got: %s\n", **argv);
-        return -1;
-    }
-    NEXT_ARGP();
-    *id = strtoul(**argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", **argv);
-        return -1;
-    }
-
-    return 0;
-}
-
 int do_clone_session_create(int argc, char **argv)
 {
-    __u32 pipeline_id, clone_session_id;
-    if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
-        return EINVAL;
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+    int ret = EINVAL;
+
+    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
+        goto err;
+
+    uint32_t session_id;
+    parser_keyword_value_pair_t kv[] = {
+            {"id", &session_id, sizeof(session_id), true, "session id"},
+            { 0 },
+    };
+
+    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+        goto err;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto err;
     }
 
-    return clone_session_create(pipeline_id, clone_session_id);
+    ret = clone_session_create(&ctx, session_id);
+
+err:
+    psabpf_context_free(&ctx);
+
+    return ret;
 }
 
 int do_clone_session_delete(int argc, char **argv)
 {
-    __u32 pipeline_id, clone_session_id;
-    if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
-        return EINVAL;
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+    int ret = EINVAL;
+
+    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
+        goto err;
+
+    uint32_t session_id;
+    parser_keyword_value_pair_t kv[] = {
+            {"id", &session_id, sizeof(session_id), true, "session id"},
+            { 0 },
+    };
+
+    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+        goto err;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto err;
     }
 
-    return clone_session_delete(pipeline_id, clone_session_id);
+    ret = clone_session_delete(&ctx, session_id);
+
+err:
+    psabpf_context_free(&ctx);
+
+    return ret;
 }
 
 int do_clone_session_add_member(int argc, char **argv)
 {
-    __u32 pipeline_id, clone_session_id;
-    if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
-        return EINVAL;
-    }
+    psabpf_context_t ctx;
+    psabpf_context_init(&ctx);
+    int ret = EINVAL;
 
-    NEXT_ARG();
-    char *endptr;
-    if (!is_keyword(*argv, "egress-port")) {
-        fprintf(stderr, "expected 'egress-port', got: %s\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
-    __u32 egress_port = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
+    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
+        goto err;
 
-    NEXT_ARG();
-    if (!is_keyword(*argv, "instance")) {
-        fprintf(stderr, "expected 'instance', got: %s\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
-    __u32 instance = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-
-    NEXT_ARG();
-    if (!is_keyword(*argv, "cos")) {
-        fprintf(stderr, "expected 'cos', got: %s\n", *argv);
-        return -1;
-    }
-    NEXT_ARG();
-    __u32 cos = strtoul(*argv, &endptr, 0);
-    if (*endptr) {
-        fprintf(stderr, "can't parse '%s'\n", *argv);
-        return -1;
-    }
-
+    uint32_t session_id, egress_port;
+    uint16_t instance, plen_bytes;
+    uint8_t cos;
     bool truncate = false;
-    __u16 plen_bytes = 0;
+    parser_keyword_value_pair_t kv[] = {
+            {"id",          &session_id,  sizeof(session_id),  true,  "session id"},
+            {"egress-port", &egress_port, sizeof(egress_port), true,  "egress port"},
+            {"instance",    &instance,    sizeof(instance),    true,  "egress port instance"},
+            {"cos",         &cos,         sizeof(cos),         false, "class of service"},
+            { 0 },
+    };
+    parser_keyword_value_pair_t truncate_kv[] = {
+            {"plen_bytes", &plen_bytes,  sizeof(plen_bytes),  true,  "packet len truncate size"},
+            { 0 },
+    };
 
-    NEXT_ARG();
+    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+        goto err;
+
     if (is_keyword(*argv, "truncate")) {
         NEXT_ARG();
-        if (!is_keyword(*argv, "plen_bytes")) {
-            fprintf(stderr, "truncate requested, but no 'plen_bytes' provided\n");
-            return -1;
-        }
-        NEXT_ARG();
-        plen_bytes = strtoul(*argv, &endptr, 0);
-        if (*endptr) {
-            fprintf(stderr, "can't parse '%s'\n", *argv);
-            return -1;
-        }
+        truncate = true;
+        if (parse_keyword_value_pairs(&argc, &argv, &truncate_kv[0]) != NO_ERROR)
+            goto err;
     }
 
-    return clone_session_add_member(pipeline_id, clone_session_id, egress_port, instance, cos, truncate, plen_bytes);
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto err;
+    }
+
+    ret = clone_session_add_member(&ctx, session_id, egress_port, instance, cos, truncate, plen_bytes);
+
+err:
+    psabpf_context_free(&ctx);
+
+    return ret;
 }
 
 int do_clone_session_del_member(int argc, char **argv)
@@ -288,7 +265,8 @@ int do_clone_session_del_member(int argc, char **argv)
     if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
         goto err;
 
-    uint32_t session_id, egress_port, instance;
+    uint32_t session_id, egress_port;
+    uint16_t instance;
     parser_keyword_value_pair_t kv[] = {
             {"id",          &session_id,  sizeof(session_id),  true, "session id"},
             {"egress-port", &egress_port, sizeof(egress_port), true, "egress port"},
@@ -318,7 +296,7 @@ int do_clone_session_help(int argc, char **argv)
     fprintf(stderr,
     "Usage: %1$s clone-session create pipe ID SESSION\n"
     "       %1$s clone-session delete pipe ID SESSION\n"
-    "       %1$s clone-session add-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID\n"
+    "       %1$s clone-session add-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID [cos CLASS_OF_SERVICE] [truncate plen_bytes BYTES]\n"
     "       %1$s clone-session del-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID\n"
     "\n"
     "       SESSION := id SESSION_ID\n"
