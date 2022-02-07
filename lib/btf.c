@@ -26,7 +26,7 @@
 #include <psabpf.h>
 #include "btf.h"
 #include "common.h"
-#include "../include/bpf_defs.h"
+#include "bpf_defs.h"
 
 static uint32_t follow_types(struct btf * btf, uint32_t type_id)
 {

@@ -18,8 +18,6 @@
 #ifndef P4C_BPF_DEFS_H
 #define P4C_BPF_DEFS_H
 
-// TODO: make this file private for library (move to lib/ directory)
-
 #ifdef __GNUC__
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"

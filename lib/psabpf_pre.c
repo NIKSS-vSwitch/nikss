@@ -19,10 +19,9 @@
 #include <errno.h>
 #include <unistd.h>
 #include "bpf/bpf.h"
-#include "bpf/libbpf.h"
 
 #include <psabpf_pre.h>
-#include "../include/bpf_defs.h"
+#include "bpf_defs.h"
 #include "common.h"
 #include "btf.h"
 
@@ -154,10 +153,13 @@ static int do_create_pre_session(psabpf_bpf_map_descriptor_t *pr_map,
     }
 
     /* add inner map to outer map */
-    error_code = bpf_map_update_elem(pr_map->fd, &session, &inner_map_fd, BPF_NOEXIST);
+    uint64_t flags = BPF_NOEXIST;
+    if (pr_map->type == BPF_MAP_TYPE_ARRAY_OF_MAPS)
+        flags = BPF_ANY;
+    error_code = bpf_map_update_elem(pr_map->fd, &session, &inner_map_fd, flags);
     if (error_code != 0) {
         error_code = errno;
-        fprintf(stderr, "failed to add session/group to map %s\n", strerror(error_code));
+        fprintf(stderr, "failed to add session/group to map: %s\n", strerror(error_code));
         goto ret;
     }
 
@@ -207,7 +209,7 @@ static int remove_pre_session(psabpf_context_t *ctx, const char *pr_map_name, ui
     if (pr_map.key_size != sizeof(session)) {
         fprintf(stderr, "key map size must be equal to %lu\n", sizeof(session));
         ret = EINVAL;
-        goto err;;
+        goto err;
     }
 
     ret = bpf_map_delete_elem(pr_map.fd, &session);
@@ -222,6 +224,32 @@ err:
     close_object_fd(&pr_map.fd);
 
     return ret;
+}
+
+static bool pre_session_exists(psabpf_context_t *ctx, const char *pr_map_name, uint32_t session)
+{
+    if (ctx == NULL)
+        return false;
+
+    psabpf_bpf_map_descriptor_t pr_map;
+    int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
+    if (ret != 0)
+        return false;
+
+    if (pr_map.key_size != sizeof(uint32_t) || pr_map.value_size != sizeof(uint32_t)) {
+        fprintf(stderr, "invalid session/group map\n");
+        close_object_fd(&pr_map.fd);
+        return false;
+    }
+
+    uint32_t inner_map_id;
+    ret = bpf_map_lookup_elem(pr_map.fd, &session, &inner_map_id);
+    close_object_fd(&pr_map.fd);
+
+    if (ret != 0)
+        return false;
+
+    return inner_map_id != 0;
 }
 
 static int pre_session_insert_entry(psabpf_context_t *ctx, const char *pr_map_name,
@@ -254,7 +282,7 @@ static int pre_session_insert_entry(psabpf_context_t *ctx, const char *pr_map_na
     /* 1. Gead head. */
     elem_t head_idx = { 0 };
     struct element head;
-    ret = bpf_map_lookup_elem(pr_map.fd, &head_idx, &head);
+    ret = bpf_map_lookup_elem(session_map.fd, &head_idx, &head);
     if (ret != 0) {
         ret = errno;
         fprintf(stderr, "error getting head of list: %s\n", strerror(ret));
@@ -418,11 +446,11 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
     ctx->id = id;
 }
 
-// TODO: implement
-int psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
+bool psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
-    (void) ctx; (void) session;
-    return 0;
+    if (session == NULL)
+        return false;
+    return pre_session_exists(ctx, CLONE_SESSION_TABLE, session->id);
 }
 
 int psabpf_clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
@@ -496,6 +524,7 @@ int psabpf_clone_session_entry_delete(psabpf_context_t *ctx, psabpf_clone_sessio
 
 int psabpf_clone_session_entry_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
 {
+    (void) ctx; (void) session; (void) entry;
     return NO_ERROR;
 }
 
@@ -535,11 +564,11 @@ int psabpf_mcast_grp_create(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group
     return create_pre_session(ctx, MULTICAST_GROUP_TABLE, MULTICAST_GROUP_TABLE_INNER, group->id);
 }
 
-// TODO: implement
-int psabpf_mcast_grp_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+bool psabpf_mcast_grp_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
 {
-    (void) ctx; (void) group;
-    return 0;
+    if (group == NULL)
+        return false;
+    return pre_session_exists(ctx, MULTICAST_GROUP_TABLE, group->id);
 }
 
 int psabpf_mcast_grp_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
@@ -591,6 +620,7 @@ int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t
 
 int psabpf_mcast_grp_member_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
 {
+    (void) ctx; (void) group; (void) member;
     return NO_ERROR;
 }
 

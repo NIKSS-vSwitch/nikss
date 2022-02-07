@@ -51,7 +51,7 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
 
 // TODO: add function to get all identifiers of clone sessions, which are created.
 int psabpf_clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
-int psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
+bool psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
 int psabpf_clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
 
 void psabpf_clone_session_entry_init(psabpf_clone_session_entry_t *entry);
@@ -107,7 +107,7 @@ void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group);
 void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mcast_grp_id);
 
 int psabpf_mcast_grp_create(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group);
-int psabpf_mcast_grp_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group);
+bool psabpf_mcast_grp_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group);
 int psabpf_mcast_grp_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group);
 
 void psabpf_mcast_grp_member_init(psabpf_mcast_grp_member_t *member);
@@ -119,6 +119,5 @@ void psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_
 int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member);
-// psabpf_mcast_grp_member_get does not make sense as mcast grp member does not have additional parameters
 
 #endif  /* __PSABPF_PRE_H */

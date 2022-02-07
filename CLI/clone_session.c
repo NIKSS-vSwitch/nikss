@@ -66,8 +66,9 @@ int clone_session_delete(__u32 pipeline_id, __u32 clone_session_id)
     psabpf_clone_session_context_init(&session);
     psabpf_clone_session_id(&session, clone_session_id);
 
-    if (psabpf_clone_session_exists(&ctx, &session)) {
-        error = EEXIST;
+    if (!psabpf_clone_session_exists(&ctx, &session)) {
+        fprintf(stderr, "no such clone session %u\n", clone_session_id);
+        error = ENOENT;
         goto err;
     }
 
@@ -91,7 +92,7 @@ int clone_session_add_member(psabpf_pipeline_id_t pipeline_id,
                              bool      truncate,
                              uint16_t  packet_length_bytes)
 {
-    int error = 0;
+    int error;
     psabpf_context_t ctx;
     psabpf_clone_session_ctx_t session;
     psabpf_clone_session_entry_t entry;
@@ -102,8 +103,9 @@ int clone_session_add_member(psabpf_pipeline_id_t pipeline_id,
     psabpf_clone_session_context_init(&session);
     psabpf_clone_session_id(&session, clone_session_id);
 
-    if (psabpf_clone_session_exists(&ctx, &session)) {
-        error = EEXIST;
+    if (!psabpf_clone_session_exists(&ctx, &session)) {
+        fprintf(stderr, "no such clone session %u\n", clone_session_id);
+        error = ENOENT;
         goto err;
     }
 
@@ -192,7 +194,7 @@ static int parse_pipe_and_id(int *argc, char ***argv, __u32 *pipe, __u32 *id)
     return 0;
 }
 
-int do_create(int argc, char **argv)
+int do_clone_session_create(int argc, char **argv)
 {
     __u32 pipeline_id, clone_session_id;
     if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
@@ -202,7 +204,7 @@ int do_create(int argc, char **argv)
     return clone_session_create(pipeline_id, clone_session_id);
 }
 
-int do_delete(int argc, char **argv)
+int do_clone_session_delete(int argc, char **argv)
 {
     __u32 pipeline_id, clone_session_id;
     if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
@@ -212,7 +214,7 @@ int do_delete(int argc, char **argv)
     return clone_session_delete(pipeline_id, clone_session_id);
 }
 
-int do_add_member(int argc, char **argv)
+int do_clone_session_add_member(int argc, char **argv)
 {
     __u32 pipeline_id, clone_session_id;
     if (parse_pipe_and_id(&argc, &argv, &pipeline_id, &clone_session_id)) {
@@ -277,7 +279,7 @@ int do_add_member(int argc, char **argv)
     return clone_session_add_member(pipeline_id, clone_session_id, egress_port, instance, cos, truncate, plen_bytes);
 }
 
-int do_del_member(int argc, char **argv)
+int do_clone_session_del_member(int argc, char **argv)
 {
     psabpf_context_t ctx;
     psabpf_context_init(&ctx);
