@@ -21,7 +21,7 @@
 #include "multicast.h"
 #include <psabpf_pre.h>
 
-static int group_parser(int *argc, char ***argv, psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *mcast_grp)
+static int parse_group(int *argc, char ***argv, psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *mcast_grp)
 {
     int ret = parse_pipeline_id(argc, argv, ctx);
     if (ret != NO_ERROR)
@@ -51,7 +51,7 @@ int do_multicast_create_group(int argc, char **argv)
     psabpf_context_init(&ctx);
     psabpf_mcast_grp_context_init(&mcast_grp);
 
-    if (group_parser(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR)
+    if (parse_group(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR)
         goto err;
 
     if (argc > 0) {
@@ -83,7 +83,7 @@ int do_multicast_delete_group(int argc, char **argv)
     psabpf_context_init(&ctx);
     psabpf_mcast_grp_context_init(&mcast_grp);
 
-    if (group_parser(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR)
+    if (parse_group(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR)
         goto err;
 
     if (argc > 0) {
@@ -106,10 +106,10 @@ err:
     return ret;
 }
 
-static int member_parser(int *argc, char ***argv, psabpf_context_t *ctx,
-                         psabpf_mcast_grp_ctx_t *mcast_grp, psabpf_mcast_grp_member_t *member)
+static int parse_group_and_member(int *argc, char ***argv, psabpf_context_t *ctx,
+                                  psabpf_mcast_grp_ctx_t *mcast_grp, psabpf_mcast_grp_member_t *member)
 {
-    int ret = group_parser(argc, argv, ctx, mcast_grp);
+    int ret = parse_group(argc, argv, ctx, mcast_grp);
     if (ret != NO_ERROR)
         return ret;
 
@@ -142,7 +142,7 @@ int do_multicast_add_group_member(int argc, char **argv)
     psabpf_mcast_grp_context_init(&mcast_grp);
     psabpf_mcast_grp_member_init(&member);
 
-    if (member_parser(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR)
+    if (parse_group_and_member(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR)
         goto err;
 
     if (argc > 0) {
@@ -177,7 +177,7 @@ int do_multicast_del_group_member(int argc, char **argv)
     psabpf_mcast_grp_context_init(&mcast_grp);
     psabpf_mcast_grp_member_init(&member);
 
-    if (member_parser(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR)
+    if (parse_group_and_member(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR)
         goto err;
 
     if (argc > 0) {

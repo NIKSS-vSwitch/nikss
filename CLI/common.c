@@ -81,11 +81,11 @@ int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair
                 return EINVAL;
             }
 
-            if (kv_pairs[i].dst_size == 4)
+            if (kv_pairs[i].dst_size == sizeof(uint32_t))
                 *((uint32_t *) kv_pairs[i].destination) = (uint32_t) value;
-            else if (kv_pairs[i].dst_size == 2)
+            else if (kv_pairs[i].dst_size == sizeof(uint16_t))
                 *((uint16_t *) kv_pairs[i].destination) = (uint16_t) value;
-            else if (kv_pairs[i].dst_size == 1)
+            else if (kv_pairs[i].dst_size == sizeof(uint8_t))
                 *((uint8_t *) kv_pairs[i].destination) = (uint8_t) value;
             else {
                 fprintf(stderr, "BUG: type width not supported\n");
