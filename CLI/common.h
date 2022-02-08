@@ -37,9 +37,20 @@ struct cmd {
     int (*func)(int argc, char **argv);
 };
 
+typedef struct parser_keyword_value_pair {
+    const char *keyword;
+    void *destination;
+    unsigned dst_size;
+    bool required;
+    const char *comment;  /* used to print error message */
+} parser_keyword_value_pair_t;
+
 bool is_keyword(const char *word, const char *str);
 
 int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx);
+
+/* Optional values are not written when they are missing on command line, so they must be initialized */
+int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair_t *kv_pairs);
 
 extern const char *program_name;
 

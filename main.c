@@ -20,25 +20,19 @@
 
 #include "CLI/common.h"
 #include "CLI/clone_session.h"
+#include "CLI/multicast.h"
 #include "CLI/pipeline.h"
 #include "CLI/table.h"
 #include "CLI/action_selector.h"
 #include "CLI/meter.h"
 #include "CLI/digest.h"
 
-static int last_argc;
-static char **last_argv;
-static int (*last_do_help)(int argc, char **argv);
 const char *program_name;
 
 int cmd_select(const struct cmd *cmds, int argc, char **argv,
                int (*help)(int, char **))
 {
     unsigned int i;
-
-    last_argc = argc;
-    last_argv = argv;
-    last_do_help = help;
 
     if (argc < 1)
         return help(argc, argv);
@@ -104,12 +98,17 @@ static int do_port_del(int argc, char **argv)
 
 static int do_clone_session(int argc, char **argv)
 {
-    if (argc < 3) {
+    if (argc < 2) {
         do_clone_session_help(argc, argv);
         return -1;
     }
 
     return cmd_select(clone_session_cmds, argc, argv, do_clone_session_help);
+}
+
+static int do_multicast(int argc, char **argv)
+{
+    return cmd_select(multicast_cmds, argc, argv, do_multicast_help);
 }
 
 static int do_table(int argc, char **argv)
@@ -138,6 +137,7 @@ static const struct cmd cmds[] = {
         { "add-port",        do_port_add },
         { "del-port",        do_port_del },
         { "clone-session",   do_clone_session },
+        { "multicast-group", do_multicast },
         { "table",           do_table },
         { "action-selector", do_action_selector },
         { "meter",           do_meter },

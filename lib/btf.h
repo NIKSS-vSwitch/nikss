@@ -45,5 +45,6 @@ int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf);
 void free_btf(psabpf_btf_t *btf);
 
 int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *btf, psabpf_bpf_map_descriptor_t *md);
+int update_map_info(psabpf_bpf_map_descriptor_t *md);
 
 #endif  // __PSABPF_BTF_H

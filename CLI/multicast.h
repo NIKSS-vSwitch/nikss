@@ -15,24 +15,25 @@
  * limitations under the License.
  */
 
-#ifndef __PSABPFCTL_CLONE_SESSION_H
-#define __PSABPFCTL_CLONE_SESSION_H
+#ifndef __PRECTL_MULTICAST_H
+#define __PRECTL_MULTICAST_H
 
 #include "common.h"
 
-int do_clone_session_create(int argc, char **argv);
-int do_clone_session_delete(int argc, char **argv);
-int do_clone_session_add_member(int argc, char **argv);
-int do_clone_session_del_member(int argc, char **argv);
-int do_clone_session_help(int argc, char **argv);
+int do_multicast_create_group(int argc, char **argv);
+int do_multicast_delete_group(int argc, char **argv);
+int do_multicast_add_group_member(int argc, char **argv);
+int do_multicast_del_group_member(int argc, char **argv);
+int do_multicast_help(int argc, char **argv);
 
-static const struct cmd clone_session_cmds[] = {
-        {"help",       do_clone_session_help},
-        {"create",     do_clone_session_create},
-        {"delete",     do_clone_session_delete},
-        {"add-member", do_clone_session_add_member},
-        {"del-member", do_clone_session_del_member},
+
+static const struct cmd multicast_cmds[] = {
+        {"help",       do_multicast_help},
+        {"create",     do_multicast_create_group},
+        {"delete",     do_multicast_delete_group},
+        {"add-member", do_multicast_add_group_member},
+        {"del-member", do_multicast_del_group_member},
         {0}
 };
 
-#endif //__PSABPFCTL_CLONE_SESSION_H
+#endif  /* __PRECTL_MULTICAST_H */

@@ -23,9 +23,10 @@
 #include <linux/bpf.h>
 #include <linux/btf.h>
 
-#include "../include/psabpf.h"
+#include <psabpf.h>
 #include "btf.h"
 #include "common.h"
+#include "bpf_defs.h"
 
 static uint32_t follow_types(struct btf * btf, uint32_t type_id)
 {
@@ -283,19 +284,9 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
         return errno;
 
     /* get key/value size */
-    struct bpf_map_info info = {};
-    uint32_t len = sizeof(info);
-    errno_val = bpf_obj_get_info_by_fd(md->fd, &info, &len);
-    if (errno_val) {
-        errno_val = errno;
-        fprintf(stderr, "can't get info for table %s: %s\n", name, strerror(errno_val));
+    errno_val = update_map_info(md);
+    if (errno_val != NO_ERROR)
         return errno_val;
-    }
-
-    md->type = info.type;
-    md->key_size = info.key_size;
-    md->value_size = info.value_size;
-    md->max_entries = info.max_entries;
 
     /* Find entry in BTF for our map */
     if (btf != NULL && btf->btf != NULL) {
@@ -303,6 +294,30 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
         if (md->btf_type_id == 0)
             fprintf(stderr, "can't get BTF info for %s\n", name);
     }
+
+    return NO_ERROR;
+}
+
+int update_map_info(psabpf_bpf_map_descriptor_t *md)
+{
+    if (md == NULL)
+        return EINVAL;
+    if (md->fd < 0)
+        return EBADF;
+
+    struct bpf_map_info info = {};
+    uint32_t len = sizeof(info);
+    int errno_val = bpf_obj_get_info_by_fd(md->fd, &info, &len);
+    if (errno_val) {
+        errno_val = errno;
+        fprintf(stderr, "can't get info for table: %s\n", strerror(errno_val));
+        return errno_val;
+    }
+
+    md->type = info.type;
+    md->key_size = info.key_size;
+    md->value_size = info.value_size;
+    md->max_entries = info.max_entries;
 
     return NO_ERROR;
 }

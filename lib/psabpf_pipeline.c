@@ -26,7 +26,7 @@
 #include <string.h>
 
 #include "../include/psabpf_pipeline.h"
-#include "../include/bpf_defs.h"
+#include "bpf_defs.h"
 #include "common.h"
 #include "btf.h"
 
