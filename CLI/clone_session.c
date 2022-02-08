@@ -23,7 +23,7 @@
 #include <psabpf_pre.h>
 #include "common.h"
 
-int clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
+static int clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
 {
     int error;
     psabpf_clone_session_ctx_t session;
@@ -47,7 +47,7 @@ err:
     return error;
 }
 
-int clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
+static int clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
 {
     int error;
     psabpf_clone_session_ctx_t session;
@@ -71,13 +71,13 @@ err:
     return error;
 }
 
-int clone_session_add_member(psabpf_context_t *ctx,
-                             psabpf_clone_session_id_t clone_session_id,
-                             uint32_t  egress_port,
-                             uint16_t  instance,
-                             uint8_t   class_of_service,
-                             bool      truncate,
-                             uint16_t  packet_length_bytes)
+static int clone_session_add_member(psabpf_context_t *ctx,
+                                    psabpf_clone_session_id_t clone_session_id,
+                                    uint32_t  egress_port,
+                                    uint16_t  instance,
+                                    uint8_t   class_of_service,
+                                    bool      truncate,
+                                    uint16_t  packet_length_bytes)
 {
     int error;
     psabpf_clone_session_ctx_t session;
@@ -113,10 +113,10 @@ err:
     return error;
 }
 
-int clone_session_del_member(psabpf_context_t *ctx,
-                             psabpf_clone_session_id_t clone_session_id,
-                             uint32_t  egress_port,
-                             uint16_t  instance)
+static int clone_session_del_member(psabpf_context_t *ctx,
+                                    psabpf_clone_session_id_t clone_session_id,
+                                    uint32_t  egress_port,
+                                    uint16_t  instance)
 {
     int error;
     psabpf_clone_session_ctx_t session;
@@ -125,10 +125,11 @@ int clone_session_del_member(psabpf_context_t *ctx,
     psabpf_clone_session_context_init(&session);
     psabpf_clone_session_id(&session, clone_session_id);
 
-//    if (psabpf_clone_session_exists(&ctx, &session)) {
-//        error = EEXIST;
-//        goto err;
-//    }
+    if (!psabpf_clone_session_exists(ctx, &session)) {
+        fprintf(stderr, "no such clone session %u\n", clone_session_id);
+        error = ENOENT;
+        goto err;
+    }
 
     psabpf_clone_session_entry_init(&entry);
     psabpf_clone_session_entry_port(&entry, egress_port);

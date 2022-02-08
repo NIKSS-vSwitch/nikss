@@ -21,6 +21,27 @@
 #include "multicast.h"
 #include <psabpf_pre.h>
 
+static int group_parser(int *argc, char ***argv, psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *mcast_grp)
+{
+    int ret = parse_pipeline_id(argc, argv, ctx);
+    if (ret != NO_ERROR)
+        return ret;
+
+    psabpf_mcast_grp_id_t group_id;
+    parser_keyword_value_pair_t kv[] = {
+            {"id", &group_id, sizeof(group_id), true, "multicast group id"},
+            { 0 },
+    };
+
+    ret = parse_keyword_value_pairs(argc, argv, &kv[0]);
+    if (ret != NO_ERROR)
+        return ret;
+
+    psabpf_mcast_grp_id(mcast_grp, group_id);
+
+    return NO_ERROR;
+}
+
 int do_multicast_create_group(int argc, char **argv)
 {
     psabpf_context_t ctx;
@@ -30,16 +51,7 @@ int do_multicast_create_group(int argc, char **argv)
     psabpf_context_init(&ctx);
     psabpf_mcast_grp_context_init(&mcast_grp);
 
-    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
-        goto err;
-
-    psabpf_mcast_grp_id_t group_id;
-    parser_keyword_value_pair_t kv[] = {
-            {"id", &group_id, sizeof(group_id), true, "multicast group id"},
-            { 0 },
-    };
-
-    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+    if (group_parser(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR)
         goto err;
 
     if (argc > 0) {
@@ -47,10 +59,8 @@ int do_multicast_create_group(int argc, char **argv)
         goto err;
     }
 
-    psabpf_mcast_grp_id(&mcast_grp, group_id);
-
     if (psabpf_mcast_grp_exists(&ctx, &mcast_grp)) {
-        fprintf(stderr, "multicast group %u already exists\n", group_id);
+        fprintf(stderr, "multicast group already exists\n");
         ret = EEXIST;
         goto err;
     }
@@ -73,16 +83,7 @@ int do_multicast_delete_group(int argc, char **argv)
     psabpf_context_init(&ctx);
     psabpf_mcast_grp_context_init(&mcast_grp);
 
-    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
-        goto err;
-
-    psabpf_mcast_grp_id_t group_id;
-    parser_keyword_value_pair_t kv[] = {
-            {"id", &group_id, sizeof(group_id), true, "multicast group id"},
-            { 0 },
-    };
-
-    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+    if (group_parser(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR)
         goto err;
 
     if (argc > 0) {
@@ -90,10 +91,8 @@ int do_multicast_delete_group(int argc, char **argv)
         goto err;
     }
 
-    psabpf_mcast_grp_id(&mcast_grp, group_id);
-
     if (!psabpf_mcast_grp_exists(&ctx, &mcast_grp)) {
-        fprintf(stderr, "multicast group %u does not exist\n", group_id);
+        fprintf(stderr, "multicast group does not exist\n");
         ret = ENOENT;
         goto err;
     }
@@ -107,6 +106,31 @@ err:
     return ret;
 }
 
+static int member_parser(int *argc, char ***argv, psabpf_context_t *ctx,
+                         psabpf_mcast_grp_ctx_t *mcast_grp, psabpf_mcast_grp_member_t *member)
+{
+    int ret = group_parser(argc, argv, ctx, mcast_grp);
+    if (ret != NO_ERROR)
+        return ret;
+
+    uint32_t egress_port;
+    uint16_t instance;
+    parser_keyword_value_pair_t kv[] = {
+            {"egress-port", &egress_port, sizeof(egress_port), true, "egress port"},
+            {"instance",    &instance,    sizeof(instance),    true, "egress port instance"},
+            { 0 },
+    };
+
+    ret = parse_keyword_value_pairs(argc, argv, &kv[0]);
+    if (ret != NO_ERROR)
+        return ret;
+
+    psabpf_mcast_grp_member_port(member, egress_port);
+    psabpf_mcast_grp_member_instance(member, instance);
+
+    return NO_ERROR;
+}
+
 int do_multicast_add_group_member(int argc, char **argv)
 {
     psabpf_context_t ctx;
@@ -118,20 +142,7 @@ int do_multicast_add_group_member(int argc, char **argv)
     psabpf_mcast_grp_context_init(&mcast_grp);
     psabpf_mcast_grp_member_init(&member);
 
-    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
-        goto err;
-
-    psabpf_mcast_grp_id_t group_id;
-    uint32_t egress_port;
-    uint16_t instance;
-    parser_keyword_value_pair_t kv[] = {
-            {"id",          &group_id,    sizeof(group_id),    true, "multicast group id"},
-            {"egress-port", &egress_port, sizeof(egress_port), true, "egress port"},
-            {"instance",    &instance,    sizeof(instance),    true, "egress port instance"},
-            { 0 },
-    };
-
-    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+    if (member_parser(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR)
         goto err;
 
     if (argc > 0) {
@@ -139,12 +150,8 @@ int do_multicast_add_group_member(int argc, char **argv)
         goto err;
     }
 
-    psabpf_mcast_grp_id(&mcast_grp, group_id);
-    psabpf_mcast_grp_member_port(&member, egress_port);
-    psabpf_mcast_grp_member_instance(&member, instance);
-
     if (!psabpf_mcast_grp_exists(&ctx, &mcast_grp)) {
-        fprintf(stderr, "multicast group %u does not exist\n", group_id);
+        fprintf(stderr, "multicast group does not exist\n");
         ret = ENOENT;
         goto err;
     }
@@ -170,20 +177,7 @@ int do_multicast_del_group_member(int argc, char **argv)
     psabpf_mcast_grp_context_init(&mcast_grp);
     psabpf_mcast_grp_member_init(&member);
 
-    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
-        goto err;
-
-    psabpf_mcast_grp_id_t group_id;
-    uint32_t egress_port;
-    uint16_t instance;
-    parser_keyword_value_pair_t kv[] = {
-            {"id",          &group_id,    sizeof(group_id),    true, "multicast group id"},
-            {"egress-port", &egress_port, sizeof(egress_port), true, "egress port"},
-            {"instance",    &instance,    sizeof(instance),    true, "egress port instance"},
-            { 0 },
-    };
-
-    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+    if (member_parser(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR)
         goto err;
 
     if (argc > 0) {
@@ -191,12 +185,8 @@ int do_multicast_del_group_member(int argc, char **argv)
         goto err;
     }
 
-    psabpf_mcast_grp_id(&mcast_grp, group_id);
-    psabpf_mcast_grp_member_port(&member, egress_port);
-    psabpf_mcast_grp_member_instance(&member, instance);
-
     if (!psabpf_mcast_grp_exists(&ctx, &mcast_grp)) {
-        fprintf(stderr, "multicast group %u does not exist\n", group_id);
+        fprintf(stderr, "multicast group does not exist\n");
         ret = ENOENT;
         goto err;
     }
