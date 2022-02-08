@@ -34,6 +34,7 @@ set(PSABPFCTL_SRCS
         CLI/action_selector.c
         CLI/common.c
         CLI/clone_session.c
+        CLI/multicast.c
         CLI/digest.c
         CLI/pipeline.c
         CLI/table.c

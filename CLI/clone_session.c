@@ -219,7 +219,7 @@ int do_clone_session_add_member(int argc, char **argv)
 
     uint32_t session_id, egress_port;
     uint16_t instance, plen_bytes;
-    uint8_t cos;
+    uint8_t cos = 0;
     bool truncate = false;
     parser_keyword_value_pair_t kv[] = {
             {"id",          &session_id,  sizeof(session_id),  true,  "session id"},
