@@ -24,6 +24,29 @@
 
 #define NO_ERROR 0
 
+/*
+ * Internal types
+ */
+
+typedef struct psabpf_btf {
+    /* BTF metadata are associated with eBPF program, eBPF map may do not own BTF */
+    int associated_prog;
+    void * btf;
+} psabpf_btf_t;
+
+typedef struct psabpf_bpf_map_descriptor {
+    int fd;
+    uint32_t type;
+    uint32_t key_size;
+    uint32_t value_size;
+    uint32_t btf_type_id;  // TODO: key type ID and value type ID
+    uint32_t max_entries;
+} psabpf_bpf_map_descriptor_t;
+
+/*
+ * General purpose types and functions
+ */
+
 typedef uint32_t psabpf_pipeline_id_t;
 
 /**
@@ -54,6 +77,34 @@ void psabpf_context_free(psabpf_context_t *ctx);
 void psabpf_context_set_pipeline(psabpf_context_t *ctx, psabpf_pipeline_id_t pipeline_id);
 psabpf_pipeline_id_t psabpf_context_get_pipeline(psabpf_context_t *ctx);
 
+typedef enum psabpf_struct_field_type {
+    PSABPF_STRUCT_FIELD_TYPE_UNKNOWN = 0,
+    PSABPF_STRUCT_FIELD_TYPE_DATA,
+    /* For nested structures */
+    PSABPF_STRUCT_FIELD_TYPE_STRUCT_START,
+    PSABPF_STRUCT_FIELD_TYPE_STRUCT_END
+} psabpf_struct_field_type_t;
+
+/* Type for internal use */
+typedef struct psabpf_struct_field_descriptor {
+    psabpf_struct_field_type_t type;
+    size_t data_offset;
+    size_t data_len;
+    const char *name;
+} psabpf_struct_field_descriptor_t;
+
+/* Used to read/write structures */
+typedef struct psabpf_struct_field {
+    psabpf_struct_field_type_t type;
+    void *data;
+    size_t data_len;
+    const char *name;
+} psabpf_struct_field_t;
+
+psabpf_struct_field_type_t psabpf_struct_get_field_type(psabpf_struct_field_t *field);
+const char * psabpf_struct_get_field_name(psabpf_struct_field_t *field);
+const void * psabpf_struct_get_field_data(psabpf_struct_field_t *field);
+size_t psabpf_struct_get_field_data_len(psabpf_struct_field_t *field);
 
 ////// TableEntry
 enum psabpf_matchkind_t {
@@ -107,21 +158,6 @@ typedef struct psabpf_table_entry {
 
     uint32_t priority;
 } psabpf_table_entry_t;
-
-typedef struct psabpf_btf {
-    // BTF metadata are associated with eBPF program, eBPF map do not have own BTF
-    int associated_prog;
-    void * btf;
-} psabpf_btf_t;
-
-typedef struct psabpf_bpf_map_descriptor {
-    int fd;
-    uint32_t type;
-    uint32_t key_size;
-    uint32_t value_size;
-    uint32_t btf_type_id;  // TODO: key type ID and value type ID
-    uint32_t max_entries;
-} psabpf_bpf_map_descriptor_t;
 
 /*
  * TODO: specific fields of table entry context are still to be added.
@@ -281,22 +317,54 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
 int psabpf_action_selector_set_default_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action);
 
 /*
- * P4 Counters
+ * TODO: Action Profile
  */
-// TODO: design API for Counters
+
+/*
+ * Counters
+ */
 
 typedef uint64_t psabpf_counter_value_t;
 
-// TODO: psabpf API for counters is not done yet.
-typedef struct {
-    //! member validity: packets, bytes or both?
-    int valid;
+typedef enum psabpf_counter_type {
+    PSABPF_COUNTER_TYPE_UNKNOWN = 0,
+    PSABPF_COUNTER_TYPE_BYTES,
+    PSABPF_COUNTER_TYPE_PACKETS,
+    PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS,
+} psabpf_counter_type_t;
+
+typedef struct psabpf_counter_context {
+    psabpf_bpf_map_descriptor_t counter;
+    psabpf_btf_t btf_metadata;
+    psabpf_counter_type_t counter_type;
+} psabpf_counter_context_t;
+
+typedef struct psabpf_counter_entry {
+    psabpf_counter_type_t counter_type;
     psabpf_counter_value_t bytes;
     psabpf_counter_value_t packets;
-} psabpf_counter_data_t;
+} psabpf_counter_entry_t;
 
-int psabpf_counter_read(const char *name, size_t index, psabpf_counter_data_t *data);
-int psabpf_counter_reset(const char *name, size_t index);
+void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx);
+void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx);
+int psabpf_counter_open(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name);
+
+void psabpf_counter_entry_init(psabpf_counter_entry_t *entry);
+void psabpf_counter_entry_free(psabpf_counter_entry_t *entry);
+
+/* can be called multiple times */
+int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, void *data, size_t data_len);
+psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
+
+void psabpf_counter_entry_set_packets(psabpf_counter_entry_t *entry, psabpf_counter_value_t packets);
+void psabpf_counter_entry_set_bytes(psabpf_counter_entry_t *entry, psabpf_counter_value_t bytes);
+psabpf_counter_value_t psabpf_counter_entry_get_packets(psabpf_counter_entry_t *entry);
+psabpf_counter_value_t psabpf_counter_entry_get_bytes(psabpf_counter_entry_t *entry);
+
+int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
+psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx);
+int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
+int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
 
 /*
  * P4 Meters

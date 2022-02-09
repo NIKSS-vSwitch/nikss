@@ -57,7 +57,7 @@ void psabpf_digest_context_free(psabpf_digest_context_t *ctx)
 
 static int setup_context_no_btf(psabpf_digest_context_t *ctx)
 {
-    ctx->fields = calloc(1, sizeof(psabpf_digest_field_descriptor_t));
+    ctx->fields = calloc(1, sizeof(psabpf_struct_field_descriptor_t));
     if (ctx->fields == NULL) {
         fprintf(stderr, "not enough memory\n");
         return ENOMEM;
@@ -72,7 +72,7 @@ static int setup_context_no_btf(psabpf_digest_context_t *ctx)
 
     ctx->fields[0].data_len = ctx->queue.value_size;
     ctx->fields[0].data_offset = 0;
-    ctx->fields[0].type = DIGEST_FIELD_TYPE_DATA;
+    ctx->fields[0].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
     ctx->n_fields = 1;
 
     return NO_ERROR;
@@ -130,7 +130,7 @@ static int parse_digest_struct(psabpf_digest_context_t *ctx, uint32_t type_id, u
             return 0;
         }
 
-        ctx->fields[*field_idx].type = DIGEST_FIELD_TYPE_DATA;
+        ctx->fields[*field_idx].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
         ctx->fields[*field_idx].data_offset = base_offset + md.bit_offset / 8;
         ctx->fields[*field_idx].data_len = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, md.effective_type_id);
         const char *field_name = btf__name_by_offset(ctx->btf_metadata.btf, md.member->name_off);
@@ -144,7 +144,7 @@ static int parse_digest_struct(psabpf_digest_context_t *ctx, uint32_t type_id, u
 
         const struct btf_type *member_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, md.effective_type_id);
         if (btf_is_struct(member_type)) {
-            ctx->fields[*field_idx].type = DIGEST_FIELD_TYPE_STRUCT_START;
+            ctx->fields[*field_idx].type = PSABPF_STRUCT_FIELD_TYPE_STRUCT_START;
             (*field_idx)++;
             if (*field_idx >= ctx->n_fields)
                 goto too_many_fields;
@@ -156,7 +156,7 @@ static int parse_digest_struct(psabpf_digest_context_t *ctx, uint32_t type_id, u
                 goto too_many_fields;
             /* field_idx should point outside the last inserted entry, now add marker
              * for struct end. For now offset, len and name are not set */
-            ctx->fields[*field_idx].type = DIGEST_FIELD_TYPE_STRUCT_END;
+            ctx->fields[*field_idx].type = PSABPF_STRUCT_FIELD_TYPE_STRUCT_END;
         }
 
         (*field_idx)++;
@@ -179,7 +179,7 @@ static int parse_digest_btf(psabpf_digest_context_t *ctx)
     }
 
     ctx->n_fields = count_total_fields(ctx, type_id);
-    ctx->fields = calloc(ctx->n_fields, sizeof(psabpf_digest_field_descriptor_t));
+    ctx->fields = calloc(ctx->n_fields, sizeof(psabpf_struct_field_descriptor_t));
     if (ctx->n_fields == 0 || ctx->fields == NULL) {
         fprintf(stderr, "failed to count fields\n");
         return EINVAL;
@@ -256,7 +256,7 @@ void psabpf_digest_free(psabpf_digest_t *digest)
     memset(digest, 0, sizeof(psabpf_digest_t));
 }
 
-psabpf_digest_field_t * psabpf_digest_get_next_field(psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
+psabpf_struct_field_t * psabpf_digest_get_next_field(psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
 {
     if (ctx == NULL || digest == NULL)
         return NULL;
@@ -266,7 +266,7 @@ psabpf_digest_field_t * psabpf_digest_get_next_field(psabpf_digest_context_t *ct
         return NULL;
     }
 
-    if (ctx->fields[digest->current_field_id].type == DIGEST_FIELD_TYPE_UNKNOWN)
+    if (ctx->fields[digest->current_field_id].type == PSABPF_STRUCT_FIELD_TYPE_UNKNOWN)
         return NULL;
 
     digest->current.type = ctx->fields[digest->current_field_id].type;
@@ -277,24 +277,4 @@ psabpf_digest_field_t * psabpf_digest_get_next_field(psabpf_digest_context_t *ct
     digest->current_field_id = digest->current_field_id + 1;
 
     return &digest->current;
-}
-
-psabpf_digest_field_type_t psabpf_digest_get_field_type(psabpf_digest_field_t *field)
-{
-    return field->type;
-}
-
-const char * psabpf_digest_get_field_name(psabpf_digest_field_t *field)
-{
-    return field->name;
-}
-
-const void * psabpf_digest_get_field_data(psabpf_digest_field_t *field)
-{
-    return field->data;
-}
-
-size_t psabpf_digest_get_field_data_len(psabpf_digest_field_t *field)
-{
-    return field->data_len;
 }

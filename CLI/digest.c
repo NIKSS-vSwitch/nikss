@@ -54,18 +54,18 @@ static int parse_digest(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
 
 static int build_struct_json(json_t *parent, psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
 {
-    psabpf_digest_field_t *field;
+    psabpf_struct_field_t *field;
     while ((field = psabpf_digest_get_next_field(ctx, digest)) != NULL) {
         /* To build flat structure of output JSON just remove this and next conditional
          * statement. In other words, preserve only condition and instructions below it:
          *      if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA) continue; */
-        if (psabpf_digest_get_field_type(field) == DIGEST_FIELD_TYPE_STRUCT_START) {
+        if (psabpf_struct_get_field_type(field) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_START) {
             json_t *sub_struct = json_object();
             if (sub_struct == NULL) {
                 fprintf(stderr, "failed to prepare message sub-object JSON\n");
                 return ENOMEM;
             }
-            if (json_object_set(parent, psabpf_digest_get_field_name(field), sub_struct)) {
+            if (json_object_set(parent, psabpf_struct_get_field_name(field), sub_struct)) {
                 fprintf(stderr, "failed to add message sub-object JSON\n");
                 json_decref(sub_struct);
                 return EPERM;
@@ -79,19 +79,19 @@ static int build_struct_json(json_t *parent, psabpf_digest_context_t *ctx, psabp
             continue;
         }
 
-        if (psabpf_digest_get_field_type(field) == DIGEST_FIELD_TYPE_STRUCT_END)
+        if (psabpf_struct_get_field_type(field) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_END)
             return NO_ERROR;
 
-        if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA)
+        if (psabpf_struct_get_field_type(field) != PSABPF_STRUCT_FIELD_TYPE_DATA)
             continue;
 
-        const char *encoded_data = convert_bin_data_to_hexstr(psabpf_digest_get_field_data(field),
-                                                              psabpf_digest_get_field_data_len(field));
+        const char *encoded_data = convert_bin_data_to_hexstr(psabpf_struct_get_field_data(field),
+                                                              psabpf_struct_get_field_data_len(field));
         if (encoded_data == NULL) {
             fprintf(stderr, "not enough memory\n");
             return ENOMEM;
         }
-        const char *field_name = psabpf_digest_get_field_name(field);
+        const char *field_name = psabpf_struct_get_field_name(field);
         if (field_name == NULL)
             field_name = "";
         json_object_set_new(parent, field_name, json_string(encoded_data));
