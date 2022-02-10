@@ -28,9 +28,7 @@
 #include "btf.h"
 #include "common.h"
 #include "psabpf_table.h"
-
-#define COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES  1
-#define COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES 2
+#include "bpf_defs.h"
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
 {

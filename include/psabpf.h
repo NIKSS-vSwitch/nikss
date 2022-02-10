@@ -93,6 +93,11 @@ typedef struct psabpf_struct_field_descriptor {
     const char *name;
 } psabpf_struct_field_descriptor_t;
 
+typedef struct psabpf_struct_field_descriptor_set {
+    size_t n_fields;
+    psabpf_struct_field_descriptor_t *fields;
+} psabpf_struct_field_descriptor_set_t;
+
 /* Used to read/write structures */
 typedef struct psabpf_struct_field {
     psabpf_struct_field_type_t type;
@@ -335,8 +340,10 @@ typedef enum psabpf_counter_type {
 
 typedef struct psabpf_counter_context {
     psabpf_bpf_map_descriptor_t counter;
-    psabpf_btf_t btf_metadata;
     psabpf_counter_type_t counter_type;
+
+    psabpf_btf_t btf_metadata;
+    psabpf_struct_field_descriptor_set_t key_fds;
 } psabpf_counter_context_t;
 
 typedef struct psabpf_counter_entry {

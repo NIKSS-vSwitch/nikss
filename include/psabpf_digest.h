@@ -24,8 +24,7 @@ typedef struct psabpf_digest_context {
     psabpf_bpf_map_descriptor_t queue;
     psabpf_btf_t btf_metadata;
 
-    size_t n_fields;
-    psabpf_struct_field_descriptor_t *fields;
+    psabpf_struct_field_descriptor_set_t fds;
 } psabpf_digest_context_t;
 
 /* Used to read a next Digest message. */

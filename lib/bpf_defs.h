@@ -18,6 +18,9 @@
 #ifndef P4C_BPF_DEFS_H
 #define P4C_BPF_DEFS_H
 
+#define COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES  1
+#define COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES 2
+
 #ifdef __GNUC__
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-variable"

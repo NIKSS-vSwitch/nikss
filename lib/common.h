@@ -19,7 +19,7 @@
 #define P4C_PSABPF_COMMON_H
 
 #include <stdint.h>
-#include "../include/psabpf.h"
+#include <psabpf.h>
 
 int str_ends_with(const char *str, const char *suffix);
 
@@ -31,5 +31,9 @@ void close_object_fd(int *fd);
 int build_ebpf_map_filename(char *buffer, size_t maxlen, psabpf_context_t *ctx, const char *name);
 int build_ebpf_prog_filename(char *buffer, size_t maxlen, psabpf_context_t *ctx, const char *name);
 int build_ebpf_pipeline_path(char *buffer, size_t maxlen, psabpf_context_t *ctx);
+
+void free_struct_field_descriptor_set(psabpf_struct_field_descriptor_set_t *fds);
+int parse_struct_type(psabpf_btf_t *btf_md, uint32_t type_id, size_t data_size, psabpf_struct_field_descriptor_set_t *fds);
+psabpf_struct_field_descriptor_t *get_struct_field_descriptor(psabpf_struct_field_descriptor_set_t *fds, size_t index);
 
 #endif  /* P4C_PSABPF_COMMON_H */
