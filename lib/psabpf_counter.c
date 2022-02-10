@@ -16,7 +16,9 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
+#include <bpf/bpf.h>
 
 #include <psabpf.h>
 #include "common.h"
@@ -122,3 +124,165 @@ int psabpf_counter_open(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *
     return parse_counter_key(ctx);
 }
 
+void psabpf_counter_entry_init(psabpf_counter_entry_t *entry)
+{
+    if (entry == NULL)
+        return;
+
+    memset(entry, 0, sizeof(psabpf_counter_entry_t));
+}
+
+void psabpf_counter_entry_free(psabpf_counter_entry_t *entry)
+{
+    if (entry == NULL)
+        return;
+
+    free_struct_field_set(&entry->entry_key);
+
+    if (entry->raw_key != NULL)
+        free(entry->raw_key);
+    entry->raw_key = NULL;
+}
+
+int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, void *data, size_t data_len)
+{
+    if (entry == NULL)
+        return EINVAL;
+    if (data == NULL || data_len < 1)
+        return ENODATA;
+
+    return struct_field_set_append(&entry->entry_key, data, data_len);
+}
+
+psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL)
+        return NULL;
+
+    if (entry->raw_key == NULL)
+        return NULL;
+
+    psabpf_struct_field_descriptor_t *fd;
+    fd = get_struct_field_descriptor(&ctx->key_fds, entry->current_key_id);
+    if (fd == NULL) {
+        entry->current_key_id = 0;
+        return NULL;
+    }
+
+    entry->current_field.type = fd->type;
+    entry->current_field.data_len = fd->data_len;
+    entry->current_field.name = fd->name;
+    entry->current_field.data = entry->raw_key + fd->data_offset;
+
+    entry->current_key_id = entry->current_key_id + 1;
+
+    return &entry->current_field;
+}
+
+void psabpf_counter_entry_set_packets(psabpf_counter_entry_t *entry, psabpf_counter_value_t packets)
+{
+    if (entry == NULL)
+        return;
+    entry->packets = packets;
+}
+
+void psabpf_counter_entry_set_bytes(psabpf_counter_entry_t *entry, psabpf_counter_value_t bytes)
+{
+    if (entry == NULL)
+        return;
+    entry->bytes = bytes;
+}
+
+psabpf_counter_value_t psabpf_counter_entry_get_packets(psabpf_counter_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+
+    if (entry->counter_type == PSABPF_COUNTER_TYPE_PACKETS ||
+        entry->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
+        return entry->packets;
+
+    return 0;
+}
+
+psabpf_counter_value_t psabpf_counter_entry_get_bytes(psabpf_counter_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+
+    if (entry->counter_type == PSABPF_COUNTER_TYPE_BYTES ||
+        entry->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
+        return entry->bytes;
+
+    return 0;
+}
+
+static void *allocate_key_buffer(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    if (entry->raw_key != NULL)
+        return entry->raw_key;  /* already allocated */
+
+    entry->raw_key = malloc(ctx->counter.key_size);
+    if (entry->raw_key == NULL)
+        fprintf(stderr, "not enough memory\n");
+
+    return entry->raw_key;
+}
+
+int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    if (allocate_key_buffer(ctx, entry) == NULL)
+        return ENOMEM;
+
+    int ret = construct_struct_from_fields(&entry->entry_key, &ctx->key_fds, entry->raw_key, ctx->counter.key_size);
+    if (ret != NO_ERROR)
+        return ret;
+
+    uint8_t value[16];
+    ret = bpf_map_lookup_elem(ctx->counter.fd, entry->raw_key, &value[0]);
+    if (ret != 0) {
+        ret = errno;
+        fprintf(stderr, "failed to read Counter entry: %s\n", strerror(ret));
+        return ret;
+    }
+
+    size_t counter_size = ctx->counter.value_size;
+    if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES)
+        memcpy(&entry->bytes, &value[0], counter_size);
+    else if (ctx->counter_type == PSABPF_COUNTER_TYPE_PACKETS)
+        memcpy(&entry->packets, &value[0], counter_size);
+    else if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+        counter_size = counter_size / 2;
+        memcpy(&entry->bytes, &value[0], counter_size);
+        memcpy(&entry->packets, &value[counter_size], counter_size);
+    }
+
+    return NO_ERROR;
+}
+
+psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx)
+{
+    return NULL;
+}
+
+int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    return NO_ERROR;
+}
+
+int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    entry->bytes = 0;
+    entry->packets = 0;
+
+    return psabpf_counter_set(ctx, entry);
+}

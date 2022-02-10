@@ -106,6 +106,11 @@ typedef struct psabpf_struct_field {
     const char *name;
 } psabpf_struct_field_t;
 
+typedef struct psabpf_struct_field_set {
+    size_t n_fields;
+    psabpf_struct_field_t *fields;
+} psabpf_struct_field_set_t;
+
 psabpf_struct_field_type_t psabpf_struct_get_field_type(psabpf_struct_field_t *field);
 const char * psabpf_struct_get_field_name(psabpf_struct_field_t *field);
 const void * psabpf_struct_get_field_data(psabpf_struct_field_t *field);
@@ -347,6 +352,11 @@ typedef struct psabpf_counter_context {
 } psabpf_counter_context_t;
 
 typedef struct psabpf_counter_entry {
+    psabpf_struct_field_set_t entry_key;
+    void *raw_key;
+    size_t current_key_id;
+    psabpf_struct_field_t current_field;
+
     psabpf_counter_type_t counter_type;
     psabpf_counter_value_t bytes;
     psabpf_counter_value_t packets;

@@ -255,3 +255,109 @@ psabpf_struct_field_descriptor_t *get_struct_field_descriptor(psabpf_struct_fiel
 
     return &fds->fields[index];
 }
+
+void free_struct_field_set(psabpf_struct_field_set_t *sfs)
+{
+    if (sfs == NULL)
+        return;
+
+    if (sfs->fields != NULL) {
+        for (unsigned i = 0; i < sfs->n_fields; i++) {
+            if (sfs->fields[i].data != NULL)
+                free(sfs->fields[i].data);
+            if (sfs->fields[i].name != NULL)
+                free((void *) sfs->fields[i].name);
+        }
+        free(sfs->fields);
+    }
+
+    sfs->fields = NULL;
+    sfs->n_fields = 0;
+}
+
+int struct_field_set_append(psabpf_struct_field_set_t *sfs, void *data, size_t data_len)
+{
+    if (sfs == NULL)
+        return EINVAL;
+    if (data == NULL || data_len < 1)
+        return ENODATA;
+
+    size_t new_size = (sfs->n_fields + 1) * sizeof(psabpf_struct_field_t);
+    psabpf_struct_field_t *tmp_array = malloc(new_size);
+
+    if (tmp_array == NULL)
+        return ENOMEM;
+
+    if (sfs->n_fields != 0)
+        memcpy(tmp_array, sfs->fields, (sfs->n_fields) * sizeof(psabpf_struct_field_t));
+    if (sfs->fields != NULL)
+        free(sfs->fields);
+    sfs->fields = tmp_array;
+
+    sfs->fields[sfs->n_fields].data = malloc(data_len);
+    if (sfs->fields[sfs->n_fields].data == NULL)
+        return ENOMEM;
+
+    sfs->fields[sfs->n_fields].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
+    memcpy(sfs->fields[sfs->n_fields].data, data, data_len);
+    sfs->fields[sfs->n_fields].data_len = data_len;
+    sfs->fields[sfs->n_fields].name = NULL;
+
+    sfs->n_fields += 1;
+
+    return NO_ERROR;
+}
+
+int construct_struct_from_fields(psabpf_struct_field_set_t *data, psabpf_struct_field_descriptor_set_t *fds,
+                                 void *buffer, size_t buffer_len)
+{
+    memset(buffer, 0, buffer_len);
+
+    /* If passed number of fields is equal to number of fields of structure then try build field by field */
+    unsigned struct_data_fields = 0;
+    for (unsigned i = 0; i < fds->n_fields; i++) {
+        if (fds->fields[i].type == PSABPF_STRUCT_FIELD_TYPE_DATA)
+            ++struct_data_fields;
+    }
+
+    if (struct_data_fields == data->n_fields) {
+        unsigned field_idx = 0;
+        bool failed = false;
+        for (unsigned descriptor_idx = 0; descriptor_idx < fds->n_fields; descriptor_idx++) {
+            if (fds->fields[descriptor_idx].type != PSABPF_STRUCT_FIELD_TYPE_DATA)
+                continue;
+
+            if (data->fields[field_idx].data_len > fds->fields[descriptor_idx].data_len) {
+                failed = true;
+                break;
+            }
+
+            memcpy(buffer + fds->fields[descriptor_idx].data_offset,
+                   data->fields[field_idx].data,
+                   data->fields[field_idx].data_len);
+
+            ++field_idx;
+        }
+        if (!failed)
+            return NO_ERROR;
+
+    }
+
+    fprintf(stderr, "failed to construct data type based on fields\n");
+
+    /* We can build structure if total length of data is equal to length of struct type */
+    size_t total_size = 0;
+    for (unsigned i = 0; i < data->n_fields; i++)
+        total_size += data->fields[i].data_len;
+
+    if (total_size == buffer_len) {
+        size_t offset = 0;
+        for (unsigned i = 0; i < data->n_fields; i++) {
+            memcpy(buffer + offset, data->fields[i].data, data->fields[i].data_len);
+            offset += data->fields[i].data_len;
+        }
+    }
+
+    fprintf(stderr, "failed to construct data type\n");
+    return EINVAL;
+}

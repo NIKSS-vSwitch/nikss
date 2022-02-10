@@ -36,4 +36,9 @@ void free_struct_field_descriptor_set(psabpf_struct_field_descriptor_set_t *fds)
 int parse_struct_type(psabpf_btf_t *btf_md, uint32_t type_id, size_t data_size, psabpf_struct_field_descriptor_set_t *fds);
 psabpf_struct_field_descriptor_t *get_struct_field_descriptor(psabpf_struct_field_descriptor_set_t *fds, size_t index);
 
+void free_struct_field_set(psabpf_struct_field_set_t *sfs);
+int struct_field_set_append(psabpf_struct_field_set_t *sfs, void *data, size_t data_len);
+int construct_struct_from_fields(psabpf_struct_field_set_t *data, psabpf_struct_field_descriptor_set_t *fds,
+                                 void *buffer, size_t buffer_len);
+
 #endif  /* P4C_PSABPF_COMMON_H */
