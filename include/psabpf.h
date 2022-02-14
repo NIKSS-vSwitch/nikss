@@ -343,24 +343,26 @@ typedef enum psabpf_counter_type {
     PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS,
 } psabpf_counter_type_t;
 
-typedef struct psabpf_counter_context {
-    psabpf_bpf_map_descriptor_t counter;
-    psabpf_counter_type_t counter_type;
-
-    psabpf_btf_t btf_metadata;
-    psabpf_struct_field_descriptor_set_t key_fds;
-} psabpf_counter_context_t;
-
 typedef struct psabpf_counter_entry {
     psabpf_struct_field_set_t entry_key;
     void *raw_key;
     size_t current_key_id;
     psabpf_struct_field_t current_field;
 
-    psabpf_counter_type_t counter_type;
     psabpf_counter_value_t bytes;
     psabpf_counter_value_t packets;
 } psabpf_counter_entry_t;
+
+typedef struct psabpf_counter_context {
+    psabpf_bpf_map_descriptor_t counter;
+    psabpf_counter_type_t counter_type;
+
+    psabpf_btf_t btf_metadata;
+    psabpf_struct_field_descriptor_set_t key_fds;
+
+    psabpf_counter_entry_t current_entry;
+    void *prev_entry_key;
+} psabpf_counter_context_t;
 
 void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx);
 void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx);
@@ -369,10 +371,12 @@ int psabpf_counter_open(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *
 void psabpf_counter_entry_init(psabpf_counter_entry_t *entry);
 void psabpf_counter_entry_free(psabpf_counter_entry_t *entry);
 
-/* can be called multiple times */
+/* Can be called multiple times. */
 int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, void *data, size_t data_len);
+/* Valid after call to psabpf_counter_get() or psabpf_counter_get_next(). */
 psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
 
+psabpf_counter_type_t psabpf_counter_get_type(psabpf_counter_context_t *ctx);
 void psabpf_counter_entry_set_packets(psabpf_counter_entry_t *entry, psabpf_counter_value_t packets);
 void psabpf_counter_entry_set_bytes(psabpf_counter_entry_t *entry, psabpf_counter_value_t bytes);
 psabpf_counter_value_t psabpf_counter_entry_get_packets(psabpf_counter_entry_t *entry);

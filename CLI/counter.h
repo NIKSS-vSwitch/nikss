@@ -21,11 +21,15 @@
 #include "common.h"
 
 int do_counter_get(int argc, char **argv);
+int do_counter_set(int argc, char **argv);
+int do_counter_reset(int argc, char **argv);
 int do_counter_help(int argc, char **argv);
 
 static const struct cmd counter_cmds[] = {
-        {"help", do_counter_help},
-        {"get",  do_counter_get},
+        {"help",  do_counter_help},
+        {"get",   do_counter_get},
+        {"set",   do_counter_set},
+        {"reset", do_counter_reset},
         {0}
 };
 

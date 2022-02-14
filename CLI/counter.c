@@ -16,8 +16,34 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+
+#include <jansson.h>
 
 #include "counter.h"
+#include <psabpf.h>
+
+void dump_counter_entry(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    psabpf_struct_field_t *key;
+
+    printf("counter:\n");
+    printf("\ttype: %u\n", psabpf_counter_get_type(ctx));
+    printf("\tkey:\n");
+    while ((key = psabpf_counter_entry_get_next_key(ctx, entry)) != NULL) {
+        const char *name = psabpf_struct_get_field_name(key);
+        char *data = convert_bin_data_to_hexstr(psabpf_struct_get_field_data(key), psabpf_struct_get_field_data_len(key));
+        if (data == NULL)
+            continue;
+
+        printf("\t\t%s: %s\n", name, data);
+
+        free(data);
+    }
+    printf("\tdata:\n");
+    printf("\t\tbytes: %lu\n", psabpf_counter_entry_get_bytes(entry));
+    printf("\t\tpackets: %lu\n", psabpf_counter_entry_get_packets(entry));
+}
 
 int do_counter_get(int argc, char **argv)
 {
@@ -34,11 +60,17 @@ int do_counter_get(int argc, char **argv)
     psabpf_counter_entry_t entry;
     psabpf_counter_entry_init(&entry);
 
-    uint32_t key = 1;
-    psabpf_counter_entry_set_key(&entry, &key, sizeof(key));
-    psabpf_counter_get(&ctx, &entry);
+//    uint32_t key = 1;
+//    psabpf_counter_entry_set_key(&entry, &key, sizeof(key));
+//    psabpf_counter_get(&ctx, &entry);
+//    dump_counter_entry(&ctx, &entry);
 
-    printf("packets: %lu, bytes: %lu\n", entry.packets, entry.bytes);
+    psabpf_counter_entry_t *iter;
+    while ((iter = psabpf_counter_get_next(&ctx)) != NULL) {
+        dump_counter_entry(&ctx, iter);
+
+        psabpf_counter_entry_free(iter);
+    }
 
     psabpf_counter_entry_free(&entry);
     psabpf_counter_ctx_free(&ctx);
@@ -48,8 +80,30 @@ int do_counter_get(int argc, char **argv)
     return NO_ERROR;
 }
 
+int do_counter_set(int argc, char **argv)
+{
+    (void) argc; (void) argv;
+    return NO_ERROR;
+}
+
+int do_counter_reset(int argc, char **argv)
+{
+    (void) argc; (void) argv;
+    return NO_ERROR;
+}
+
 int do_counter_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
+    fprintf(stderr,
+            "Usage: %1$s counter get pipe ID COUNTER [key DATA]\n"
+            "       %1$s counter set pipe ID COUNTER [key DATA] value COUNTER_VALUE\n"
+            "       %1$s counter reset pipe ID COUNTER [key DATA]\n"
+            "\n"
+            "       COUNTER := { id COUNTER_ID | name COUNTER | COUNTER_FILE }\n"
+            "       COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }\n"
+            "",
+            program_name);
+
     return NO_ERROR;
 }

@@ -25,6 +25,11 @@
 #include "btf.h"
 #include "bpf_defs.h"
 
+#define MAX_COUNTER_VALUE_SIZE 16
+
+#define MAX_COUNTER_VALUE_SIZE_SINGLE_FIELD 8
+#define MAX_COUNTER_VALUE_SIZE_BOTH_FIELDS  MAX_COUNTER_VALUE_SIZE
+
 void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx)
 {
     if (ctx == NULL)
@@ -43,6 +48,11 @@ void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx)
     free_btf(&ctx->btf_metadata);
     close_object_fd(&(ctx->counter.fd));
     free_struct_field_descriptor_set(&ctx->key_fds);
+    psabpf_counter_entry_free(&ctx->current_entry);
+
+    if (ctx->prev_entry_key != NULL)
+        free(ctx->prev_entry_key);
+    ctx->prev_entry_key= NULL;
 }
 
 static int parse_counter_value(psabpf_counter_context_t *ctx)
@@ -87,8 +97,10 @@ static int parse_counter_value(psabpf_counter_context_t *ctx)
         return EINVAL;
 
     /* Validate counter size - up to 64 bits per counter*/
-    if ((ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS && ctx->counter.value_size > 16) ||
-        (ctx->counter_type != PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS && ctx->counter.value_size > 8))
+    if ((ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS &&
+            ctx->counter.value_size > MAX_COUNTER_VALUE_SIZE_BOTH_FIELDS) ||
+        (ctx->counter_type != PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS &&
+            ctx->counter.value_size > MAX_COUNTER_VALUE_SIZE_SINGLE_FIELD))
         return ENOTSUP;
 
     return NO_ERROR;
@@ -179,6 +191,14 @@ psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_
     return &entry->current_field;
 }
 
+psabpf_counter_type_t psabpf_counter_get_type(psabpf_counter_context_t *ctx)
+{
+    if (ctx == NULL)
+        return PSABPF_COUNTER_TYPE_UNKNOWN;
+
+    return ctx->counter_type;
+}
+
 void psabpf_counter_entry_set_packets(psabpf_counter_entry_t *entry, psabpf_counter_value_t packets)
 {
     if (entry == NULL)
@@ -197,24 +217,14 @@ psabpf_counter_value_t psabpf_counter_entry_get_packets(psabpf_counter_entry_t *
 {
     if (entry == NULL)
         return 0;
-
-    if (entry->counter_type == PSABPF_COUNTER_TYPE_PACKETS ||
-        entry->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
-        return entry->packets;
-
-    return 0;
+    return entry->packets;
 }
 
 psabpf_counter_value_t psabpf_counter_entry_get_bytes(psabpf_counter_entry_t *entry)
 {
     if (entry == NULL)
         return 0;
-
-    if (entry->counter_type == PSABPF_COUNTER_TYPE_BYTES ||
-        entry->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
-        return entry->bytes;
-
-    return 0;
+    return entry->bytes;
 }
 
 static void *allocate_key_buffer(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
@@ -229,25 +239,18 @@ static void *allocate_key_buffer(psabpf_counter_context_t *ctx, psabpf_counter_e
     return entry->raw_key;
 }
 
-int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+static int read_and_parse_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
 {
-    if (ctx == NULL || entry == NULL)
-        return EINVAL;
-
-    if (allocate_key_buffer(ctx, entry) == NULL)
-        return ENOMEM;
-
-    int ret = construct_struct_from_fields(&entry->entry_key, &ctx->key_fds, entry->raw_key, ctx->counter.key_size);
-    if (ret != NO_ERROR)
-        return ret;
-
-    uint8_t value[16];
-    ret = bpf_map_lookup_elem(ctx->counter.fd, entry->raw_key, &value[0]);
+    uint8_t value[MAX_COUNTER_VALUE_SIZE];
+    int ret = bpf_map_lookup_elem(ctx->counter.fd, entry->raw_key, &value[0]);
     if (ret != 0) {
         ret = errno;
         fprintf(stderr, "failed to read Counter entry: %s\n", strerror(ret));
         return ret;
     }
+
+    entry->bytes = 0;
+    entry->packets = 0;
 
     size_t counter_size = ctx->counter.value_size;
     if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES)
@@ -263,15 +266,152 @@ int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *en
     return NO_ERROR;
 }
 
+int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    if (allocate_key_buffer(ctx, entry) == NULL)
+        return ENOMEM;
+
+    int ret = construct_struct_from_fields(&entry->entry_key, &ctx->key_fds, entry->raw_key, ctx->counter.key_size);
+    if (ret != NO_ERROR)
+        return ret;
+
+    return read_and_parse_counter_value(ctx, entry);
+}
+
 psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx)
 {
-    return NULL;
+    if (ctx == NULL)
+        return NULL;
+
+    if (allocate_key_buffer(ctx, &ctx->current_entry) == NULL)
+        return NULL;
+
+    /* on first call ctx->prev_entry_ke must be NULL */
+    if (bpf_map_get_next_key(ctx->counter.fd, ctx->prev_entry_key, ctx->current_entry.raw_key) != 0) {
+        /* no more entries, prepare for next iteration */
+        if (ctx->prev_entry_key != NULL)
+            free(ctx->prev_entry_key);
+        ctx->prev_entry_key = NULL;
+
+        return NULL;
+    }
+
+    if (ctx->prev_entry_key == NULL) {
+        ctx->prev_entry_key = malloc(ctx->counter.key_size);
+        if (ctx->prev_entry_key == NULL) {
+            fprintf(stderr, "not enough memory\n");
+            return NULL;
+        }
+    }
+
+    memcpy(ctx->prev_entry_key, ctx->current_entry.raw_key, ctx->counter.key_size);
+    if (read_and_parse_counter_value(ctx, &ctx->current_entry) != NO_ERROR)
+        return NULL;
+
+    return &ctx->current_entry;
+}
+
+static int encode_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, uint8_t *buffer)
+{
+    size_t counter_size = ctx->counter.value_size;
+    if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES)
+        memcpy(buffer, &entry->bytes, counter_size);
+    else if (ctx->counter_type == PSABPF_COUNTER_TYPE_PACKETS)
+        memcpy(buffer, &entry->packets, counter_size);
+    else if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+        counter_size = counter_size / 2;
+        memcpy(buffer, &entry->bytes, counter_size);
+        memcpy(buffer + counter_size, &entry->packets, counter_size);
+    } else
+        return EBADF;
+
+    return NO_ERROR;
+}
+
+static bool is_zero_counter_value(const uint8_t *buffer, size_t buffer_len)
+{
+    for (size_t i = 0; i < buffer_len; i++) {
+        if (buffer[i] != 0)
+            return false;
+    }
+    return true;
+}
+
+static int set_all_counters(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, void *encoded_value)
+{
+    char * key = malloc(ctx->counter.key_size);
+    char * next_key = malloc(ctx->counter.key_size);
+    int error_code = NO_ERROR;
+    int ret;
+    bool can_remove_entries = is_zero_counter_value(encoded_value, ctx->counter.value_size);
+
+    if (ctx->counter.type == BPF_MAP_TYPE_HASH)
+        can_remove_entries = false;
+
+    if (key == NULL || next_key == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        error_code = ENOMEM;
+        goto clean_up;
+    }
+
+    if (bpf_map_get_next_key(ctx->counter.fd, NULL, next_key) != 0)
+        goto clean_up;  /* table empty */
+
+    do {
+        /* Swap buffers, so next_key will become key and next_key may be reused */
+        char * tmp_key = next_key;
+        next_key = key;
+        key = tmp_key;
+
+        if (can_remove_entries)
+            ret = bpf_map_delete_elem(ctx->counter.fd, entry->raw_key);
+        else
+            ret = bpf_map_update_elem(ctx->counter.fd, entry->raw_key, encoded_value, 0);
+
+        if (ret != 0) {
+            error_code = errno;
+            break;
+        }
+
+    } while (bpf_map_get_next_key(ctx->counter.fd, key, next_key) == 0);
+
+clean_up:
+    if (key)
+        free(key);
+    if (next_key)
+        free(next_key);
+    return error_code;
 }
 
 int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL)
         return EINVAL;
+
+    uint8_t value[MAX_COUNTER_VALUE_SIZE];
+    if (encode_counter_value(ctx, entry, &value[0]) != NO_ERROR)
+        return EINVAL;
+
+    if (entry->entry_key.n_fields == 0)
+        return set_all_counters(ctx, entry, &value[0]);
+
+    if (allocate_key_buffer(ctx, entry) == NULL)
+        return ENOMEM;
+
+    int ret = construct_struct_from_fields(&entry->entry_key, &ctx->key_fds, entry->raw_key, ctx->counter.key_size);
+    if (ret != NO_ERROR)
+        return ret;
+
+    if (ctx->counter.type == BPF_MAP_TYPE_HASH && is_zero_counter_value(&value[0], ctx->counter.value_size)) {
+        ret = bpf_map_delete_elem(ctx->counter.fd, entry->raw_key);
+    } else {
+        ret = bpf_map_update_elem(ctx->counter.fd, entry->raw_key, &value[0], 0);
+    }
+    if (ret != 0)
+        ret = errno;
 
     return NO_ERROR;
 }
