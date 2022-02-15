@@ -42,7 +42,8 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
         fprintf(stderr, "name: counter access not supported yet\n");
         return ENOTSUP;
     } else {
-        *counter_name = **argv;
+        if (counter_name != NULL)
+            *counter_name = **argv;
         int error_code = psabpf_counter_ctx_name(psabpf_ctx, ctx, **argv);
         if (error_code != NO_ERROR)
             return error_code;
@@ -55,7 +56,7 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
 static int parse_counter_key(int *argc, char ***argv, psabpf_counter_entry_t *entry)
 {
     if (!is_keyword(**argv, "key"))
-        return EINVAL;
+        return NO_ERROR; /* key is optional */
     NEXT_ARGP_RET();
 
     bool has_any_key = false;
@@ -73,6 +74,46 @@ static int parse_counter_key(int *argc, char ***argv, psabpf_counter_entry_t *en
         NEXT_ARGP();
     }
 
+    return NO_ERROR;
+}
+
+static int parse_counter_value(int *argc, char ***argv,
+                               psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    if (!is_keyword(**argv, "value")) {
+        fprintf(stderr, "expected \'value\' keyword\n");
+        return EINVAL;
+    }
+    NEXT_ARGP_RET();
+
+    psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
+    char *end_ptr = NULL;
+
+    psabpf_counter_value_t parsed_value = strtoull(**argv, &end_ptr, 0);
+    if (type == PSABPF_COUNTER_TYPE_BYTES) {
+        if (*end_ptr == '\0')
+            psabpf_counter_entry_set_bytes(entry, parsed_value);
+    } else if (type == PSABPF_COUNTER_TYPE_PACKETS) {
+        if (*end_ptr == '\0')
+            psabpf_counter_entry_set_packets(entry, parsed_value);
+    } else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+        if (*end_ptr == ':') {
+            psabpf_counter_entry_set_bytes(entry, parsed_value);
+            parsed_value = strtoull(end_ptr, &end_ptr, 0);
+            if (*end_ptr == '\0')
+                psabpf_counter_entry_set_packets(entry, parsed_value);
+        }
+    } else {
+        fprintf(stderr, "unknown Counter type\n");
+        return EBADF;
+    }
+
+    if (*end_ptr != '\0') {
+        fprintf(stderr, "%s: failed to parse\n", **argv);
+        return EINVAL;
+    }
+
+    NEXT_ARGP();
     return NO_ERROR;
 }
 
@@ -268,14 +309,75 @@ clean_up_psabpf:
 
 int do_counter_set(int argc, char **argv)
 {
-    (void) argc; (void) argv;
-    return NO_ERROR;
+    int ret = EINVAL;
+    psabpf_context_t psabpf_ctx;
+    psabpf_counter_context_t ctx;
+    psabpf_counter_entry_t entry;
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_counter_ctx_init(&ctx);
+    psabpf_counter_entry_init(&entry);
+
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_dst_counter(&argc, &argv, NULL, &psabpf_ctx, &ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_counter_value(&argc, &argv, &ctx, &entry) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    ret = psabpf_counter_set(&ctx, &entry);
+
+clean_up:
+    psabpf_counter_entry_free(&entry);
+    psabpf_counter_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
+
+    return ret;
 }
 
 int do_counter_reset(int argc, char **argv)
 {
-    (void) argc; (void) argv;
-    return NO_ERROR;
+    int ret = EINVAL;
+    psabpf_context_t psabpf_ctx;
+    psabpf_counter_context_t ctx;
+    psabpf_counter_entry_t entry;
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_counter_ctx_init(&ctx);
+    psabpf_counter_entry_init(&entry);
+
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_dst_counter(&argc, &argv, NULL, &psabpf_ctx, &ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    ret = psabpf_counter_reset(&ctx, &entry);
+
+clean_up:
+    psabpf_counter_entry_free(&entry);
+    psabpf_counter_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
+
+    return ret;
 }
 
 int do_counter_help(int argc, char **argv)
