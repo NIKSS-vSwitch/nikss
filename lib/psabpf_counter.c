@@ -112,7 +112,7 @@ static int parse_counter_key(psabpf_counter_context_t *ctx)
     return parse_struct_type(&ctx->btf_metadata, type_id, ctx->counter.key_size, &ctx->key_fds);
 }
 
-int psabpf_counter_open(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name)
+int psabpf_counter_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name)
 {
     if (psabpf_ctx == NULL || ctx == NULL || name == NULL)
         return EINVAL;
@@ -156,7 +156,7 @@ void psabpf_counter_entry_free(psabpf_counter_entry_t *entry)
     entry->raw_key = NULL;
 }
 
-int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, void *data, size_t data_len)
+int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, const void *data, size_t data_len)
 {
     if (entry == NULL)
         return EINVAL;
@@ -386,6 +386,7 @@ clean_up:
     return error_code;
 }
 
+// TODO: allow remove entries only for reset method
 int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL)

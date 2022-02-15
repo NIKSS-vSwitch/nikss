@@ -52,7 +52,7 @@ static int parse_digest_btf(psabpf_digest_context_t *ctx)
     return parse_struct_type(&ctx->btf_metadata, type_id, ctx->queue.value_size, &ctx->fds);
 }
 
-int psabpf_digest_open(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name)
+int psabpf_digest_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name)
 {
     if (psabpf_ctx == NULL || ctx == NULL || name == NULL)
         return EINVAL;

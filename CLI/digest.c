@@ -40,7 +40,7 @@ static int parse_digest(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
         fprintf(stderr, "name: digest access not supported yet\n");
         return ENOTSUP;
     } else {
-        int error_code = psabpf_digest_open(psabpf_ctx, ctx, **argv);
+        int error_code = psabpf_digest_name(psabpf_ctx, ctx, **argv);
         if (error_code != NO_ERROR) {
             fprintf(stderr, "failed to open digest %s: %s\n", **argv, strerror(error_code));
             return error_code;

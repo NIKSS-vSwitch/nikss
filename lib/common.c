@@ -156,13 +156,13 @@ static int setup_struct_field_descriptor_set_btf(psabpf_btf_t *btf_md, psabpf_st
         fds->fields[*field_idx].data_offset = base_offset;
         fds->fields[*field_idx].data_len = psabtf_get_type_size_by_id(btf_md->btf, type_id);
 
-        const char *field_name = btf__name_by_offset(btf_md->btf, type->name_off);
-        if (field_name != NULL) {
-            fds->fields[*field_idx].name = strdup(field_name);
-            if (fds->fields[*field_idx].name == NULL) {
-                fprintf(stderr, "not enough memory\n");
-                return ENOMEM;
-            }
+        /* hide type name (e.g. 'unsigned int'), but we don't have information about name used in C code */
+        char name_tmp[128];
+        snprintf(&name_tmp[0], sizeof(name_tmp), "field%u", *field_idx);
+        fds->fields[*field_idx].name = strdup(name_tmp);
+        if (fds->fields[*field_idx].name == NULL) {
+            fprintf(stderr, "not enough memory\n");
+            return ENOMEM;
         }
 
         (*field_idx)++;
@@ -275,7 +275,7 @@ void free_struct_field_set(psabpf_struct_field_set_t *sfs)
     sfs->n_fields = 0;
 }
 
-int struct_field_set_append(psabpf_struct_field_set_t *sfs, void *data, size_t data_len)
+int struct_field_set_append(psabpf_struct_field_set_t *sfs, const void *data, size_t data_len)
 {
     if (sfs == NULL)
         return EINVAL;

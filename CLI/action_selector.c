@@ -38,7 +38,7 @@ static int parse_dst_action_selector(int *argc, char ***argv, psabpf_context_t *
         fprintf(stderr, "name: Action Selector access not supported yet\n");
         return ENOTSUP;
     } else {
-        int error_code = psabpf_action_selector_ctx_open(psabpf_ctx, ctx, **argv);
+        int error_code = psabpf_action_selector_ctx_name(psabpf_ctx, ctx, **argv);
         if (error_code != NO_ERROR)
             return error_code;
     }

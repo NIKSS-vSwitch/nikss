@@ -292,7 +292,7 @@ typedef struct psabpf_action_selector_context {
 
 void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx);
 void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx);
-int psabpf_action_selector_ctx_open(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name);
+int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name);
 
 void psabpf_action_selector_member_init(psabpf_action_selector_member_context_t *member);
 void psabpf_action_selector_member_free(psabpf_action_selector_member_context_t *member);
@@ -366,13 +366,13 @@ typedef struct psabpf_counter_context {
 
 void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx);
 void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx);
-int psabpf_counter_open(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name);
+int psabpf_counter_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name);
 
 void psabpf_counter_entry_init(psabpf_counter_entry_t *entry);
 void psabpf_counter_entry_free(psabpf_counter_entry_t *entry);
 
 /* Can be called multiple times. */
-int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, void *data, size_t data_len);
+int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, const void *data, size_t data_len);
 /* Valid after call to psabpf_counter_get() or psabpf_counter_get_next(). */
 psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
 

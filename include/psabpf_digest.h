@@ -37,7 +37,7 @@ typedef struct psabpf_digest {
 
 void psabpf_digest_context_init(psabpf_digest_context_t *ctx);
 void psabpf_digest_context_free(psabpf_digest_context_t *ctx);
-int psabpf_digest_open(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name);
+int psabpf_digest_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name);
 /* Will initialize digest, but must be later freed */
 int psabpf_digest_get_next(psabpf_digest_context_t *ctx, psabpf_digest_t *digest);
 void psabpf_digest_free(psabpf_digest_t *digest);
