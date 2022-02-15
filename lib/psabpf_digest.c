@@ -26,7 +26,7 @@
 #include "btf.h"
 #include "common.h"
 
-void psabpf_digest_context_init(psabpf_digest_context_t *ctx)
+void psabpf_digest_ctx_init(psabpf_digest_context_t *ctx)
 {
     if (ctx == NULL)
         return;
@@ -36,7 +36,7 @@ void psabpf_digest_context_init(psabpf_digest_context_t *ctx)
     ctx->btf_metadata.associated_prog = -1;
 }
 
-void psabpf_digest_context_free(psabpf_digest_context_t *ctx)
+void psabpf_digest_ctx_free(psabpf_digest_context_t *ctx)
 {
     if (ctx == NULL)
         return;
@@ -52,7 +52,7 @@ static int parse_digest_btf(psabpf_digest_context_t *ctx)
     return parse_struct_type(&ctx->btf_metadata, type_id, ctx->queue.value_size, &ctx->fds);
 }
 
-int psabpf_digest_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name)
+int psabpf_digest_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name)
 {
     if (psabpf_ctx == NULL || ctx == NULL || name == NULL)
         return EINVAL;

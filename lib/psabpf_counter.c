@@ -112,7 +112,7 @@ static int parse_counter_key(psabpf_counter_context_t *ctx)
     return parse_struct_type(&ctx->btf_metadata, type_id, ctx->counter.key_size, &ctx->key_fds);
 }
 
-int psabpf_counter_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name)
+int psabpf_counter_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name)
 {
     if (psabpf_ctx == NULL || ctx == NULL || name == NULL)
         return EINVAL;

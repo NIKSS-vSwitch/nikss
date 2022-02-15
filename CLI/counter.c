@@ -43,7 +43,7 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
         return ENOTSUP;
     } else {
         *counter_name = **argv;
-        int error_code = psabpf_counter_name(psabpf_ctx, ctx, **argv);
+        int error_code = psabpf_counter_ctx_name(psabpf_ctx, ctx, **argv);
         if (error_code != NO_ERROR)
             return error_code;
     }

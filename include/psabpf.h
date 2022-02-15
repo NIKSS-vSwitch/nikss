@@ -366,7 +366,7 @@ typedef struct psabpf_counter_context {
 
 void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx);
 void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx);
-int psabpf_counter_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name);
+int psabpf_counter_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name);
 
 void psabpf_counter_entry_init(psabpf_counter_entry_t *entry);
 void psabpf_counter_entry_free(psabpf_counter_entry_t *entry);

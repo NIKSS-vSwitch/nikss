@@ -40,7 +40,7 @@ static int parse_digest(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
         fprintf(stderr, "name: digest access not supported yet\n");
         return ENOTSUP;
     } else {
-        int error_code = psabpf_digest_name(psabpf_ctx, ctx, **argv);
+        int error_code = psabpf_digest_ctx_name(psabpf_ctx, ctx, **argv);
         if (error_code != NO_ERROR) {
             fprintf(stderr, "failed to open digest %s: %s\n", **argv, strerror(error_code));
             return error_code;
@@ -109,7 +109,7 @@ int do_digest_get(int argc, char **argv)
     const char *digest_instance_name = NULL;
 
     psabpf_context_init(&psabpf_ctx);
-    psabpf_digest_context_init(&ctx);
+    psabpf_digest_ctx_init(&ctx);
 
     if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
         goto clean_up_psabpf;
@@ -164,7 +164,7 @@ clean_up:
     json_decref(root);
 
 clean_up_psabpf:
-    psabpf_digest_context_free(&ctx);
+    psabpf_digest_ctx_free(&ctx);
     psabpf_context_free(&psabpf_ctx);
 
     return error_code;
