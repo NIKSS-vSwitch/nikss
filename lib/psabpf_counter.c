@@ -340,7 +340,8 @@ static bool is_zero_counter_value(const uint8_t *buffer, size_t buffer_len)
     return true;
 }
 
-static int set_all_counters(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, void *encoded_value)
+static int set_all_counters(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry,
+                            void *encoded_value, bool remove_entry_allowed)
 {
     char * key = malloc(ctx->counter.key_size);
     char * next_key = malloc(ctx->counter.key_size);
@@ -348,7 +349,7 @@ static int set_all_counters(psabpf_counter_context_t *ctx, psabpf_counter_entry_
     int ret;
     bool can_remove_entries = is_zero_counter_value(encoded_value, ctx->counter.value_size);
 
-    if (ctx->counter.type == BPF_MAP_TYPE_HASH)
+    if (ctx->counter.type == BPF_MAP_TYPE_ARRAY || !remove_entry_allowed)
         can_remove_entries = false;
 
     if (key == NULL || next_key == NULL) {
@@ -386,8 +387,7 @@ clean_up:
     return error_code;
 }
 
-// TODO: allow remove entries only for reset method
-int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+static int do_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, bool remove_entry_allowed)
 {
     if (ctx == NULL || entry == NULL)
         return EINVAL;
@@ -397,7 +397,7 @@ int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *en
         return EINVAL;
 
     if (entry->entry_key.n_fields == 0)
-        return set_all_counters(ctx, entry, &value[0]);
+        return set_all_counters(ctx, entry, &value[0], remove_entry_allowed);
 
     if (allocate_key_buffer(ctx, entry) == NULL)
         return ENOMEM;
@@ -406,7 +406,9 @@ int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *en
     if (ret != NO_ERROR)
         return ret;
 
-    if (ctx->counter.type == BPF_MAP_TYPE_HASH && is_zero_counter_value(&value[0], ctx->counter.value_size)) {
+    if (remove_entry_allowed &&
+        ctx->counter.type == BPF_MAP_TYPE_HASH &&
+        is_zero_counter_value(&value[0], ctx->counter.value_size)) {
         ret = bpf_map_delete_elem(ctx->counter.fd, entry->raw_key);
     } else {
         ret = bpf_map_update_elem(ctx->counter.fd, entry->raw_key, &value[0], 0);
@@ -414,7 +416,12 @@ int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *en
     if (ret != 0)
         ret = errno;
 
-    return NO_ERROR;
+    return ret;
+}
+
+int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    return do_counter_set(ctx, entry, false);
 }
 
 int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
@@ -425,5 +432,5 @@ int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *
     entry->bytes = 0;
     entry->packets = 0;
 
-    return psabpf_counter_set(ctx, entry);
+    return do_counter_set(ctx, entry, true);
 }

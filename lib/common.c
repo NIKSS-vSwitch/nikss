@@ -167,7 +167,6 @@ static int setup_struct_field_descriptor_set_btf(psabpf_btf_t *btf_md, psabpf_st
 
         (*field_idx)++;
         return NO_ERROR;
-
     }
 
     if (!btf_is_struct(type)) {
@@ -340,7 +339,6 @@ int construct_struct_from_fields(psabpf_struct_field_set_t *data, psabpf_struct_
         }
         if (!failed)
             return NO_ERROR;
-
     }
 
     fprintf(stderr, "failed to construct data type based on fields\n");
