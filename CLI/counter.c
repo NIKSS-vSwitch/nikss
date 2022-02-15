@@ -99,6 +99,7 @@ static int parse_counter_value(int *argc, char ***argv,
     } else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
         if (*end_ptr == ':') {
             psabpf_counter_entry_set_bytes(entry, parsed_value);
+            ++end_ptr;
             parsed_value = strtoull(end_ptr, &end_ptr, 0);
             if (*end_ptr == '\0')
                 psabpf_counter_entry_set_packets(entry, parsed_value);

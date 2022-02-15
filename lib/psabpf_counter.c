@@ -124,8 +124,10 @@ int psabpf_counter_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context
     }
 
     int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->counter);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "couldn't open counter %s\n", name);
         return ret;
+    }
 
     if (parse_counter_value(ctx) != NO_ERROR) {
         fprintf(stderr, "%s: not a Counter instance\n", name);
@@ -163,7 +165,10 @@ int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, const void *data
     if (data == NULL || data_len < 1)
         return ENODATA;
 
-    return struct_field_set_append(&entry->entry_key, data, data_len);
+    int ret = struct_field_set_append(&entry->entry_key, data, data_len);
+    if (ret != NO_ERROR)
+        fprintf(stderr, "couldn't append key to an entry: %s\n", strerror(ret));
+    return ret;
 }
 
 psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
@@ -340,8 +345,7 @@ static bool is_zero_counter_value(const uint8_t *buffer, size_t buffer_len)
     return true;
 }
 
-static int set_all_counters(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry,
-                            void *encoded_value, bool remove_entry_allowed)
+static int set_all_counters(psabpf_counter_context_t *ctx, void *encoded_value, bool remove_entry_allowed)
 {
     char * key = malloc(ctx->counter.key_size);
     char * next_key = malloc(ctx->counter.key_size);
@@ -368,12 +372,13 @@ static int set_all_counters(psabpf_counter_context_t *ctx, psabpf_counter_entry_
         key = tmp_key;
 
         if (can_remove_entries)
-            ret = bpf_map_delete_elem(ctx->counter.fd, entry->raw_key);
+            ret = bpf_map_delete_elem(ctx->counter.fd, key);
         else
-            ret = bpf_map_update_elem(ctx->counter.fd, entry->raw_key, encoded_value, 0);
+            ret = bpf_map_update_elem(ctx->counter.fd, key, encoded_value, 0);
 
         if (ret != 0) {
             error_code = errno;
+            fprintf(stderr, "failed to set all entries: %s\n", strerror(error_code));
             break;
         }
 
@@ -397,7 +402,7 @@ static int do_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t 
         return EINVAL;
 
     if (entry->entry_key.n_fields == 0)
-        return set_all_counters(ctx, entry, &value[0], remove_entry_allowed);
+        return set_all_counters(ctx, &value[0], remove_entry_allowed);
 
     if (allocate_key_buffer(ctx, entry) == NULL)
         return ENOMEM;
@@ -413,8 +418,10 @@ static int do_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t 
     } else {
         ret = bpf_map_update_elem(ctx->counter.fd, entry->raw_key, &value[0], 0);
     }
-    if (ret != 0)
+    if (ret != 0) {
         ret = errno;
+        fprintf(stderr, "failed to set an entry: %s\n", strerror(ret));
+    }
 
     return ret;
 }
