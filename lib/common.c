@@ -341,7 +341,7 @@ int construct_struct_from_fields(psabpf_struct_field_set_t *data, psabpf_struct_
             return NO_ERROR;
     }
 
-    fprintf(stderr, "failed to construct data type based on fields\n");
+    fprintf(stderr, "failed to construct data type based on fields, trying byte by byte...\n");
 
     /* We can build structure if total length of data is equal to length of struct type */
     size_t total_size = 0;
@@ -354,6 +354,7 @@ int construct_struct_from_fields(psabpf_struct_field_set_t *data, psabpf_struct_
             memcpy(buffer + offset, data->fields[i].data, data->fields[i].data_len);
             offset += data->fields[i].data_len;
         }
+        return NO_ERROR;
     }
 
     fprintf(stderr, "failed to construct data type\n");
