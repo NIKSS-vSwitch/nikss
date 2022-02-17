@@ -320,7 +320,6 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
     }
 
     struct bpf_map *map;
-    uint32_t tuple_id = 0;
     bpf_object__for_each_map(map, obj) {
         if (bpf_map__is_pinned(map)) {
             ret = bpf_map__unpin(map, NULL);
