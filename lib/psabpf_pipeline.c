@@ -222,6 +222,63 @@ bool psabpf_pipeline_exists(psabpf_context_t *ctx)
     return access(mounted_path, F_OK) == 0;
 }
 
+int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *map_name)
+{
+    // We assume that each tuple has "_tuple_" suffix
+    // This name also is reserved in a p4c-ebpf-psa compiler
+    const char *suffix = "_tuple_";
+    const char *ternary_tbl_name_lst_char_ptr = strstr(map_name, suffix);
+
+    if (ternary_tbl_name_lst_char_ptr) {
+        int tuples_map_name_length = (int)(ternary_tbl_name_lst_char_ptr - map_name);
+        const char tuples_map_name[tuples_map_name_length + 12]; // + _tuples_map (11+1 characters)
+        memcpy((void *)tuples_map_name, map_name, tuples_map_name_length);
+        memcpy((void *)tuples_map_name + tuples_map_name_length, "_tuples_map", 12);
+
+        psabpf_btf_t btf_metadata;
+        btf_metadata.btf = NULL;
+        if (load_btf(ctx, &btf_metadata) != NO_ERROR) {
+            fprintf(stderr, "warning: couldn't find BTF info\n");
+        }
+        psabpf_bpf_map_descriptor_t tuple_map;
+        int ret = open_bpf_map(ctx, tuples_map_name, &btf_metadata, &tuple_map);
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "couldn't open map %s: %s\n", tuples_map_name, strerror(ret));
+            return ret;
+        }
+
+        uint32_t tuple_id = 0;
+        char *elem;
+        for (elem = strtok(map_name,"_"); elem != NULL; elem = strtok(NULL, "_")){}
+        char *end;
+        tuple_id = (uint32_t)strtol(elem, &end, 10);
+        if (elem == end) {
+            fprintf(stderr, "cannot convert tuple_id from tuple name: %s", map_name);
+            return ENODATA;
+        }
+
+        psabpf_btf_t btf_metadata_tuple;
+        btf_metadata_tuple.btf = NULL;
+        if (load_btf(ctx, &btf_metadata_tuple) != NO_ERROR)
+            fprintf(stderr, "warning: couldn't find BTF info\n");
+        psabpf_bpf_map_descriptor_t tuple;
+        ret = open_bpf_map(ctx, map_name, &btf_metadata_tuple, &tuple);
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "couldn't open map %s: %s\n", map_name, strerror(ret));
+            return ret;
+        }
+
+        ret = bpf_map_update_elem(tuple_map.fd, &tuple_id, &tuple.fd, 0);
+        if (ret != 0) {
+            fprintf(stderr, "failed to add tuple %u: %s\n", tuple_id, strerror(ret));
+        }
+
+        tuple_id++;
+    }
+
+    return NO_ERROR;
+}
+
 int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 {
     struct bpf_object *obj;
@@ -263,6 +320,7 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
     }
 
     struct bpf_map *map;
+    uint32_t tuple_id = 0;
     bpf_object__for_each_map(map, obj) {
         if (bpf_map__is_pinned(map)) {
             ret = bpf_map__unpin(map, NULL);
@@ -288,6 +346,12 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
         ret = bpf_map__pin(map, pinned_file);
         if (ret) {
             fprintf(stderr, "failed to pin map at %s: %s\n", pinned_file, strerror(-ret));
+            goto err_close_obj;
+        }
+
+        ret = join_tuple_to_map_if_tuple(ctx, map_name);
+        if (ret) {
+            fprintf(stderr, "failed to add tuple (%s) to tuples map\n", map_name);
             goto err_close_obj;
         }
     }
