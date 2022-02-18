@@ -210,40 +210,15 @@ static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ct
     return NO_ERROR;
 }
 
-int do_counter_get(int argc, char **argv)
+static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry,
+                              const char *counter_name, bool entry_has_key)
 {
     int ret = EINVAL;
-    const char *counter_name = NULL;
-    psabpf_context_t psabpf_ctx;
-    psabpf_counter_context_t ctx;
-    psabpf_counter_entry_t entry;
-
-    psabpf_context_init(&psabpf_ctx);
-    psabpf_counter_ctx_init(&ctx);
-    psabpf_counter_entry_init(&entry);
-
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
-        goto clean_up_psabpf;
-
-    if (parse_dst_counter(&argc, &argv, &counter_name, &psabpf_ctx, &ctx) != NO_ERROR)
-        goto clean_up_psabpf;
-
-    bool counter_key_provided = false;
-    if (argc >= 1 && is_keyword(*argv, "key")) {
-        counter_key_provided = true;
-        if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR)
-            goto clean_up_psabpf;
-    }
-
-    if (argc > 0) {
-        fprintf(stderr, "%s: unused argument\n", *argv);
-        goto clean_up_psabpf;
-    }
-
     json_t *root = json_object();
     json_t *extern_type = json_object();
     json_t *instance_name = json_object();
     json_t *entries = json_array();
+
     if (root == NULL || extern_type == NULL || instance_name == NULL || entries == NULL) {
         fprintf(stderr, "failed to prepare JSON\n");
         ret = ENOMEM;
@@ -257,7 +232,7 @@ int do_counter_get(int argc, char **argv)
     }
     json_object_set(root, "Counter", extern_type);
 
-    psabpf_counter_type_t type = psabpf_counter_get_type(&ctx);
+    psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
     if (type == PSABPF_COUNTER_TYPE_BYTES)
         json_object_set_new(instance_name, "type", json_string("BYTES"));
     else if (type == PSABPF_COUNTER_TYPE_PACKETS)
@@ -267,17 +242,17 @@ int do_counter_get(int argc, char **argv)
     else
         json_object_set_new(instance_name, "type", json_string("UNKNOWN"));
 
-    if (counter_key_provided) {
-        if ((ret = psabpf_counter_get(&ctx, &entry)) != NO_ERROR)
+    if (entry_has_key) {
+        if ((ret = psabpf_counter_get(ctx, entry)) != NO_ERROR)
             goto clean_up;
         json_t *current_obj = json_object();
-        ret = build_json_counter_entry(current_obj, &ctx, &entry);
+        ret = build_json_counter_entry(current_obj, ctx, entry);
         json_array_append_new(entries, current_obj);
     } else {
         psabpf_counter_entry_t *iter;
-        while ((iter = psabpf_counter_get_next(&ctx)) != NULL) {
+        while ((iter = psabpf_counter_get_next(ctx)) != NULL) {
             json_t *current_obj = json_object();
-            ret = build_json_counter_entry(current_obj, &ctx, iter);
+            ret = build_json_counter_entry(current_obj, ctx, iter);
             json_array_append_new(entries, current_obj);
             psabpf_counter_entry_free(iter);
             if (ret != NO_ERROR)
@@ -300,7 +275,41 @@ clean_up:
     json_decref(entries);
     json_decref(root);
 
-clean_up_psabpf:
+    return ret;
+}
+
+int do_counter_get(int argc, char **argv)
+{
+    int ret = EINVAL;
+    const char *counter_name = NULL;
+    psabpf_context_t psabpf_ctx;
+    psabpf_counter_context_t ctx;
+    psabpf_counter_entry_t entry;
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_counter_ctx_init(&ctx);
+    psabpf_counter_entry_init(&entry);
+
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_dst_counter(&argc, &argv, &counter_name, &psabpf_ctx, &ctx) != NO_ERROR)
+        goto clean_up;
+
+    bool counter_key_provided = (argc >= 1 && is_keyword(*argv, "key"));
+    if (counter_key_provided) {
+        if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR)
+            goto clean_up;
+    }
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    ret = print_json_counter(&ctx, &entry, counter_name, counter_key_provided);
+
+clean_up:
     psabpf_counter_entry_free(&entry);
     psabpf_counter_ctx_free(&ctx);
     psabpf_context_free(&psabpf_ctx);
