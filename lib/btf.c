@@ -28,12 +28,12 @@
 #include "common.h"
 #include "bpf_defs.h"
 
-static uint32_t follow_types(struct btf * btf, uint32_t type_id)
+static uint32_t follow_types(struct btf *btf, uint32_t type_id)
 {
     if (type_id == 0)
         return type_id;
 
-    const struct btf_type * type = btf__type_by_id(btf, type_id);
+    const struct btf_type *type = btf__type_by_id(btf, type_id);
     while (true) {
         if (btf_is_typedef(type) || btf_is_ptr(type))
             type_id = type->type;
@@ -45,9 +45,9 @@ static uint32_t follow_types(struct btf * btf, uint32_t type_id)
     return type_id;
 }
 
-static uint32_t find_data_section_type_id(struct btf * btf, uint32_t sec_type_id, const char *name)
+static uint32_t find_data_section_type_id(struct btf *btf, uint32_t sec_type_id, const char *name)
 {
-    const struct btf_type * type = btf__type_by_id(btf, sec_type_id);
+    const struct btf_type *type = btf__type_by_id(btf, sec_type_id);
     if (type == NULL)
         return 0;
 
@@ -55,10 +55,10 @@ static uint32_t find_data_section_type_id(struct btf * btf, uint32_t sec_type_id
         return 0;
 
     unsigned entries = btf_vlen(type);
-    const struct btf_var_secinfo * info = btf_var_secinfos(type);
+    const struct btf_var_secinfo *info = btf_var_secinfos(type);
 
     for (unsigned i = 0; i < entries; i++, info++) {
-        const struct btf_type * entry_type = btf__type_by_id(btf, info->type);
+        const struct btf_type *entry_type = btf__type_by_id(btf, info->type);
 
         const char *entry_name = btf__name_by_offset(btf, entry_type->name_off);
         if (entry_name != NULL && name != NULL) {
@@ -71,7 +71,7 @@ static uint32_t find_data_section_type_id(struct btf * btf, uint32_t sec_type_id
     return 0;
 }
 
-const struct btf_type * psabtf_get_type_by_id(struct btf * btf, uint32_t type_id)
+const struct btf_type *psabtf_get_type_by_id(struct btf *btf, uint32_t type_id)
 {
     type_id = follow_types(btf, type_id);
     if (type_id == 0)
@@ -79,17 +79,17 @@ const struct btf_type * psabtf_get_type_by_id(struct btf * btf, uint32_t type_id
     return btf__type_by_id(btf, type_id);
 }
 
-static uint32_t psabtf_get_map_type_id_by_name(struct btf * btf, const char * name)
+static uint32_t psabtf_get_map_type_id_by_name(struct btf *btf, const char *name)
 {
     uint32_t type_id = 0;
     unsigned nodes = btf__get_nr_types(btf);
 
     /* First find ".maps" section to avoid false positive match to name */
     for (unsigned i = 1; i <= nodes; i++) {
-        const struct btf_type * type = btf__type_by_id(btf, i);
+        const struct btf_type *type = btf__type_by_id(btf, i);
         if (!type->name_off)
             continue;
-        const char * type_name = btf__name_by_offset(btf, type->name_off);
+        const char *type_name = btf__name_by_offset(btf, type->name_off);
         if (type_name == NULL)
             continue;
         if (strcmp(type_name, ".maps") == 0) {
@@ -109,8 +109,8 @@ static uint32_t psabtf_get_map_type_id_by_name(struct btf * btf, const char * na
     return follow_types(btf, type_id);
 }
 
-int psabtf_get_member_md_by_name(struct btf * btf, uint32_t type_id,
-        const char * member_name, psabtf_struct_member_md_t * md)
+int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
+        const char *member_name, psabtf_struct_member_md_t *md)
 {
     if (type_id == 0)
         return -EPERM;
@@ -141,8 +141,8 @@ int psabtf_get_member_md_by_name(struct btf * btf, uint32_t type_id,
     return -EPERM;
 }
 
-int psabtf_get_member_md_by_index(struct btf * btf, uint32_t type_id, uint16_t index,
-                                  psabtf_struct_member_md_t * md)
+int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
+                                  psabtf_struct_member_md_t *md)
 {
     if (type_id == 0)
         return -EPERM;
@@ -169,7 +169,7 @@ int psabtf_get_member_md_by_index(struct btf * btf, uint32_t type_id, uint16_t i
     return NO_ERROR;
 }
 
-uint32_t psabtf_get_member_type_id_by_name(struct btf * btf, uint32_t type_id, const char * member_name)
+uint32_t psabtf_get_member_type_id_by_name(struct btf *btf, uint32_t type_id, const char *member_name)
 {
     psabtf_struct_member_md_t md = {};
     if (psabtf_get_member_md_by_name(btf, type_id, member_name, &md) != 0)
@@ -178,9 +178,9 @@ uint32_t psabtf_get_member_type_id_by_name(struct btf * btf, uint32_t type_id, c
     return md.effective_type_id;
 }
 
-size_t psabtf_get_type_size_by_id(struct btf * btf, uint32_t type_id)
+size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
 {
-    const struct btf_type * type = psabtf_get_type_by_id(btf, type_id);
+    const struct btf_type *type = psabtf_get_type_by_id(btf, type_id);
     if (type == NULL)
         return 0;
 
@@ -193,7 +193,7 @@ size_t psabtf_get_type_size_by_id(struct btf * btf, uint32_t type_id)
         case BTF_KIND_ARRAY: {
             // Should work with multidimensional arrays, but
             // LLVM collapse them into one-dimensional array.
-            const struct btf_array * array_info = btf_array(type);
+            const struct btf_array *array_info = btf_array(type);
             // BTF is taken from kernel, so we can trust in it that there is no
             // infinite dimensional array (we do not prevent from stack overflow).
             size_t type_size = psabtf_get_type_size_by_id(btf, array_info->type);

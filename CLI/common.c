@@ -117,6 +117,8 @@ static int update_context(const char *data, size_t len, void *ctx, enum destinat
         return psabpf_action_param_create(ctx, data, len);
     else if (ctx_type == CTX_METER_INDEX)
         return psabpf_meter_entry_index(ctx, data, len);
+    else if (ctx_type == CTX_COUNTER_KEY)
+        return psabpf_counter_entry_set_key(ctx, data, len);
 
     return EPERM;
 }

@@ -41,3 +41,23 @@ psabpf_pipeline_id_t psabpf_context_get_pipeline(psabpf_context_t *ctx)
 {
     return ctx->pipeline_id;
 }
+
+psabpf_struct_field_type_t psabpf_struct_get_field_type(psabpf_struct_field_t *field)
+{
+    return field->type;
+}
+
+const char * psabpf_struct_get_field_name(psabpf_struct_field_t *field)
+{
+    return field->name;
+}
+
+const void * psabpf_struct_get_field_data(psabpf_struct_field_t *field)
+{
+    return field->data;
+}
+
+size_t psabpf_struct_get_field_data_len(psabpf_struct_field_t *field)
+{
+    return field->data_len;
+}

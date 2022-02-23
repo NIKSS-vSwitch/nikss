@@ -31,6 +31,7 @@ set(PSABPFCTL_SRCS
         lib/psabpf_table.c
         lib/psabpf_action_selector.c
         lib/psabpf_meter.c
+        lib/psabpf_counter.c
         CLI/action_selector.c
         CLI/common.c
         CLI/clone_session.c
@@ -39,6 +40,7 @@ set(PSABPFCTL_SRCS
         CLI/pipeline.c
         CLI/table.c
         CLI/meter.c
+        CLI/counter.c
         main.c)
 
 add_executable(psabpf-ctl ${PSABPFCTL_SRCS})

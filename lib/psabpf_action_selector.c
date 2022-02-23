@@ -178,7 +178,7 @@ static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_s
     return NO_ERROR;
 }
 
-int psabpf_action_selector_ctx_open(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
+int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
 {
     if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
         return EINVAL;
