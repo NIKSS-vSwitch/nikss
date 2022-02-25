@@ -247,9 +247,11 @@ int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *map_name)
             return ret;
         }
 
+        // Take tuple_id from a map name
         uint32_t tuple_id = 0;
         char *elem;
-        for (elem = strtok(map_name,"_"); elem != NULL; elem = strtok(NULL, "_")){}
+        elem = strrchr(map_name, '_');
+        elem++;
         char *end;
         tuple_id = (uint32_t)strtol(elem, &end, 10);
         if (elem == end) {
