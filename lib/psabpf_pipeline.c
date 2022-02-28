@@ -298,17 +298,6 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 
     bpf_object__for_each_program(pos, obj) {
         const char *sec_name = bpf_program__section_name(pos);
-        fd = bpf_program__fd(pos);
-        if (!strcmp(sec_name, TC_INIT_PROG) || !strcmp(sec_name, XDP_INIT_PROG)) {
-            ret = do_initialize_maps(fd);
-            if (ret) {
-                ret = -errno;
-                fprintf(stderr, "failed to initialize maps: %s\n", strerror(errno));
-                goto err_close_obj;
-            }
-            // do not pin map initializer
-            continue;
-        }
 
         build_ebpf_prog_filename(pinned_file, sizeof(pinned_file),
                                  ctx, program_pin_name(pos));
@@ -354,6 +343,19 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
         if (ret) {
             fprintf(stderr, "failed to add tuple (%s) to tuples map\n", map_name);
             goto err_close_obj;
+        }
+    }
+
+    bpf_object__for_each_program(pos, obj) {
+        const char *sec_name = bpf_program__section_name(pos);
+        fd = bpf_program__fd(pos);
+        if (!strcmp(sec_name, TC_INIT_PROG) || !strcmp(sec_name, XDP_INIT_PROG)) {
+            ret = do_initialize_maps(fd);
+            if (ret) {
+                ret = -errno;
+                fprintf(stderr, "failed to initialize maps: %s\n", strerror(errno));
+                goto err_close_obj;
+            }
         }
     }
 
