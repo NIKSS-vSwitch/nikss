@@ -271,7 +271,7 @@ int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *map_name)
         }
 
         ret = bpf_map_update_elem(tuple_map.fd, &tuple_id, &tuple.fd, 0);
-        if (ret != 0) {
+        if (ret != NO_ERROR) {
             fprintf(stderr, "failed to add tuple %u: %s\n", tuple_id, strerror(ret));
         }
 
