@@ -25,6 +25,7 @@
 #include "../include/psabpf.h"
 #include "table.h"
 #include "common.h"
+#include "counter.h"
 
 /******************************************************************************
  * Command line parsing functions
@@ -57,7 +58,7 @@ static int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx
 }
 
 static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
-                              psabpf_action_t * action, bool * indirect_table)
+                              psabpf_action_t *action, bool *indirect_table)
 {
     *indirect_table = false;
 
@@ -159,8 +160,36 @@ static int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
     return NO_ERROR;
 }
 
-static int parse_action_data(int *argc, char ***argv,
-                             psabpf_action_t *action, bool indirect_table)
+static int parse_direct_counter_entry(int *argc, char ***argv,
+                                      psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                                      psabpf_direct_counter_context_t *dc, psabpf_counter_entry_t *counter)
+{
+    if (!is_keyword(**argv, "counter"))
+        return EINVAL;
+
+    NEXT_ARGP_RET();
+    const char *instance = **argv;
+    NEXT_ARGP_RET();
+
+    int ret = psabpf_direct_counter_ctx_name(dc, ctx, instance);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "%s: DirectCounter not found\n", instance);
+        return ret;
+    }
+
+    ret = parse_counter_value_str(**argv, psabpf_direct_counter_get_type(dc), counter);
+    if (ret != NO_ERROR)
+        return ret;
+
+    ret = psabpf_table_entry_set_direct_counter(entry, dc, counter);
+    if (ret != NO_ERROR)
+        fprintf(stderr, "%s: failed to append DirectCounter to table entry\n", instance);
+
+    return ret;
+}
+
+static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
+                             psabpf_table_entry_t *entry, psabpf_action_t *action, bool indirect_table)
 {
     if (!is_keyword(**argv, "data")) {
         if (indirect_table) {
@@ -180,6 +209,22 @@ static int parse_action_data(int *argc, char ***argv,
             if (is_keyword(**argv, "group")) {
                 ref_is_group_ref = true;
                 NEXT_ARGP_RET();
+            }
+        } else {
+            if (is_keyword(**argv, "counter")) {
+                psabpf_direct_counter_context_t dc;
+                psabpf_counter_entry_t counter;
+
+                psabpf_direct_counter_ctx_init(&dc);
+                psabpf_counter_entry_init(&counter);
+
+                int ret = parse_direct_counter_entry(argc, argv, ctx, entry, &dc, &counter);
+                psabpf_counter_entry_free(&counter);
+                psabpf_direct_counter_ctx_free(&dc);
+                if (ret != NO_ERROR)
+                    return ret;
+
+                continue;
             }
         }
 
@@ -263,7 +308,7 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
         goto clean_up;
 
     /* 4. Get action parameters */
-    if (parse_action_data(&argc, &argv, &action, table_is_indirect) != NO_ERROR)
+    if (parse_action_data(&argc, &argv, &ctx, &entry, &action, table_is_indirect) != NO_ERROR)
         goto clean_up;
 
     /* 5. Get entry priority */
@@ -374,7 +419,8 @@ int do_table_help(int argc, char **argv)
             /* note: by default '&&&' is used but it also will require
              *   an escape sequence in a CLI, so lets use '^' instead */
             "       TERNARY_KEY := { DATA^MASK }\n"
-            "       ACTION_PARAMS := { DATA }\n"
+            "       ACTION_PARAMS := { DATA | counter COUNTER_NAME COUNTER_VALUE }\n"
+            "       COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }\n"
             "",
             program_name);
     return 0;

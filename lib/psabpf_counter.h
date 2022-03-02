@@ -15,24 +15,14 @@
  * limitations under the License.
  */
 
-#ifndef __PRECTL_COUNTER_H
-#define __PRECTL_COUNTER_H
+#ifndef P4C_PSABPF_COUNTER_H
+#define P4C_PSABPF_COUNTER_H
 
-#include "common.h"
+#include <psabpf.h>
 
-int do_counter_get(int argc, char **argv);
-int do_counter_set(int argc, char **argv);
-int do_counter_reset(int argc, char **argv);
-int do_counter_help(int argc, char **argv);
+/* Might be used to test whether given type ID is a valid counter */
+psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id);
 
-static const struct cmd counter_cmds[] = {
-        {"help",  do_counter_help},
-        {"get",   do_counter_get},
-        {"set",   do_counter_set},
-        {"reset", do_counter_reset},
-        {0}
-};
+int encode_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, uint8_t *buffer);
 
-int parse_counter_value_str(const char *str, psabpf_counter_type_t type, psabpf_counter_entry_t *entry);
-
-#endif  /* __PRECTL_COUNTER_H */
+#endif  /* P4C_PSABPF_COUNTER_H */

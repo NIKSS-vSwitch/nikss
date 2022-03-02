@@ -116,7 +116,67 @@ const char * psabpf_struct_get_field_name(psabpf_struct_field_t *field);
 const void * psabpf_struct_get_field_data(psabpf_struct_field_t *field);
 size_t psabpf_struct_get_field_data_len(psabpf_struct_field_t *field);
 
-////// TableEntry
+/*
+ * Counters
+ */
+
+typedef uint64_t psabpf_counter_value_t;
+
+typedef enum psabpf_counter_type {
+    PSABPF_COUNTER_TYPE_UNKNOWN = 0,
+    PSABPF_COUNTER_TYPE_BYTES,
+    PSABPF_COUNTER_TYPE_PACKETS,
+    PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS,
+} psabpf_counter_type_t;
+
+typedef struct psabpf_counter_entry {
+    psabpf_struct_field_set_t entry_key;
+    void *raw_key;
+    size_t current_key_id;
+    psabpf_struct_field_t current_field;
+
+    psabpf_counter_value_t bytes;
+    psabpf_counter_value_t packets;
+} psabpf_counter_entry_t;
+
+typedef struct psabpf_counter_context {
+    psabpf_bpf_map_descriptor_t counter;
+    psabpf_counter_type_t counter_type;
+
+    psabpf_btf_t btf_metadata;
+    psabpf_struct_field_descriptor_set_t key_fds;
+
+    psabpf_counter_entry_t current_entry;
+    void *prev_entry_key;
+} psabpf_counter_context_t;
+
+void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx);
+void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx);
+int psabpf_counter_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name);
+
+void psabpf_counter_entry_init(psabpf_counter_entry_t *entry);
+void psabpf_counter_entry_free(psabpf_counter_entry_t *entry);
+
+/* Can be called multiple times. */
+int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, const void *data, size_t data_len);
+/* Valid after call to psabpf_counter_get() or psabpf_counter_get_next(). */
+psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
+
+psabpf_counter_type_t psabpf_counter_get_type(psabpf_counter_context_t *ctx);
+void psabpf_counter_entry_set_packets(psabpf_counter_entry_t *entry, psabpf_counter_value_t packets);
+void psabpf_counter_entry_set_bytes(psabpf_counter_entry_t *entry, psabpf_counter_value_t bytes);
+psabpf_counter_value_t psabpf_counter_entry_get_packets(psabpf_counter_entry_t *entry);
+psabpf_counter_value_t psabpf_counter_entry_get_bytes(psabpf_counter_entry_t *entry);
+
+int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
+psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx);
+int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
+int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
+
+/*
+ * Tables
+ */
+
 enum psabpf_matchkind_t {
     PSABPF_EXACT,
     PSABPF_LPM,
@@ -160,6 +220,11 @@ typedef struct psabpf_action {
     psabpf_action_param_t *params;
 } psabpf_action_t;
 
+typedef struct psabpf_direct_counter_entry {
+    psabpf_counter_entry_t counter;
+    unsigned counter_idx;
+} psabpf_direct_counter_entry_t;
+
 typedef struct psabpf_table_entry {
     size_t n_keys;
     psabpf_match_key_t **match_keys;
@@ -167,7 +232,18 @@ typedef struct psabpf_table_entry {
     psabpf_action_t *action;
 
     uint32_t priority;
+
+    size_t n_direct_counters;
+    psabpf_direct_counter_entry_t *direct_counters;
 } psabpf_table_entry_t;
+
+typedef struct psabpf_direct_counter_context {
+    const char *name;
+    psabpf_counter_type_t counter_type;
+    size_t counter_size;
+    size_t counter_offset;
+    unsigned counter_idx;
+} psabpf_direct_counter_context_t;
 
 /*
  * TODO: specific fields of table entry context are still to be added.
@@ -188,6 +264,10 @@ typedef struct psabpf_table_entry_context {
 
     psabpf_btf_t btf_metadata;
 
+    /* DirectCounter */
+    size_t n_direct_counters;
+    psabpf_direct_counter_context_t *direct_counters_ctx;
+
     // below fields might be useful when iterating
     size_t curr_idx;
     psabpf_table_entry_t *prev;
@@ -201,11 +281,11 @@ void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx);
 void psabpf_table_entry_init(psabpf_table_entry_t *entry);
 void psabpf_table_entry_free(psabpf_table_entry_t *entry);
 
-// can be invoked multiple times
+/* can be invoked multiple times */
 int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t *mk);
 
 void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act);
-// only for ternary
+/* only for ternary */
 void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority);
 
 void psabpf_matchkey_init(psabpf_match_key_t *mk);
@@ -266,6 +346,16 @@ int psabpf_table_entry_getnext(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry
  */
 int psabpf_table_entry_setdefault(psabpf_table_entry_t *entry);
 int psabpf_table_entry_getdefault(psabpf_table_entry_t *entry);
+
+/* DirectCounter */
+void psabpf_direct_counter_ctx_init(psabpf_direct_counter_context_t *dc_ctx);
+void psabpf_direct_counter_ctx_free(psabpf_direct_counter_context_t *dc_ctx);
+int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
+                                   psabpf_table_entry_ctx_t *table_ctx, const char *dc_name);
+
+int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry, psabpf_direct_counter_context_t *dc_ctx,
+                                          psabpf_counter_entry_t *dc);
+psabpf_counter_type_t psabpf_direct_counter_get_type(psabpf_direct_counter_context_t *dc_ctx);
 
 /*
  * Action Selector
@@ -329,63 +419,6 @@ int psabpf_action_selector_set_default_group_action(psabpf_action_selector_conte
 /*
  * TODO: Action Profile
  */
-
-/*
- * Counters
- */
-
-typedef uint64_t psabpf_counter_value_t;
-
-typedef enum psabpf_counter_type {
-    PSABPF_COUNTER_TYPE_UNKNOWN = 0,
-    PSABPF_COUNTER_TYPE_BYTES,
-    PSABPF_COUNTER_TYPE_PACKETS,
-    PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS,
-} psabpf_counter_type_t;
-
-typedef struct psabpf_counter_entry {
-    psabpf_struct_field_set_t entry_key;
-    void *raw_key;
-    size_t current_key_id;
-    psabpf_struct_field_t current_field;
-
-    psabpf_counter_value_t bytes;
-    psabpf_counter_value_t packets;
-} psabpf_counter_entry_t;
-
-typedef struct psabpf_counter_context {
-    psabpf_bpf_map_descriptor_t counter;
-    psabpf_counter_type_t counter_type;
-
-    psabpf_btf_t btf_metadata;
-    psabpf_struct_field_descriptor_set_t key_fds;
-
-    psabpf_counter_entry_t current_entry;
-    void *prev_entry_key;
-} psabpf_counter_context_t;
-
-void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx);
-void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx);
-int psabpf_counter_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name);
-
-void psabpf_counter_entry_init(psabpf_counter_entry_t *entry);
-void psabpf_counter_entry_free(psabpf_counter_entry_t *entry);
-
-/* Can be called multiple times. */
-int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, const void *data, size_t data_len);
-/* Valid after call to psabpf_counter_get() or psabpf_counter_get_next(). */
-psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
-
-psabpf_counter_type_t psabpf_counter_get_type(psabpf_counter_context_t *ctx);
-void psabpf_counter_entry_set_packets(psabpf_counter_entry_t *entry, psabpf_counter_value_t packets);
-void psabpf_counter_entry_set_bytes(psabpf_counter_entry_t *entry, psabpf_counter_value_t bytes);
-psabpf_counter_value_t psabpf_counter_entry_get_packets(psabpf_counter_entry_t *entry);
-psabpf_counter_value_t psabpf_counter_entry_get_bytes(psabpf_counter_entry_t *entry);
-
-int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
-psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx);
-int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
-int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
 
 /*
  * P4 Meters

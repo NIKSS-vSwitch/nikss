@@ -77,19 +77,11 @@ static int parse_counter_key(int *argc, char ***argv, psabpf_counter_entry_t *en
     return NO_ERROR;
 }
 
-static int parse_counter_value(int *argc, char ***argv,
-                               psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+int parse_counter_value_str(const char *str, psabpf_counter_type_t type, psabpf_counter_entry_t *entry)
 {
-    if (!is_keyword(**argv, "value")) {
-        fprintf(stderr, "expected \'value\' keyword\n");
-        return EINVAL;
-    }
-    NEXT_ARGP_RET();
-
-    psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
     char *end_ptr = NULL;
 
-    psabpf_counter_value_t parsed_value = strtoull(**argv, &end_ptr, 0);
+    psabpf_counter_value_t parsed_value = strtoull(str, &end_ptr, 0);
     if (type == PSABPF_COUNTER_TYPE_BYTES) {
         if (*end_ptr == '\0')
             psabpf_counter_entry_set_bytes(entry, parsed_value);
@@ -110,12 +102,27 @@ static int parse_counter_value(int *argc, char ***argv,
     }
 
     if (*end_ptr != '\0') {
-        fprintf(stderr, "%s: failed to parse\n", **argv);
+        fprintf(stderr, "%s: failed to parse\n", str);
         return EINVAL;
     }
 
-    NEXT_ARGP();
     return NO_ERROR;
+}
+
+static int parse_counter_value(int *argc, char ***argv,
+                               psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+{
+    if (!is_keyword(**argv, "value")) {
+        fprintf(stderr, "expected \'value\' keyword\n");
+        return EINVAL;
+    }
+    NEXT_ARGP_RET();
+
+    psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
+    int ret = parse_counter_value_str(**argv, type, entry);
+    NEXT_ARGP();
+
+    return ret;
 }
 
 static int build_json_counter_key(json_t *parent, psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
