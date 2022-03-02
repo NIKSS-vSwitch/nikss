@@ -222,51 +222,43 @@ bool psabpf_pipeline_exists(psabpf_context_t *ctx)
     return access(mounted_path, F_OK) == 0;
 }
 
-int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *map_name)
+int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_name)
 {
     // We assume that each tuple has "_tuple_" suffix
     // This name also is reserved in a p4c-ebpf-psa compiler
     const char *suffix = "_tuple_";
-    const char *ternary_tbl_name_lst_char_ptr = strstr(map_name, suffix);
+    const char *ternary_tbl_name_lst_char_ptr = strstr(tuple_name, suffix);
 
     if (ternary_tbl_name_lst_char_ptr) {
-        int tuples_map_name_length = (int)(ternary_tbl_name_lst_char_ptr - map_name);
-        const char tuples_map_name[tuples_map_name_length + 12]; // + _tuples_map (11+1 characters)
-        memcpy((void *)tuples_map_name, map_name, tuples_map_name_length);
-        memcpy((void *)tuples_map_name + tuples_map_name_length, "_tuples_map", 12);
+        char tuples_map_name[256];
+        int ternary_map_name_length = (int)(ternary_tbl_name_lst_char_ptr - tuple_name);
+        char map_name[256];
+        strncpy(map_name, tuple_name, ternary_map_name_length);
+        snprintf(tuples_map_name, sizeof(tuples_map_name), "%s_tuples_map", map_name);
 
-        psabpf_btf_t btf_metadata;
-        btf_metadata.btf = NULL;
-        if (load_btf(ctx, &btf_metadata) != NO_ERROR) {
-            fprintf(stderr, "warning: couldn't find BTF info\n");
-        }
         psabpf_bpf_map_descriptor_t tuple_map;
-        int ret = open_bpf_map(ctx, tuples_map_name, &btf_metadata, &tuple_map);
+        int ret = open_bpf_map(ctx, tuples_map_name, NULL, &tuple_map);
         if (ret != NO_ERROR) {
             fprintf(stderr, "couldn't open map %s: %s\n", tuples_map_name, strerror(ret));
             return ret;
         }
 
-        // Take tuple_id from a map name
+        // Take tuple_id from a tuple map name
         uint32_t tuple_id = 0;
         char *elem;
-        elem = strrchr(map_name, '_');
+        elem = strrchr(tuple_name, '_');
         elem++;
         char *end;
         tuple_id = (uint32_t)strtol(elem, &end, 10);
         if (elem == end) {
-            fprintf(stderr, "cannot convert tuple_id from tuple name: %s", map_name);
+            fprintf(stderr, "cannot convert tuple_id from tuple name: %s", tuple_name);
             return ENODATA;
         }
 
-        psabpf_btf_t btf_metadata_tuple;
-        btf_metadata_tuple.btf = NULL;
-        if (load_btf(ctx, &btf_metadata_tuple) != NO_ERROR)
-            fprintf(stderr, "warning: couldn't find BTF info\n");
         psabpf_bpf_map_descriptor_t tuple;
-        ret = open_bpf_map(ctx, map_name, &btf_metadata_tuple, &tuple);
+        ret = open_bpf_map(ctx, tuple_name, NULL, &tuple);
         if (ret != NO_ERROR) {
-            fprintf(stderr, "couldn't open map %s: %s\n", map_name, strerror(ret));
+            fprintf(stderr, "couldn't open map %s: %s\n", tuple_name, strerror(ret));
             return ret;
         }
 
