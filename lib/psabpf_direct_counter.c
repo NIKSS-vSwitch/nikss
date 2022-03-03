@@ -57,6 +57,7 @@ int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
         }
     }
 
+    fprintf(stderr, "%s: DirectCounter entry not found\n", dc_name);
     return ENOENT;
 }
 

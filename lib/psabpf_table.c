@@ -1095,7 +1095,7 @@ static int handle_direct_objects(const char *key, char *value,
             return ENOENT;
         }
 
-        /* copy existing values, later they might be overwritten later */
+        /* copy existing values, they might be overwritten later */
         for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
             memcpy(value + ctx->direct_counters_ctx[i].counter_offset,
                    old_value_buffer + ctx->direct_counters_ctx[i].counter_offset,
