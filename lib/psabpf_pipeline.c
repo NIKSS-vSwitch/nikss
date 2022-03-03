@@ -222,7 +222,23 @@ bool psabpf_pipeline_exists(psabpf_context_t *ctx)
     return access(mounted_path, F_OK) == 0;
 }
 
-int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_name)
+static int extract_tuple_id_from_tuple(const char *tuple_name, uint32_t *tuple_id) {
+    char *elem;
+    elem = strrchr(tuple_name, '_');
+    elem++;
+    if (tuple_id != NULL) {
+        char *end;
+        *tuple_id = (uint32_t)strtol(elem, &end, 10);
+        if (elem == end) {
+            return ENODATA;
+        }
+    } else {
+        return EINVAL;
+    }
+    return NO_ERROR;
+}
+
+static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_name)
 {
     // We assume that each tuple has "_tuple_" suffix
     // This name also is reserved in a p4c-ebpf-psa compiler
@@ -245,13 +261,9 @@ int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_name)
 
         // Take tuple_id from a tuple map name
         uint32_t tuple_id = 0;
-        char *elem;
-        elem = strrchr(tuple_name, '_');
-        elem++;
-        char *end;
-        tuple_id = (uint32_t)strtol(elem, &end, 10);
-        if (elem == end) {
-            fprintf(stderr, "cannot convert tuple_id from tuple name: %s", tuple_name);
+        ret = extract_tuple_id_from_tuple(tuple_name, &tuple_id);
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "cannot extract tuple_id from tuple name %s: %s", tuple_name, strerror(ret));
             return ENODATA;
         }
 
