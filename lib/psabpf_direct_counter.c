@@ -62,7 +62,8 @@ int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
 }
 
 int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
-                                          psabpf_direct_counter_context_t *dc_ctx, psabpf_counter_entry_t *dc) {
+                                          psabpf_direct_counter_context_t *dc_ctx, psabpf_counter_entry_t *dc)
+{
     if (entry == NULL || dc_ctx == NULL || dc == NULL)
         return EINVAL;
 
