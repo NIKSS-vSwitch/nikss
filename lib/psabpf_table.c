@@ -132,8 +132,8 @@ static int execute_direct_objects_command(psabpf_table_entry_ctx_t *ctx, enum di
         } else if (strcmp(member_type_name, "meter_value") == 0) {
             /* DirectMeter */
         } else {
-            fprintf(stderr, "%s: unknown direct object instance", member_name);
-            return ENOTSUP;
+            fprintf(stderr, "%s: unknown type direct object instance, ignored", member_name);
+            continue;
         }
     }
 
