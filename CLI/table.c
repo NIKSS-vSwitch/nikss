@@ -168,22 +168,22 @@ static int parse_direct_counter_entry(int *argc, char ***argv,
         return EINVAL;
 
     NEXT_ARGP_RET();
-    const char *instance = **argv;
-    NEXT_ARGP_RET();
+    const char *name = **argv;
 
-    int ret = psabpf_direct_counter_ctx_name(dc, ctx, instance);
+    int ret = psabpf_direct_counter_ctx_name(dc, ctx, name);
     if (ret != NO_ERROR) {
-        fprintf(stderr, "%s: DirectCounter not found\n", instance);
+        fprintf(stderr, "%s: DirectCounter not found\n", name);
         return ret;
     }
 
+    NEXT_ARGP_RET();
     ret = parse_counter_value_str(**argv, psabpf_direct_counter_get_type(dc), counter);
     if (ret != NO_ERROR)
         return ret;
 
     ret = psabpf_table_entry_set_direct_counter(entry, dc, counter);
     if (ret != NO_ERROR)
-        fprintf(stderr, "%s: failed to append DirectCounter to table entry\n", instance);
+        fprintf(stderr, "%s: failed to append DirectCounter to table entry\n", name);
 
     return ret;
 }
