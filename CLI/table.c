@@ -26,6 +26,7 @@
 #include "table.h"
 #include "common.h"
 #include "counter.h"
+#include "meter.h"
 
 /******************************************************************************
  * Command line parsing functions
@@ -188,6 +189,33 @@ static int parse_direct_counter_entry(int *argc, char ***argv,
     return ret;
 }
 
+static int parse_direct_meter_entry(int *argc, char ***argv,
+                                    psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                                    psabpf_direct_meter_context_t *dm, psabpf_meter_entry_t *meter)
+{
+    if (!is_keyword(**argv, "meter"))
+        return EINVAL;
+
+    NEXT_ARGP_RET();
+    const char *instance = **argv;
+
+    int ret = psabpf_direct_meter_ctx_name(dm, ctx, instance);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "%s: DirectMeter not found\n", instance);
+        return ret;
+    }
+
+    ret = parse_meter_data(argc, argv, meter);
+    if (ret != NO_ERROR)
+        return ret;
+
+    ret = psabpf_table_entry_set_direct_meter(entry, dm, meter);
+    if (ret != NO_ERROR)
+        fprintf(stderr, "%s: failed to append DirectMeter to table entry\n", instance);
+
+    return ret;
+}
+
 static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
                              psabpf_table_entry_t *entry, psabpf_action_t *action, bool indirect_table)
 {
@@ -221,6 +249,20 @@ static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *
                 int ret = parse_direct_counter_entry(argc, argv, ctx, entry, &dc, &counter);
                 psabpf_counter_entry_free(&counter);
                 psabpf_direct_counter_ctx_free(&dc);
+                if (ret != NO_ERROR)
+                    return ret;
+
+                continue;
+            } else if (is_keyword(**argv, "meter")) {
+                psabpf_direct_meter_context_t dm;
+                psabpf_meter_entry_t meter;
+
+                psabpf_direct_meter_ctx_init(&dm);
+                psabpf_meter_entry_init(&meter);
+
+                int ret = parse_direct_meter_entry(argc, argv, ctx, entry, &dm, &meter);
+                psabpf_meter_entry_free(&meter);
+                psabpf_direct_meter_ctx_free(&dm);
                 if (ret != NO_ERROR)
                     return ret;
 
@@ -403,9 +445,6 @@ int do_table_help(int argc, char **argv)
             "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
             "       %1$s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"
             "       %1$s table default pipe ID TABLE\n"
-            /* for far future */
-            "       %1$s table timeout pipe ID TABLE set { on TTL | off }\n"
-            "       %1$s table timeout pipe ID TABLE\n"
             "\n"
             "       TABLE := { id TABLE_ID | name FILE | TABLE_FILE }\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
@@ -419,8 +458,9 @@ int do_table_help(int argc, char **argv)
             /* note: by default '&&&' is used but it also will require
              *   an escape sequence in a CLI, so lets use '^' instead */
             "       TERNARY_KEY := { DATA^MASK }\n"
-            "       ACTION_PARAMS := { DATA | counter COUNTER_NAME COUNTER_VALUE }\n"
+            "       ACTION_PARAMS := { DATA | counter COUNTER_NAME COUNTER_VALUE | meter METER_NAME METER_VALUE }\n"
             "       COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }\n"
+            "       METER_VALUE := { PIR:PBS CIR:CBS }\n"
             "",
             program_name);
     return 0;
