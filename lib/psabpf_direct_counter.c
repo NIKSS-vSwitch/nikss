@@ -70,7 +70,7 @@ int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
     if (entry->direct_counters == NULL)
         tmp_ptr = malloc(sizeof(psabpf_direct_counter_entry_t));
     else
-        tmp_ptr = realloc(entry->direct_counters, entry->n_direct_counters * sizeof(psabpf_direct_counter_entry_t));
+        tmp_ptr = realloc(entry->direct_counters, (entry->n_direct_counters + 1) * sizeof(psabpf_direct_counter_entry_t));
     if (tmp_ptr == NULL) {
         fprintf(stderr, "not enough memory\n");
         return ENOMEM;
