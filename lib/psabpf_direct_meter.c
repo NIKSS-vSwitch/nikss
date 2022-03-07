@@ -68,7 +68,7 @@ int psabpf_table_entry_set_direct_meter(psabpf_table_entry_t *entry, psabpf_dire
     if (entry->direct_meters == NULL)
         tmp_ptr = malloc(sizeof(psabpf_direct_meter_entry_t));
     else
-        tmp_ptr = realloc(entry->direct_meters, entry->n_direct_meters * sizeof(psabpf_direct_meter_entry_t));
+        tmp_ptr = realloc(entry->direct_meters, (entry->n_direct_meters + 1) * sizeof(psabpf_direct_meter_entry_t));
     if (tmp_ptr == NULL) {
         fprintf(stderr, "not enough memory\n");
         return ENOMEM;
