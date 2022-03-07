@@ -24,11 +24,11 @@
 #include <linux/bpf.h>
 #include <linux/btf.h>
 
-#include "../include/psabpf.h"
+#include <psabpf.h>
 #include "btf.h"
 #include "common.h"
 #include "psabpf_table.h"
-#include "bpf_defs.h"
+#include "psabpf_counter.h"
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
 {
@@ -55,6 +55,132 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     close_object_fd(&(ctx->prefixes.fd));
     close_object_fd(&(ctx->tuple_map.fd));
     close_object_fd(&(ctx->cache.fd));
+
+    if (ctx->direct_counters_ctx != NULL) {
+        for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
+            psabpf_direct_counter_ctx_free(&ctx->direct_counters_ctx[i]);
+        }
+        free(ctx->direct_counters_ctx);
+        ctx->direct_counters_ctx = NULL;
+    }
+    ctx->n_direct_counters = 0;
+}
+
+static int get_value_type(psabpf_table_entry_ctx_t *ctx, const struct btf_type **value_type)
+{
+    uint32_t value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value");
+    if (value_type_id == 0)
+        return ENOENT;
+    *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_type_id);
+    if (value_type == NULL)
+        return EPERM;
+
+    if (btf_kind(*value_type) != BTF_KIND_STRUCT) {
+        fprintf(stderr, "expected struct as a map value\n");
+        return EPERM;
+    }
+
+    return NO_ERROR;
+}
+
+static bool member_is_direct_object(psabpf_btf_t *btf, const struct btf_member *member,
+                                    const char **name, const char **type_name)
+{
+    *name = btf__name_by_offset(btf->btf, member->name_off);
+    if (*name == NULL)
+        return false;
+    if (strcmp(*name, "u") == 0)
+        return false;
+
+    const struct btf_type *type = psabtf_get_type_by_id(btf->btf, member->type);
+    if (type == NULL)
+        return false;
+    if (!btf_is_struct(type))
+        return false;
+    *type_name = btf__name_by_offset(btf->btf, type->name_off);
+    if (*type_name == NULL)
+        return false;
+    if (strcmp(*type_name, "bpf_spin_lock") == 0)
+        return false;
+
+    return true;
+}
+
+static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
+{
+    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
+        return NO_ERROR;
+
+    const struct btf_type *value_type;
+    int ret = get_value_type(ctx, &value_type);
+    if (ret != NO_ERROR)
+        return ret;
+
+    unsigned entries = btf_vlen(value_type);
+    const struct btf_member *member = btf_members(value_type);
+    unsigned current_counter = 0;
+    for (unsigned i = 0; i < entries; i++, member++) {
+        const char *member_name = NULL;
+        const char *member_type_name = NULL;
+        if (!member_is_direct_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
+            continue;
+
+        psabpf_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
+        if (counter_type != PSABPF_COUNTER_TYPE_UNKNOWN) {
+            /* DirectCounter */
+            ctx->n_direct_counters += 1;
+        } else if (strcmp(member_type_name, "meter_value") == 0) {
+            /* DirectMeter */
+        } else {
+            fprintf(stderr, "%s: unknown type direct object instance, ignored", member_name);
+            continue;
+        }
+    }
+
+    return NO_ERROR;
+}
+
+static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
+{
+    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
+        return NO_ERROR;
+
+    const struct btf_type *value_type;
+    int ret = get_value_type(ctx, &value_type);
+    if (ret != NO_ERROR)
+        return ret;
+
+    unsigned entries = btf_vlen(value_type);
+    const struct btf_member *member = btf_members(value_type);
+    unsigned current_counter = 0;
+    for (unsigned i = 0; i < entries; i++, member++) {
+        const char *member_name = NULL;
+        const char *member_type_name = NULL;
+        if (!member_is_direct_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
+            continue;
+
+        size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
+        size_t member_offset = btf_member_bit_offset(value_type, i) / 8;
+        psabpf_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
+
+        if (counter_type != PSABPF_COUNTER_TYPE_UNKNOWN) {
+            psabpf_direct_counter_ctx_init(&ctx->direct_counters_ctx[current_counter]);
+
+            ctx->direct_counters_ctx[current_counter].name = strdup(member_name);
+            ctx->direct_counters_ctx[current_counter].counter_type = counter_type;
+            ctx->direct_counters_ctx[current_counter].counter_offset = member_offset;
+            ctx->direct_counters_ctx[current_counter].counter_size = member_size;
+            ctx->direct_counters_ctx[current_counter].counter_idx = current_counter;
+            if (ctx->direct_counters_ctx[current_counter].name == NULL)
+                return ENOMEM;
+
+            ++current_counter;
+        } else if (strcmp(member_type_name, "meter_value") == 0) {
+            /* DirectMeter */
+        }
+    }
+
+    return NO_ERROR;
 }
 
 static int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
@@ -117,6 +243,26 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
         fprintf(stderr, "warning: cache for table %s not found: %s\n", name, strerror(ret));
     }
 
+    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0) {
+        fprintf(stderr, "unable to handle direct objects; resetting them if exist\n");
+    } else {
+        ret = count_direct_objects(ctx);
+        if (ret == NO_ERROR) {
+            if (ctx->n_direct_counters > 0) {
+                ctx->direct_counters_ctx = malloc(ctx->n_direct_counters * sizeof(psabpf_direct_counter_context_t));
+                if (ctx->direct_counters_ctx == NULL) {
+                    fprintf(stderr, "not enough memory\n");
+                    return ENOMEM;
+                }
+            }
+            ret = init_direct_objects(ctx);
+        }
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "failed to initialize direct objects: %s\n", strerror(ret));
+            return ret;
+        }
+    }
+
     return NO_ERROR;
 }
 
@@ -153,6 +299,14 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
         free(entry->action);
         entry->action = NULL;
     }
+
+    /* free direct object instances */
+    if (entry->direct_counters != NULL) {
+        for (unsigned i = 0; i < entry->n_direct_counters; i++)
+            psabpf_counter_entry_free(&entry->direct_counters[i].counter);
+        free(entry->direct_counters);
+    }
+    entry->direct_counters = NULL;
 }
 
 /* can be invoked multiple times */
@@ -959,96 +1113,74 @@ static int construct_buffer(char * buffer, size_t buffer_len,
     return return_code;
 }
 
-static bool member_is_counter(psabpf_table_entry_ctx_t *ctx, const struct btf_member *member)
+static int handle_direct_counter_write(const char *key, char *value,
+                                       psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
-    const struct btf_type *type = psabtf_get_type_by_id(ctx->btf_metadata.btf, member->type);
-    if (btf_kind(type) != BTF_KIND_STRUCT)
-        return false;
-    unsigned entries = btf_vlen(type);
-    if (entries != COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES &&
-        entries != COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES)
-        return false;
+    /* 1. Entry provided - build counter based on it (on update and add)
+     * 2. Entry not provided - init to zero on add (already done), on update copy old value */
 
-    /* Allowed field names: "packets", "bytes" */
-    const struct btf_member *m = btf_members(type);
-    for (unsigned i = 0; i < entries; i++, m++) {
-        const char *field_name = btf__name_by_offset(ctx->btf_metadata.btf, m->name_off);
-        if (field_name == NULL)
-            return false;
-        if (strcmp(field_name, "bytes") == 0 ||
-            strcmp(field_name, "packets") == 0)
-            continue;
+    if (ctx->n_direct_counters == 0)
+        return NO_ERROR;
 
-        /* Unknown field name */
-        return false;
+    if (bpf_flags == BPF_EXIST) {
+        char *old_value_buffer = NULL;
+        old_value_buffer = malloc(ctx->table.value_size);
+        if (old_value_buffer == NULL)
+            return ENOMEM;
+        memset(old_value_buffer, 0, ctx->table.value_size);
+
+        int err = bpf_map_lookup_elem(ctx->table.fd, key, old_value_buffer);
+        if (err != 0) {
+            free(old_value_buffer);
+            return ENOENT;
+        }
+
+        /* copy existing values, they might be overwritten later */
+        for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
+            memcpy(value + ctx->direct_counters_ctx[i].counter_offset,
+                   old_value_buffer + ctx->direct_counters_ctx[i].counter_offset,
+                   ctx->direct_counters_ctx[i].counter_size);
+        }
+
+        if (old_value_buffer != NULL)
+            free(old_value_buffer);
     }
 
-    return true;
+    for (unsigned i = 0; i < entry->n_direct_counters; i++) {
+        unsigned idx = entry->direct_counters[i].counter_idx;
+        if (idx >= ctx->n_direct_counters)
+            return EINVAL;
+        psabpf_direct_counter_context_t *dc_ctx = &ctx->direct_counters_ctx[idx];
+        psabpf_counter_context_t counter_ctx = {
+                .counter_type = dc_ctx->counter_type,
+                .counter.value_size = dc_ctx->counter_size,
+        };
+        int ret = encode_counter_value(&counter_ctx, &entry->direct_counters[i].counter,
+                                       (uint8_t *) value + ctx->direct_counters_ctx[i].counter_offset);
+        if (ret != NO_ERROR)
+            return ret;
+    }
+
+    return NO_ERROR;
 }
 
-static int handle_counters(const char *key, char *value_buffer,
-                           psabpf_table_entry_ctx_t *ctx)
+static int handle_direct_meter_write()
 {
-    if (ctx->is_indirect || ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0) {
-        fprintf(stderr, "unable to handle counters; resetting them to 0 if exist\n");
-        return NO_ERROR;
-    }
+    // TODO: meters
+    return NO_ERROR;
+}
 
-    psabtf_struct_member_md_t value_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value", &value_md) != NO_ERROR)
-        return ENOENT;
-
-    const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_md.effective_type_id);
-    if (value_type == NULL)
-        return EPERM;
-    if (btf_kind(value_type) != BTF_KIND_STRUCT)
-        return EPERM;
-
-    unsigned entries = btf_vlen(value_type);
-    const struct btf_member *member = btf_members(value_type);
-
-    /* Optimization: check if we have any counter
-     * Rationale: do not make system call to get old value of counters if there is no counters */
-    bool has_counter = false;
-    for (unsigned i = 0; i < entries; i++, member++) {
-        if (member_is_counter(ctx, member)) {
-            has_counter = true;
-            break;
-        }
-    }
-    if (!has_counter)
+static int handle_direct_objects_write(const char *key, char *value,
+                                       psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
+{
+    if (ctx->is_indirect || ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
         return NO_ERROR;
 
-    /* Read current counters value */
-    char * reference_buffer = malloc(ctx->table.value_size);
-    if (reference_buffer == NULL)
-        return ENOMEM;
-    int err = bpf_map_lookup_elem(ctx->table.fd, key, reference_buffer);
-    if (err != 0) {
-        fprintf(stderr, "entry with counters not found\n");
-        goto clean_up;
-    }
+    int ret = handle_direct_meter_write();
+    if (ret != NO_ERROR)
+        return ret;
 
-    /* Preserve counters value */
-    member = btf_members(value_type);
-    for (unsigned i = 0; i < entries; i++, member++) {
-        if (!member_is_counter(ctx, member))
-            continue;
-
-        size_t offset = btf_member_bit_offset(value_type, i) / 8;
-        size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
-        if (offset + size > ctx->table.value_size) {
-            fprintf(stderr, "can't write counter at offset %zu and size %zu (entry size %u)\n",
-                    offset, size, ctx->table.value_size);
-            err = EPERM;
-            goto clean_up;
-        }
-        memcpy(value_buffer + offset, reference_buffer + offset, size);
-    }
-
-clean_up:
-    free(reference_buffer);
-    return err;
+    return handle_direct_counter_write(key, value, ctx, entry, bpf_flags);
 }
 
 struct ternary_table_prefix_metadata {
@@ -1410,12 +1542,10 @@ static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->table.key_size);
 
     /* Handle direct objects */
-    if (bpf_flags == BPF_EXIST) {
-        return_code = handle_counters(key_buffer, value_buffer, ctx);
-        if (return_code != NO_ERROR) {
-            fprintf(stderr, "failed to handle counters\n");
-            goto clean_up;
-        }
+    return_code = handle_direct_objects_write(key_buffer, value_buffer, ctx, entry, bpf_flags);
+    if (return_code != NO_ERROR) {
+        fprintf(stderr, "failed to handle direct objects: %s\n", strerror(return_code));
+        goto clean_up;
     }
 
     /* update map */

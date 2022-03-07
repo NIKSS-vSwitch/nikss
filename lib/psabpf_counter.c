@@ -24,6 +24,7 @@
 #include "common.h"
 #include "btf.h"
 #include "bpf_defs.h"
+#include "psabpf_counter.h"
 
 #define MAX_COUNTER_VALUE_SIZE 16
 
@@ -55,45 +56,53 @@ void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx)
     ctx->prev_entry_key= NULL;
 }
 
-static int parse_counter_value(psabpf_counter_context_t *ctx)
+psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id)
 {
-    uint32_t value_type_id;
-    value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->counter.btf_type_id, "value");
+    const struct btf_type *type = psabtf_get_type_by_id(btf->btf, type_id);
+    if (btf_kind(type) != BTF_KIND_STRUCT)
+        return PSABPF_COUNTER_TYPE_UNKNOWN;
 
-    const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_type_id);
-    if (btf_kind(value_type) != BTF_KIND_STRUCT)
-        return EINVAL;
-
-    unsigned value_entries = btf_vlen(value_type);
+    unsigned value_entries = btf_vlen(type);
     if (value_entries != COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES &&
         value_entries != COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES)
-        return EINVAL;
+        return PSABPF_COUNTER_TYPE_UNKNOWN;
 
     /* Allowed field names: "packets", "bytes" */
     bool has_bytes = false;
     bool has_packets = false;
-    const struct btf_member *m = btf_members(value_type);
+    const struct btf_member *m = btf_members(type);
     for (unsigned i = 0; i < value_entries; i++, m++) {
-        const char *field_name = btf__name_by_offset(ctx->btf_metadata.btf, m->name_off);
+        const char *field_name = btf__name_by_offset(btf->btf, m->name_off);
         if (field_name == NULL)
-            return false;
+            return PSABPF_COUNTER_TYPE_UNKNOWN;
 
         if (strcmp(field_name, "bytes") == 0)
             has_bytes = true;
         else if (strcmp(field_name, "packets") == 0)
             has_packets = true;
         else
-            return EINVAL;
+            return PSABPF_COUNTER_TYPE_UNKNOWN;
     }
 
     /* Decode counter type */
+    psabpf_counter_type_t counter_type = PSABPF_COUNTER_TYPE_UNKNOWN;
     if (has_bytes == true && has_packets == true)
-        ctx->counter_type = PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS;
+        counter_type = PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS;
     else if (has_bytes == true && has_packets == false)
-        ctx->counter_type = PSABPF_COUNTER_TYPE_BYTES;
+        counter_type = PSABPF_COUNTER_TYPE_BYTES;
     else if (has_bytes == false && has_packets == true)
-        ctx->counter_type = PSABPF_COUNTER_TYPE_PACKETS;
-    else
+        counter_type = PSABPF_COUNTER_TYPE_PACKETS;
+
+    return counter_type;
+}
+
+static int parse_counter_value(psabpf_counter_context_t *ctx)
+{
+    uint32_t value_type_id;
+    value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->counter.btf_type_id, "value");
+
+    ctx->counter_type = get_counter_type(&ctx->btf_metadata, value_type_id);
+    if (ctx->counter_type == PSABPF_COUNTER_TYPE_UNKNOWN)
         return EINVAL;
 
     /* Validate counter size - up to 64 bits per counter*/
@@ -319,7 +328,7 @@ psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx)
     return &ctx->current_entry;
 }
 
-static int encode_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, uint8_t *buffer)
+int encode_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, uint8_t *buffer)
 {
     size_t counter_size = ctx->counter.value_size;
     if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES)
