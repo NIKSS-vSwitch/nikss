@@ -132,11 +132,12 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
         if (!member_is_direct_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
             continue;
 
+        size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
         psabpf_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
         if (counter_type != PSABPF_COUNTER_TYPE_UNKNOWN) {
             /* DirectCounter */
             ctx->n_direct_counters += 1;
-        } else if (strcmp(member_type_name, "meter_value") == 0) {
+        } else if (strcmp(member_type_name, "meter_value") == 0 && member_size == DIRECT_METER_SIZE) {
             /* DirectMeter */
             ctx->n_direct_meters += 1;
         } else {
