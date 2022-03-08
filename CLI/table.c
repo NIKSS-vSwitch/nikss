@@ -197,11 +197,11 @@ static int parse_direct_meter_entry(int *argc, char ***argv,
         return EINVAL;
 
     NEXT_ARGP_RET();
-    const char *instance = **argv;
+    const char *meter_name = **argv;
 
-    int ret = psabpf_direct_meter_ctx_name(dm, ctx, instance);
+    int ret = psabpf_direct_meter_ctx_name(dm, ctx, meter_name);
     if (ret != NO_ERROR) {
-        fprintf(stderr, "%s: DirectMeter not found\n", instance);
+        fprintf(stderr, "%s: DirectMeter not found\n", meter_name);
         return ret;
     }
 
@@ -211,7 +211,7 @@ static int parse_direct_meter_entry(int *argc, char ***argv,
 
     ret = psabpf_table_entry_set_direct_meter(entry, dm, meter);
     if (ret != NO_ERROR)
-        fprintf(stderr, "%s: failed to append DirectMeter to table entry\n", instance);
+        fprintf(stderr, "%s: failed to append DirectMeter to table entry\n", meter_name);
 
     return ret;
 }
