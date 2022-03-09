@@ -304,6 +304,7 @@ typedef struct psabpf_direct_meter_context {
  */
 typedef struct psabpf_table_entry_context {
     psabpf_bpf_map_descriptor_t table;
+    psabpf_bpf_map_descriptor_t default_entry;
     bool is_indirect;
     bool is_ternary;
 
@@ -376,32 +377,8 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t **entry);
 int psabpf_table_entry_getnext(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t **entry);
 
-/**
- * Sets a default entry.
- *
- * Example code:
- *  psabpf_table_entry_t entry;
- *  if (!psabpf_table_entry_init(&entry))
- *      return;
- *  psabpf_table_entry_tblname(&entry, "xyz");
- *
- *  psabpf_action_t action;
- *  psabpf_action_init(&action);
- *  psabpf_action_setid(&action, 1);
- *  for (action params)
- *      psabpf_action_param_set(&action, "dsada", 12);
- *
- *  if (!psabpf_table_entry_setdefault(&entry))
- *      psabpf_table_entry_free(&entry);
- *      return EINVAL;
- *
- *  psabpf_table_entry_free(&entry);
- *
- * @param entry
- * @return
- */
-int psabpf_table_entry_setdefault(psabpf_table_entry_t *entry);
-int psabpf_table_entry_getdefault(psabpf_table_entry_t *entry);
+int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
+int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 
 /* DirectCounter */
 void psabpf_direct_counter_ctx_init(psabpf_direct_counter_context_t *dc_ctx);
