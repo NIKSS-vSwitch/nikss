@@ -222,6 +222,69 @@ bool psabpf_pipeline_exists(psabpf_context_t *ctx)
     return access(mounted_path, F_OK) == 0;
 }
 
+static int extract_tuple_id_from_tuple(const char *tuple_name, uint32_t *tuple_id) {
+    char *elem;
+    elem = strrchr(tuple_name, '_');
+    elem++;
+    if (tuple_id != NULL) {
+        char *end;
+        *tuple_id = (uint32_t)strtol(elem, &end, 10);
+        if (elem == end) {
+            return ENODATA;
+        }
+    } else {
+        return EINVAL;
+    }
+    return NO_ERROR;
+}
+
+static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_name)
+{
+    // We assume that each tuple has "_tuple_" suffix
+    // This name also is reserved in a p4c-ebpf-psa compiler
+    const char *suffix = "_tuple_";
+    const char *ternary_tbl_name_lst_char_ptr = strstr(tuple_name, suffix);
+
+    if (ternary_tbl_name_lst_char_ptr) {
+        char tuples_map_name[256];
+        int ternary_map_name_length = (int)(ternary_tbl_name_lst_char_ptr - tuple_name);
+        char map_name[256];
+        strncpy(map_name, tuple_name, ternary_map_name_length);
+        snprintf(tuples_map_name, sizeof(tuples_map_name), "%s_tuples_map", map_name);
+
+        psabpf_bpf_map_descriptor_t tuple_map;
+        int ret = open_bpf_map(ctx, tuples_map_name, NULL, &tuple_map);
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "couldn't open map %s: %s\n", tuples_map_name, strerror(ret));
+            return ret;
+        }
+
+        // Take tuple_id from a tuple map name
+        uint32_t tuple_id = 0;
+        ret = extract_tuple_id_from_tuple(tuple_name, &tuple_id);
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "cannot extract tuple_id from tuple name %s: %s", tuple_name, strerror(ret));
+            return ENODATA;
+        }
+
+        psabpf_bpf_map_descriptor_t tuple;
+        ret = open_bpf_map(ctx, tuple_name, NULL, &tuple);
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "couldn't open map %s: %s\n", tuple_name, strerror(ret));
+            return ret;
+        }
+
+        ret = bpf_map_update_elem(tuple_map.fd, &tuple_id, &tuple.fd, 0);
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "failed to add tuple %u: %s\n", tuple_id, strerror(ret));
+        }
+
+        tuple_id++;
+    }
+
+    return NO_ERROR;
+}
+
 int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 {
     struct bpf_object *obj;
@@ -239,17 +302,6 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 
     bpf_object__for_each_program(pos, obj) {
         const char *sec_name = bpf_program__section_name(pos);
-        fd = bpf_program__fd(pos);
-        if (!strcmp(sec_name, TC_INIT_PROG) || !strcmp(sec_name, XDP_INIT_PROG)) {
-            ret = do_initialize_maps(fd);
-            if (ret) {
-                ret = -errno;
-                fprintf(stderr, "failed to initialize maps: %s\n", strerror(errno));
-                goto err_close_obj;
-            }
-            // do not pin map initializer
-            continue;
-        }
 
         build_ebpf_prog_filename(pinned_file, sizeof(pinned_file),
                                  ctx, program_pin_name(pos));
@@ -289,6 +341,25 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
         if (ret) {
             fprintf(stderr, "failed to pin map at %s: %s\n", pinned_file, strerror(-ret));
             goto err_close_obj;
+        }
+
+        ret = join_tuple_to_map_if_tuple(ctx, map_name);
+        if (ret) {
+            fprintf(stderr, "failed to add tuple (%s) to tuples map\n", map_name);
+            goto err_close_obj;
+        }
+    }
+
+    bpf_object__for_each_program(pos, obj) {
+        const char *sec_name = bpf_program__section_name(pos);
+        fd = bpf_program__fd(pos);
+        if (!strcmp(sec_name, TC_INIT_PROG) || !strcmp(sec_name, XDP_INIT_PROG)) {
+            ret = do_initialize_maps(fd);
+            if (ret) {
+                ret = -errno;
+                fprintf(stderr, "failed to initialize maps: %s\n", strerror(errno));
+                goto err_close_obj;
+            }
         }
     }
 
