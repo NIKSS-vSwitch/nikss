@@ -174,6 +174,43 @@ int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *en
 int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
 
 /*
+ * P4 Meters
+ */
+
+typedef uint64_t psabpf_meter_value_t;
+
+typedef struct {
+    size_t index_size;
+    void *index;
+    psabpf_meter_value_t pbs;
+    psabpf_meter_value_t pir;
+    psabpf_meter_value_t cbs;
+    psabpf_meter_value_t cir;
+} psabpf_meter_entry_t;
+
+typedef struct {
+    int table_fd;
+    uint32_t index_size;
+    uint32_t value_size;
+} psabpf_meter_ctx_t;
+
+void psabpf_meter_entry_init(psabpf_meter_entry_t *entry);
+void psabpf_meter_entry_free(psabpf_meter_entry_t *entry);
+int psabpf_meter_entry_index(psabpf_meter_entry_t *entry, const char *data, size_t size);
+int psabpf_meter_entry_data(psabpf_meter_entry_t *entry,
+                            psabpf_meter_value_t pir,
+                            psabpf_meter_value_t pbs,
+                            psabpf_meter_value_t cir,
+                            psabpf_meter_value_t cbs);
+
+void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx);
+void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx);
+int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name);
+int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+int psabpf_meter_ctx_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+
+/*
  * Tables
  */
 
@@ -225,6 +262,11 @@ typedef struct psabpf_direct_counter_entry {
     unsigned counter_idx;
 } psabpf_direct_counter_entry_t;
 
+typedef struct psabpf_direct_meter_entry {
+    psabpf_meter_entry_t meter;
+    unsigned meter_idx;
+} psabpf_direct_meter_entry_t;
+
 typedef struct psabpf_table_entry {
     size_t n_keys;
     psabpf_match_key_t **match_keys;
@@ -235,6 +277,9 @@ typedef struct psabpf_table_entry {
 
     size_t n_direct_counters;
     psabpf_direct_counter_entry_t *direct_counters;
+
+    size_t n_direct_meters;
+    psabpf_direct_meter_entry_t *direct_meters;
 } psabpf_table_entry_t;
 
 typedef struct psabpf_direct_counter_context {
@@ -244,6 +289,13 @@ typedef struct psabpf_direct_counter_context {
     size_t counter_offset;
     unsigned counter_idx;
 } psabpf_direct_counter_context_t;
+
+typedef struct psabpf_direct_meter_context {
+    const char *name;
+    size_t meter_size;
+    size_t meter_offset;
+    unsigned meter_idx;
+} psabpf_direct_meter_context_t;
 
 /*
  * TODO: specific fields of table entry context are still to be added.
@@ -267,6 +319,10 @@ typedef struct psabpf_table_entry_context {
     /* DirectCounter */
     size_t n_direct_counters;
     psabpf_direct_counter_context_t *direct_counters_ctx;
+
+    /* DirectMeter */
+    size_t n_direct_meters;
+    psabpf_direct_meter_context_t *direct_meters_ctx;
 
     // below fields might be useful when iterating
     size_t curr_idx;
@@ -357,6 +413,15 @@ int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry, psabpf_di
                                           psabpf_counter_entry_t *dc);
 psabpf_counter_type_t psabpf_direct_counter_get_type(psabpf_direct_counter_context_t *dc_ctx);
 
+/* DirectMeter */
+void psabpf_direct_meter_ctx_init(psabpf_direct_meter_context_t *dm_ctx);
+void psabpf_direct_meter_ctx_free(psabpf_direct_meter_context_t *dm_ctx);
+int psabpf_direct_meter_ctx_name(psabpf_direct_meter_context_t *dm_ctx,
+                                 psabpf_table_entry_ctx_t *table_ctx, const char *dm_name);
+
+int psabpf_table_entry_set_direct_meter(psabpf_table_entry_t *entry, psabpf_direct_meter_context_t *dm_ctx,
+                                        psabpf_meter_entry_t *dm);
+
 /*
  * Action Selector
  */
@@ -419,43 +484,6 @@ int psabpf_action_selector_set_default_group_action(psabpf_action_selector_conte
 /*
  * TODO: Action Profile
  */
-
-/*
- * P4 Meters
- */
-
-typedef uint64_t psabpf_meter_value_t;
-
-typedef struct {
-    size_t index_size;
-    void *index;
-    psabpf_meter_value_t pbs;
-    psabpf_meter_value_t pir;
-    psabpf_meter_value_t cbs;
-    psabpf_meter_value_t cir;
-} psabpf_meter_entry_t;
-
-typedef struct {
-    int table_fd;
-    uint32_t index_size;
-    uint32_t value_size;
-} psabpf_meter_ctx_t;
-
-void psabpf_meter_entry_init(psabpf_meter_entry_t *entry);
-void psabpf_meter_entry_free(psabpf_meter_entry_t *entry);
-int psabpf_meter_entry_index(psabpf_meter_entry_t *entry, const char *data, size_t size);
-int psabpf_meter_entry_data(psabpf_meter_entry_t *entry,
-                            psabpf_meter_value_t pir,
-                            psabpf_meter_value_t pbs,
-                            psabpf_meter_value_t cir,
-                            psabpf_meter_value_t cbs);
-
-void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx);
-void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx);
-int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name);
-int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
-int psabpf_meter_ctx_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
-int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 
 ////// P4 Registers
 // TODO: to be implemented

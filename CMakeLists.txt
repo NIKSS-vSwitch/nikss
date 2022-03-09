@@ -33,6 +33,7 @@ set(PSABPFCTL_SRCS
         lib/psabpf_meter.c
         lib/psabpf_counter.c
         lib/psabpf_direct_counter.c
+        lib/psabpf_direct_meter.c
         CLI/action_selector.c
         CLI/common.c
         CLI/clone_session.c

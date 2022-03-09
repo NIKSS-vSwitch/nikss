@@ -29,6 +29,7 @@
 #include "common.h"
 #include "psabpf_table.h"
 #include "psabpf_counter.h"
+#include "psabpf_meter.h"
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
 {
@@ -57,13 +58,20 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     close_object_fd(&(ctx->cache.fd));
 
     if (ctx->direct_counters_ctx != NULL) {
-        for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
+        for (unsigned i = 0; i < ctx->n_direct_counters; i++)
             psabpf_direct_counter_ctx_free(&ctx->direct_counters_ctx[i]);
-        }
         free(ctx->direct_counters_ctx);
         ctx->direct_counters_ctx = NULL;
     }
     ctx->n_direct_counters = 0;
+
+    if (ctx->direct_meters_ctx != NULL) {
+        for (unsigned i = 0; i < ctx->n_direct_meters; i++)
+            psabpf_direct_meter_ctx_free(&ctx->direct_meters_ctx[i]);
+        free(ctx->direct_meters_ctx);
+        ctx->direct_meters_ctx = NULL;
+    }
+    ctx->n_direct_meters = 0;
 }
 
 static int get_value_type(psabpf_table_entry_ctx_t *ctx, const struct btf_type **value_type)
@@ -118,19 +126,20 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
 
     unsigned entries = btf_vlen(value_type);
     const struct btf_member *member = btf_members(value_type);
-    unsigned current_counter = 0;
     for (unsigned i = 0; i < entries; i++, member++) {
         const char *member_name = NULL;
         const char *member_type_name = NULL;
         if (!member_is_direct_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
             continue;
 
+        size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
         psabpf_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
         if (counter_type != PSABPF_COUNTER_TYPE_UNKNOWN) {
             /* DirectCounter */
             ctx->n_direct_counters += 1;
-        } else if (strcmp(member_type_name, "meter_value") == 0) {
+        } else if (strcmp(member_type_name, "meter_value") == 0 && member_size == DIRECT_METER_SIZE) {
             /* DirectMeter */
+            ctx->n_direct_meters += 1;
         } else {
             fprintf(stderr, "%s: unknown type direct object instance, ignored", member_name);
             continue;
@@ -140,7 +149,7 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
     return NO_ERROR;
 }
 
-static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
+static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
 {
     if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
         return NO_ERROR;
@@ -153,6 +162,7 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
     unsigned entries = btf_vlen(value_type);
     const struct btf_member *member = btf_members(value_type);
     unsigned current_counter = 0;
+    unsigned current_meter = 0;
     for (unsigned i = 0; i < entries; i++, member++) {
         const char *member_name = NULL;
         const char *member_type_name = NULL;
@@ -175,12 +185,47 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
                 return ENOMEM;
 
             ++current_counter;
-        } else if (strcmp(member_type_name, "meter_value") == 0) {
-            /* DirectMeter */
+        } else if (strcmp(member_type_name, "meter_value") == 0 && member_size == DIRECT_METER_SIZE) {
+            psabpf_direct_meter_ctx_init(&ctx->direct_meters_ctx[current_meter]);
+
+            ctx->direct_meters_ctx[current_meter].name = strdup(member_name);
+            ctx->direct_meters_ctx[current_meter].meter_offset = member_offset;
+            ctx->direct_meters_ctx[current_meter].meter_size = member_size;
+            ctx->direct_meters_ctx[current_meter].meter_idx = current_meter;
+            if (ctx->direct_meters_ctx[current_meter].name == NULL)
+                return ENOMEM;
+
+            ++current_meter;
         }
     }
 
     return NO_ERROR;
+}
+
+static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
+{
+    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0) {
+        fprintf(stderr, "unable to handle direct objects; resetting them if exist\n");
+        return NO_ERROR;
+    }
+
+    int ret = count_direct_objects(ctx);
+    if (ret != NO_ERROR)
+        return ret;
+
+    if (ctx->n_direct_counters > 0) {
+        ctx->direct_counters_ctx = malloc(ctx->n_direct_counters * sizeof(psabpf_direct_counter_context_t));
+        if (ctx->direct_counters_ctx == NULL)
+            return ENOMEM;
+    }
+
+    if (ctx->n_direct_meters > 0) {
+        ctx->direct_meters_ctx = malloc(ctx->n_direct_meters * sizeof(psabpf_direct_meter_context_t));
+        if (ctx->direct_meters_ctx == NULL)
+            return ENOMEM; // TODO: deallocate counter ctx to avoid mem leak or memory corruption
+    }
+
+    return init_direct_objects_context(ctx);
 }
 
 static int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
@@ -239,28 +284,13 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     char cache_name[256];
     snprintf(cache_name, sizeof(cache_name), "%s_cache", name);
     ret = open_bpf_map(psabpf_ctx, cache_name, &ctx->btf_metadata, &ctx->cache);
-    if (ret != NO_ERROR) {
+    if (ret != NO_ERROR)
         fprintf(stderr, "warning: cache for table %s not found: %s\n", name, strerror(ret));
-    }
 
-    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0) {
-        fprintf(stderr, "unable to handle direct objects; resetting them if exist\n");
-    } else {
-        ret = count_direct_objects(ctx);
-        if (ret == NO_ERROR) {
-            if (ctx->n_direct_counters > 0) {
-                ctx->direct_counters_ctx = malloc(ctx->n_direct_counters * sizeof(psabpf_direct_counter_context_t));
-                if (ctx->direct_counters_ctx == NULL) {
-                    fprintf(stderr, "not enough memory\n");
-                    return ENOMEM;
-                }
-            }
-            ret = init_direct_objects(ctx);
-        }
-        if (ret != NO_ERROR) {
-            fprintf(stderr, "failed to initialize direct objects: %s\n", strerror(ret));
-            return ret;
-        }
+    ret = init_direct_objects(ctx);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "failed to initialize direct objects: %s\n", strerror(ret));
+        return ret;
     }
 
     return NO_ERROR;
@@ -300,13 +330,21 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
         entry->action = NULL;
     }
 
-    /* free direct object instances */
+    /* free DirectCounter instances */
     if (entry->direct_counters != NULL) {
         for (unsigned i = 0; i < entry->n_direct_counters; i++)
             psabpf_counter_entry_free(&entry->direct_counters[i].counter);
         free(entry->direct_counters);
     }
     entry->direct_counters = NULL;
+
+    /* free DirectMeter instances */
+    if (entry->direct_meters != NULL) {
+        for (unsigned i = 0; i < entry->n_direct_meters; i++)
+            psabpf_meter_entry_free(&entry->direct_meters[i].meter);
+        free(entry->direct_meters);
+    }
+    entry->direct_meters = NULL;
 }
 
 /* can be invoked multiple times */
@@ -1164,9 +1202,22 @@ static int handle_direct_counter_write(const char *key, char *value,
     return NO_ERROR;
 }
 
-static int handle_direct_meter_write()
+static int handle_direct_meter_write(char *value, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    // TODO: meters
+    /* Configure meters only when provided, otherwise leave it uninitialized */
+
+    for (unsigned i = 0; i < entry->n_direct_meters; i++) {
+        unsigned idx = entry->direct_meters[i].meter_idx;
+        if (idx >= ctx->n_direct_meters)
+            return EINVAL;
+        psabpf_direct_meter_context_t *dm_ctx = &ctx->direct_meters_ctx[idx];
+        if (dm_ctx->meter_size != DIRECT_METER_SIZE)
+            return EINVAL;
+
+        convert_meter_entry_to_data(&entry->direct_meters[i].meter,
+                                    (psabpf_meter_data_t *) (value + dm_ctx->meter_offset));
+    }
+
     return NO_ERROR;
 }
 
@@ -1176,7 +1227,7 @@ static int handle_direct_objects_write(const char *key, char *value,
     if (ctx->is_indirect || ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
         return NO_ERROR;
 
-    int ret = handle_direct_meter_write();
+    int ret = handle_direct_meter_write(value, ctx, entry);
     if (ret != NO_ERROR)
         return ret;
 
