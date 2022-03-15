@@ -24,5 +24,8 @@
 psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id);
 
 int encode_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, uint8_t *buffer);
+/* data -> counter entry */
+int decode_counter_value(psabpf_counter_entry_t *entry, const uint8_t *buffer,
+                         size_t counter_size, psabpf_counter_type_t counter_type);
 
 #endif  /* P4C_PSABPF_COUNTER_H */

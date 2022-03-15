@@ -242,12 +242,16 @@ typedef struct psabpf_match_key {
             const uint64_t end;
         } range;
     } u;
+
+    bool data_owner;
 } psabpf_match_key_t;
 
 typedef struct psabpf_action_param {
     char *data;  /* might be an action data or reference */
     size_t len;
     bool is_group_reference;
+    bool is_data_owner;
+    uint32_t param_id;
 } psabpf_action_param_t;
 
 typedef struct psabpf_action {
@@ -262,10 +266,26 @@ typedef struct psabpf_direct_counter_entry {
     unsigned counter_idx;
 } psabpf_direct_counter_entry_t;
 
+typedef struct psabpf_direct_counter_context {
+    const char *name;
+    psabpf_counter_type_t counter_type;
+    size_t counter_size;
+    size_t counter_offset;
+    unsigned counter_idx;
+    bool is_data_owner;
+} psabpf_direct_counter_context_t;
+
 typedef struct psabpf_direct_meter_entry {
     psabpf_meter_entry_t meter;
     unsigned meter_idx;
 } psabpf_direct_meter_entry_t;
+
+typedef struct psabpf_direct_meter_context {
+    const char *name;
+    size_t meter_size;
+    size_t meter_offset;
+    unsigned meter_idx;
+} psabpf_direct_meter_context_t;
 
 typedef struct psabpf_table_entry {
     size_t n_keys;
@@ -280,22 +300,15 @@ typedef struct psabpf_table_entry {
 
     size_t n_direct_meters;
     psabpf_direct_meter_entry_t *direct_meters;
+
+    /* For iteration over entry data */
+    size_t current_match_key_id;
+    psabpf_match_key_t current_match_key;
+    size_t current_action_param_id;
+    psabpf_action_param_t current_action_param;
+    size_t current_direct_counter_ctx_id;
+    psabpf_direct_counter_context_t current_direct_counter_ctx;
 } psabpf_table_entry_t;
-
-typedef struct psabpf_direct_counter_context {
-    const char *name;
-    psabpf_counter_type_t counter_type;
-    size_t counter_size;
-    size_t counter_offset;
-    unsigned counter_idx;
-} psabpf_direct_counter_context_t;
-
-typedef struct psabpf_direct_meter_context {
-    const char *name;
-    size_t meter_size;
-    size_t meter_offset;
-    unsigned meter_idx;
-} psabpf_direct_meter_context_t;
 
 /*
  * TODO: specific fields of table entry context are still to be added.
@@ -334,48 +347,65 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx);
 void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx);
 int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name);
 void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx);
+bool psabpf_table_entry_ctx_is_indirect(psabpf_table_entry_ctx_t *ctx);
+bool psabpf_table_entry_ctx_has_priority(psabpf_table_entry_ctx_t *ctx);
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry);
 void psabpf_table_entry_free(psabpf_table_entry_t *entry);
 
 /* can be invoked multiple times */
 int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t *mk);
+psabpf_match_key_t *psabpf_table_entry_get_next_matchkey(psabpf_table_entry_t *entry);
 
 void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act);
 /* only for ternary */
-void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority);
+void psabpf_table_entry_priority(psabpf_table_entry_t *entry, uint32_t priority);
+uint32_t psabpf_table_entry_get_priority(psabpf_table_entry_t *entry);
 
 void psabpf_matchkey_init(psabpf_match_key_t *mk);
 void psabpf_matchkey_free(psabpf_match_key_t *mk);
 void psabpf_matchkey_type(psabpf_match_key_t *mk, enum psabpf_matchkind_t type);
 int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size);
+enum psabpf_matchkind_t psabpf_matchkey_get_type(psabpf_match_key_t *mk);
+const void *psabpf_matchkey_get_data(psabpf_match_key_t *mk);
+size_t psabpf_matchkey_get_data_size(psabpf_match_key_t *mk);
 
-// only for lpm
+/* only for lpm */
 int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix);
+uint32_t psabpf_matchkey_get_prefix(psabpf_match_key_t *mk);
 
-// only for ternary
+/* only for ternary */
 int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size);
+const void *psabpf_matchkey_get_mask(psabpf_match_key_t *mk);
+size_t psabpf_matchkey_get_mask_size(psabpf_match_key_t *mk);
 
-// only for 'range' match
+/* only for 'range' match */
 int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start);
 int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end);
 
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size);
-// should be called when psabpf_action_param() is not called after psabpf_action_param_create()
+/* should be called when psabpf_action_param() is not called after psabpf_action_param_create() */
 void psabpf_action_param_free(psabpf_action_param_t *param);
 
 void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param);
+
+psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry);
+void *psabpf_action_param_get_data(psabpf_action_param_t *param);
+size_t psabpf_action_param_get_data_len(psabpf_action_param_t *param);
+const char *psabpf_action_param_get_name(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, psabpf_action_param_t *param);
 
 void psabpf_action_init(psabpf_action_t *action);
 void psabpf_action_free(psabpf_action_t *action);
 void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id);
 int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param);
+uint32_t psabpf_action_get_id(psabpf_table_entry_t *entry);
+const char *psabpf_action_get_name(psabpf_table_entry_ctx_t *ctx, uint32_t action_id);
 
 int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
-int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t **entry);
-int psabpf_table_entry_getnext(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t **entry);
+int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
+int psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 
 int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
@@ -388,7 +418,10 @@ int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
 
 int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry, psabpf_direct_counter_context_t *dc_ctx,
                                           psabpf_counter_entry_t *dc);
+psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 psabpf_counter_type_t psabpf_direct_counter_get_type(psabpf_direct_counter_context_t *dc_ctx);
+const char *psabpf_direct_counter_get_name(psabpf_direct_counter_context_t *dc_ctx);
+int psabpf_direct_counter_get_value(psabpf_direct_counter_context_t *dc_ctx, psabpf_table_entry_t *entry, psabpf_counter_entry_t *dc);
 
 /* DirectMeter */
 void psabpf_direct_meter_ctx_init(psabpf_direct_meter_context_t *dm_ctx);

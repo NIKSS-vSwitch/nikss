@@ -29,6 +29,7 @@ void psabpf_direct_counter_ctx_init(psabpf_direct_counter_context_t *dc_ctx)
 
     memset(dc_ctx, 0, sizeof(psabpf_direct_counter_context_t));
     dc_ctx->counter_idx = -1;
+    dc_ctx->is_data_owner = true;
 }
 
 void psabpf_direct_counter_ctx_free(psabpf_direct_counter_context_t *dc_ctx)
@@ -36,7 +37,7 @@ void psabpf_direct_counter_ctx_free(psabpf_direct_counter_context_t *dc_ctx)
     if (dc_ctx == NULL)
         return;
 
-    if (dc_ctx->name != NULL)
+    if (dc_ctx->name != NULL && dc_ctx->is_data_owner == true)
         free((void *) dc_ctx->name);
     dc_ctx->name = NULL;
 }
@@ -53,6 +54,8 @@ int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
             dc_ctx->counter_offset = table_ctx->direct_counters_ctx[i].counter_offset;
             dc_ctx->counter_size = table_ctx->direct_counters_ctx[i].counter_size;
             dc_ctx->counter_idx = i;
+            dc_ctx->name = table_ctx->direct_counters_ctx[i].name;
+            dc_ctx->is_data_owner = false;
             return NO_ERROR;
         }
     }
@@ -88,9 +91,52 @@ int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
     return NO_ERROR;
 }
 
+psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL)
+        return NULL;
+
+    if (entry->current_direct_counter_ctx_id >= ctx->n_direct_counters) {
+        entry->current_direct_counter_ctx_id = 0;
+        return NULL;
+    }
+
+    memcpy(&entry->current_direct_counter_ctx,
+           &ctx->direct_counters_ctx[entry->current_direct_counter_ctx_id],
+           sizeof(psabpf_direct_counter_context_t));
+    entry->current_direct_counter_ctx.is_data_owner = false;
+
+    entry->current_direct_counter_ctx_id += 1;
+
+    return &entry->current_direct_counter_ctx;
+}
+
 psabpf_counter_type_t psabpf_direct_counter_get_type(psabpf_direct_counter_context_t *dc_ctx)
 {
     if (dc_ctx == NULL)
         return PSABPF_COUNTER_TYPE_UNKNOWN;
     return dc_ctx->counter_type;
+}
+
+const char *psabpf_direct_counter_get_name(psabpf_direct_counter_context_t *dc_ctx)
+{
+    if (dc_ctx == NULL)
+        return NULL;
+    return dc_ctx->name;
+}
+
+int psabpf_direct_counter_get_value(psabpf_direct_counter_context_t *dc_ctx, psabpf_table_entry_t *entry, psabpf_counter_entry_t *dc)
+{
+    if (dc_ctx == NULL || entry == NULL || dc == NULL)
+        return EINVAL;
+    psabpf_counter_entry_init(dc);
+
+    for (unsigned i = 0; i < entry->n_direct_counters; i++) {
+        if (dc_ctx->counter_idx == entry->direct_counters[i].counter_idx) {
+            memcpy(dc, &entry->direct_counters[i].counter, sizeof(psabpf_counter_entry_t));
+            return NO_ERROR;
+        }
+    }
+
+    return ENOENT;
 }

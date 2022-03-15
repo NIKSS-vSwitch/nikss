@@ -253,6 +253,25 @@ static void *allocate_key_buffer(psabpf_counter_context_t *ctx, psabpf_counter_e
     return entry->raw_key;
 }
 
+int decode_counter_value(psabpf_counter_entry_t *entry, const uint8_t *buffer,
+                         size_t counter_size, psabpf_counter_type_t counter_type)
+{
+    entry->bytes = 0;
+    entry->packets = 0;
+
+    if (counter_type == PSABPF_COUNTER_TYPE_BYTES)
+        memcpy(&entry->bytes, &buffer[0], counter_size);
+    else if (counter_type == PSABPF_COUNTER_TYPE_PACKETS)
+        memcpy(&entry->packets, &buffer[0], counter_size);
+    else if (counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+        counter_size = counter_size / 2;
+        memcpy(&entry->bytes, &buffer[0], counter_size);
+        memcpy(&entry->packets, &buffer[counter_size], counter_size);
+    }
+
+    return NO_ERROR;
+}
+
 static int read_and_parse_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
 {
     uint8_t value[MAX_COUNTER_VALUE_SIZE];
@@ -263,21 +282,7 @@ static int read_and_parse_counter_value(psabpf_counter_context_t *ctx, psabpf_co
         return ret;
     }
 
-    entry->bytes = 0;
-    entry->packets = 0;
-
-    size_t counter_size = ctx->counter.value_size;
-    if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES)
-        memcpy(&entry->bytes, &value[0], counter_size);
-    else if (ctx->counter_type == PSABPF_COUNTER_TYPE_PACKETS)
-        memcpy(&entry->packets, &value[0], counter_size);
-    else if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
-        counter_size = counter_size / 2;
-        memcpy(&entry->bytes, &value[0], counter_size);
-        memcpy(&entry->packets, &value[counter_size], counter_size);
-    }
-
-    return NO_ERROR;
+    return decode_counter_value(entry, value, ctx->counter.value_size, ctx->counter_type);
 }
 
 int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)

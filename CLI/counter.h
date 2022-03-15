@@ -34,5 +34,6 @@ static const struct cmd counter_cmds[] = {
 };
 
 int parse_counter_value_str(const char *str, psabpf_counter_type_t type, psabpf_counter_entry_t *entry);
+int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf_counter_type_t type);
 
 #endif  /* __PRECTL_COUNTER_H */
