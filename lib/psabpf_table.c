@@ -441,7 +441,7 @@ psabpf_match_key_t *psabpf_table_entry_get_next_matchkey(psabpf_table_entry_t *e
     }
 
     memcpy(&entry->current_match_key, entry->match_keys[entry->current_match_key_id], sizeof(psabpf_match_key_t));
-    entry->current_match_key.data_owner = false;
+    entry->current_match_key.is_data_owner = false;
     entry->current_match_key_id += 1;
 
     return &entry->current_match_key;
@@ -491,7 +491,7 @@ void psabpf_matchkey_init(psabpf_match_key_t *mk)
     if (mk == NULL)
         return;
     memset(mk, 0, sizeof(psabpf_match_key_t));
-    mk->data_owner = true;
+    mk->is_data_owner = true;
 }
 
 void psabpf_matchkey_free(psabpf_match_key_t *mk)
@@ -499,12 +499,12 @@ void psabpf_matchkey_free(psabpf_match_key_t *mk)
     if (mk == NULL)
         return;
 
-    if (mk->data != NULL && mk->data_owner == true)
+    if (mk->data != NULL && mk->is_data_owner == true)
         free(mk->data);
     mk->data = NULL;
 
     if (mk->type == PSABPF_TERNARY) {
-        if (mk->u.ternary.mask != NULL && mk->data_owner == true)
+        if (mk->u.ternary.mask != NULL && mk->is_data_owner == true)
             free(mk->u.ternary.mask);
         mk->u.ternary.mask = NULL;
     }

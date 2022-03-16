@@ -243,7 +243,7 @@ typedef struct psabpf_match_key {
         } range;
     } u;
 
-    bool data_owner;
+    bool is_data_owner;
 } psabpf_match_key_t;
 
 typedef struct psabpf_action_param {
