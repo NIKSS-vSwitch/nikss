@@ -53,7 +53,7 @@ static void convert_rate(const psabpf_meter_value_t *rate, psabpf_meter_value_t 
     }
 }
 
-static int convert_meter_data_to_entry(psabpf_meter_data_t *data, psabpf_meter_entry_t *entry) {
+int convert_meter_data_to_entry(const psabpf_meter_data_t *data, psabpf_meter_entry_t *entry) {
     if (entry == NULL || data == NULL)
         return ENODATA;
 
@@ -75,7 +75,7 @@ static int convert_meter_data_to_entry(psabpf_meter_data_t *data, psabpf_meter_e
     return NO_ERROR;
 }
 
-int convert_meter_entry_to_data(psabpf_meter_entry_t *entry, psabpf_meter_data_t *data) {
+int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_data_t *data) {
     if (entry == NULL || data == NULL)
         return ENODATA;
 

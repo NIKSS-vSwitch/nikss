@@ -335,6 +335,7 @@ void psabpf_table_entry_init(psabpf_table_entry_t *entry)
 
     psabpf_matchkey_init(&entry->current_match_key);
     psabpf_direct_counter_ctx_init(&entry->current_direct_counter_ctx);
+    psabpf_direct_meter_ctx_init(&entry->current_direct_meter_ctx);
 }
 
 void psabpf_table_entry_free(psabpf_table_entry_t *entry)
@@ -377,6 +378,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
     psabpf_matchkey_free(&entry->current_match_key);
     psabpf_action_param_free(&entry->current_action_param);
     psabpf_direct_counter_ctx_free(&entry->current_direct_counter_ctx);
+    psabpf_direct_meter_ctx_free(&entry->current_direct_meter_ctx);
 }
 
 /* can be invoked multiple times */
@@ -1413,8 +1415,8 @@ static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_
                 .counter_type = dc_ctx->counter_type,
                 .counter.value_size = dc_ctx->counter_size,
         };
-        int ret = encode_counter_value(&counter_ctx, &entry->direct_counters[i].counter,
-                                       (uint8_t *) value + ctx->direct_counters_ctx[i].counter_offset);
+        int ret = convert_counter_entry_to_data(&counter_ctx, &entry->direct_counters[i].counter,
+                                                (uint8_t *) value + ctx->direct_counters_ctx[i].counter_offset);
         if (ret != NO_ERROR)
             return ret;
     }
@@ -2253,8 +2255,7 @@ static int parse_table_value_priority(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
     return NO_ERROR;
 }
 
-static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                                            const void *value)
+static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
 {
     if (ctx->n_direct_counters == 0)
         return NO_ERROR;
@@ -2266,12 +2267,32 @@ static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabp
     for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
         psabpf_counter_entry_init(&entry->direct_counters[i].counter);
         entry->direct_counters[i].counter_idx = ctx->direct_counters_ctx->counter_idx;
-        decode_counter_value(&entry->direct_counters[i].counter,
-                             value + ctx->direct_counters_ctx[i].counter_offset,
-                             ctx->direct_counters_ctx[i].counter_size,
-                             ctx->direct_counters_ctx[i].counter_type);
+        convert_counter_data_to_entry(value + ctx->direct_counters_ctx[i].counter_offset,
+                                      ctx->direct_counters_ctx[i].counter_size,
+                                      ctx->direct_counters_ctx[i].counter_type,
+                                      &entry->direct_counters[i].counter);
     }
     entry->n_direct_counters = ctx->n_direct_counters;
+
+    return NO_ERROR;
+}
+
+static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+{
+    if (ctx->n_direct_meters == 0)
+        return NO_ERROR;
+
+    entry->direct_meters = malloc(ctx->n_direct_meters * sizeof(psabpf_direct_meter_entry_t));
+    if (entry->direct_meters == NULL)
+        return ENOMEM;
+
+    for (unsigned i = 0; i < ctx->n_direct_meters; i++) {
+        psabpf_meter_entry_init(&entry->direct_meters[i].meter);
+        entry->direct_meters[i].meter_idx = ctx->direct_meters_ctx[i].meter_idx;
+        convert_meter_data_to_entry(value + ctx->direct_meters_ctx[i].meter_offset,
+                                    &entry->direct_meters[i].meter);
+    }
+    entry->n_direct_meters = ctx->n_direct_meters;
 
     return NO_ERROR;
 }
@@ -2279,6 +2300,10 @@ static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabp
 static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
 {
     int ret = parse_table_value_direct_counter(ctx, entry, value);
+    if (ret != NO_ERROR)
+        return ret;
+
+    ret = parse_table_value_direct_meter(ctx, entry, value);
     if (ret != NO_ERROR)
         return ret;
 

@@ -285,6 +285,7 @@ typedef struct psabpf_direct_meter_context {
     size_t meter_size;
     size_t meter_offset;
     unsigned meter_idx;
+    bool is_data_owner;
 } psabpf_direct_meter_context_t;
 
 typedef struct psabpf_table_entry {
@@ -308,6 +309,8 @@ typedef struct psabpf_table_entry {
     psabpf_action_param_t current_action_param;
     size_t current_direct_counter_ctx_id;
     psabpf_direct_counter_context_t current_direct_counter_ctx;
+    size_t current_direct_meter_ctx_id;
+    psabpf_direct_meter_context_t current_direct_meter_ctx;
 } psabpf_table_entry_t;
 
 /*
@@ -421,7 +424,7 @@ int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry, psabpf_di
 psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 psabpf_counter_type_t psabpf_direct_counter_get_type(psabpf_direct_counter_context_t *dc_ctx);
 const char *psabpf_direct_counter_get_name(psabpf_direct_counter_context_t *dc_ctx);
-int psabpf_direct_counter_get_value(psabpf_direct_counter_context_t *dc_ctx, psabpf_table_entry_t *entry, psabpf_counter_entry_t *dc);
+int psabpf_direct_counter_get_entry(psabpf_direct_counter_context_t *dc_ctx, psabpf_table_entry_t *entry, psabpf_counter_entry_t *dc);
 
 /* DirectMeter */
 void psabpf_direct_meter_ctx_init(psabpf_direct_meter_context_t *dm_ctx);
@@ -431,6 +434,9 @@ int psabpf_direct_meter_ctx_name(psabpf_direct_meter_context_t *dm_ctx,
 
 int psabpf_table_entry_set_direct_meter(psabpf_table_entry_t *entry, psabpf_direct_meter_context_t *dm_ctx,
                                         psabpf_meter_entry_t *dm);
+psabpf_direct_meter_context_t *psabpf_direct_meter_get_next_ctx(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
+const char *psabpf_direct_meter_get_name(psabpf_direct_meter_context_t *dm_ctx);
+int psabpf_direct_meter_get_entry(psabpf_direct_meter_context_t *dm_ctx, psabpf_table_entry_t *entry, psabpf_meter_entry_t *dm);
 
 /*
  * Action Selector

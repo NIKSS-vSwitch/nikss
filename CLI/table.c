@@ -314,7 +314,7 @@ static int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *e
  * JSON functions
  *****************************************************************************/
 
-json_t *create_JSON_match_key(psabpf_match_key_t *mk)
+static json_t *create_JSON_match_key(psabpf_match_key_t *mk)
 {
     json_t *root = json_object();
     if (root == NULL)
@@ -369,7 +369,7 @@ json_t *create_JSON_match_key(psabpf_match_key_t *mk)
     return root;
 }
 
-json_t *create_JSON_entry_key(psabpf_table_entry_t *entry)
+static json_t *create_JSON_entry_key(psabpf_table_entry_t *entry)
 {
     json_t *keys = json_array();
     if (keys == NULL)
@@ -387,7 +387,7 @@ json_t *create_JSON_entry_key(psabpf_table_entry_t *entry)
     return keys;
 }
 
-json_t *create_JSON_entry_action_params(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_JSON_entry_action_params(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *param_root = json_array();
     if (param_root == NULL)
@@ -420,7 +420,7 @@ json_t *create_JSON_entry_action_params(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     return param_root;
 }
 
-json_t *create_JSON_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_JSON_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *action_root = json_object();
     if (action_root == NULL)
@@ -442,7 +442,7 @@ json_t *create_JSON_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_ent
     return action_root;
 }
 
-json_t *create_JSON_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_JSON_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *counters_root = json_object();
     if (counters_root == NULL)
@@ -451,28 +451,33 @@ json_t *create_JSON_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_t
     psabpf_direct_counter_context_t *dc_ctx;
     while ((dc_ctx = psabpf_direct_counter_get_next_ctx(ctx, entry)) != NULL) {
         psabpf_counter_entry_t counter;
-        int ret = psabpf_direct_counter_get_value(dc_ctx, entry, &counter);
+        int ret = psabpf_direct_counter_get_entry(dc_ctx, entry, &counter);
         psabpf_counter_type_t type = psabpf_direct_counter_get_type(dc_ctx);
         const char *name = psabpf_direct_counter_get_name(dc_ctx);
 
-        psabpf_direct_counter_ctx_free(dc_ctx);
-        if (ret != NO_ERROR || name == NULL) {
-            json_decref(counters_root);
-            psabpf_counter_entry_free(&counter);
-            return NULL;
-        }
-
         json_t *counter_entry = json_object();
-        if (counter_entry == NULL) {
+
+        if (ret != NO_ERROR || name == NULL || counter_entry == NULL) {
             json_decref(counters_root);
+            json_decref(counter_entry);
             psabpf_counter_entry_free(&counter);
+            psabpf_direct_counter_ctx_free(dc_ctx);
             return NULL;
         }
 
         ret = build_json_counter_value(counter_entry, &counter, type);
         psabpf_counter_entry_free(&counter);
-        json_object_set_new(counters_root, name, counter_entry);
         if (ret != NO_ERROR) {
+            json_decref(counter_entry);
+            json_decref(counters_root);
+            psabpf_direct_counter_ctx_free(dc_ctx);
+            return NULL;
+        }
+
+        ret = json_object_set_new(counters_root, name, counter_entry);
+        psabpf_direct_counter_ctx_free(dc_ctx);
+        if (ret != 0) {
+            json_decref(counter_entry);
             json_decref(counters_root);
             return NULL;
         }
@@ -481,7 +486,49 @@ json_t *create_JSON_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_t
     return counters_root;
 }
 
-json_t *create_JSON_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_JSON_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    json_t *meters_root = json_object();
+    if (meters_root == NULL)
+        return NULL;
+
+    psabpf_direct_meter_context_t *dm_ctx;
+    while ((dm_ctx = psabpf_direct_meter_get_next_ctx(ctx, entry)) != NULL) {
+        psabpf_meter_entry_t meter;
+        const char *name = psabpf_direct_meter_get_name(dm_ctx);
+        int ret = psabpf_direct_meter_get_entry(dm_ctx, entry, &meter);
+        json_t *meter_entry = json_object();
+
+        if (name == NULL || ret != NO_ERROR || meter_entry == NULL) {
+            json_decref(meters_root);
+            json_decref(meter_entry);
+            psabpf_meter_entry_free(&meter);
+            psabpf_direct_meter_ctx_free(dm_ctx);
+            return NULL;
+        }
+
+        /* json_int_t is signed type, so if we expect values larger than 2^63
+         * they should be converted to string in such case
+         * TODO: move to meter.c */
+        json_object_set_new(meter_entry, "pir", json_integer((json_int_t) meter.pir));
+        json_object_set_new(meter_entry, "pbs", json_integer((json_int_t) meter.pbs));
+        json_object_set_new(meter_entry, "cir", json_integer((json_int_t) meter.cir));
+        json_object_set_new(meter_entry, "cbs", json_integer((json_int_t) meter.cbs));
+        psabpf_meter_entry_free(&meter);
+
+        ret = json_object_set_new(meters_root, name, meter_entry);
+        psabpf_direct_meter_ctx_free(dm_ctx);
+        if (ret != 0) {
+            json_decref(meters_root);
+            json_decref(meter_entry);
+            return NULL;
+        }
+    }
+
+    return meters_root;
+}
+
+static json_t *create_JSON_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *entry_root = json_object();
     if (entry_root == NULL)
@@ -494,10 +541,11 @@ json_t *create_JSON_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *e
     }
     json_object_set_new(entry_root, "key", key);
 
-    if (psabpf_table_entry_ctx_has_priority(ctx))
+    if (psabpf_table_entry_ctx_has_priority(ctx)) {
         json_object_set_new(entry_root,
                             "priority",
                             json_integer(psabpf_table_entry_get_priority(entry)));
+    }
 
     if (psabpf_table_entry_ctx_is_indirect(ctx)) {
         /* TODO: references */
@@ -515,12 +563,50 @@ json_t *create_JSON_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *e
             return NULL;
         }
         json_object_set_new(entry_root, "DirectCounter", counters);
+
+        json_t *meters = create_JSON_entry_direct_meter(ctx, entry);
+        if (meters == NULL) {
+            json_decref(entry_root);
+            return NULL;
+        }
+        json_object_set_new(entry_root, "DirectMeter", meters);
     }
 
     return entry_root;
 }
 
-int print_json_table_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *table_name)
+static int build_JSON_table_metadata(psabpf_table_entry_ctx_t *ctx, json_t *parent)
+{
+    json_t *direct_counters = json_object();
+    if (direct_counters == NULL)
+        return ENOMEM;
+
+    psabpf_direct_counter_context_t *dc_ctx;
+    psabpf_table_entry_t entry;
+    psabpf_table_entry_init(&entry);
+    while ((dc_ctx = psabpf_direct_counter_get_next_ctx(ctx, &entry)) != NULL) {
+        psabpf_counter_type_t type = psabpf_direct_counter_get_type(dc_ctx);
+        const char *name = psabpf_direct_counter_get_name(dc_ctx);
+        json_t *counter_entry = json_object();
+
+        if (name == NULL || counter_entry == NULL) {
+            json_decref(counter_entry);
+            psabpf_direct_counter_ctx_free(dc_ctx);
+            continue;
+        }
+
+        build_json_counter_type(counter_entry, type);
+        json_object_set_new(direct_counters, name, counter_entry);
+        psabpf_direct_counter_ctx_free(dc_ctx);
+    }
+    psabpf_table_entry_free(&entry);
+
+    json_object_set_new(parent, "DirectCounter", direct_counters);
+
+    return NO_ERROR;
+}
+
+static int print_json_table_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *table_name)
 {
     int ret = EINVAL;
     json_t *root = json_object();
@@ -545,6 +631,11 @@ int print_json_table_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         goto clean_up;
     }
     json_array_append_new(entries, parsed_entry);
+
+    if (build_JSON_table_metadata(ctx, instance_name) != NO_ERROR) {
+        fprintf(stderr, "failed to create table JSON entry metadata\n");
+        goto clean_up;
+    }
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
     ret = NO_ERROR;

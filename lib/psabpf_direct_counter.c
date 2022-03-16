@@ -125,7 +125,7 @@ const char *psabpf_direct_counter_get_name(psabpf_direct_counter_context_t *dc_c
     return dc_ctx->name;
 }
 
-int psabpf_direct_counter_get_value(psabpf_direct_counter_context_t *dc_ctx, psabpf_table_entry_t *entry, psabpf_counter_entry_t *dc)
+int psabpf_direct_counter_get_entry(psabpf_direct_counter_context_t *dc_ctx, psabpf_table_entry_t *entry, psabpf_counter_entry_t *dc)
 {
     if (dc_ctx == NULL || entry == NULL || dc == NULL)
         return EINVAL;

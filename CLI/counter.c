@@ -221,6 +221,20 @@ static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ct
     return ret;
 }
 
+int build_json_counter_type(void *parent, psabpf_counter_type_t type)
+{
+    if (type == PSABPF_COUNTER_TYPE_BYTES)
+        json_object_set_new(parent, "type", json_string("BYTES"));
+    else if (type == PSABPF_COUNTER_TYPE_PACKETS)
+        json_object_set_new(parent, "type", json_string("PACKETS"));
+    else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
+        json_object_set_new(parent, "type", json_string("PACKETS_AND_BYTES"));
+    else
+        json_object_set_new(parent, "type", json_string("UNKNOWN"));
+
+    return NO_ERROR;
+}
+
 static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry,
                               const char *counter_name, bool entry_has_key)
 {
@@ -243,15 +257,7 @@ static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entr
     }
     json_object_set(root, "Counter", extern_type);
 
-    psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
-    if (type == PSABPF_COUNTER_TYPE_BYTES)
-        json_object_set_new(instance_name, "type", json_string("BYTES"));
-    else if (type == PSABPF_COUNTER_TYPE_PACKETS)
-        json_object_set_new(instance_name, "type", json_string("PACKETS"));
-    else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
-        json_object_set_new(instance_name, "type", json_string("PACKETS_AND_BYTES"));
-    else
-        json_object_set_new(instance_name, "type", json_string("UNKNOWN"));
+    build_json_counter_type(instance_name, psabpf_counter_get_type(ctx));
 
     if (entry_has_key) {
         if ((ret = psabpf_counter_get(ctx, entry)) != NO_ERROR)

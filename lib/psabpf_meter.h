@@ -41,6 +41,7 @@ typedef struct {
 
 #define DIRECT_METER_SIZE sizeof(psabpf_meter_data_t)
 
-int convert_meter_entry_to_data(psabpf_meter_entry_t *entry, psabpf_meter_data_t *data);
+int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_data_t *data);
+int convert_meter_data_to_entry(const psabpf_meter_data_t *data, psabpf_meter_entry_t *entry);
 
 #endif  /* P4C_PSABPF_METER_H */
