@@ -309,6 +309,15 @@ static int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *e
     return NO_ERROR;
 }
 
+static int parse_table_type(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx)
+{
+    if (is_keyword(**argv, "ref")) {
+        psabpf_table_entry_ctx_mark_indirect(ctx);
+        NEXT_ARGP();
+    }
+    return NO_ERROR;
+}
+
 /******************************************************************************
  * JSON functions
  *****************************************************************************/
@@ -576,6 +585,11 @@ static json_t *create_JSON_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_ent
 
 static int build_JSON_table_metadata(psabpf_table_entry_ctx_t *ctx, json_t *parent)
 {
+    if (psabpf_table_entry_ctx_is_indirect(ctx))
+        return NO_ERROR;
+
+    /* DirectCounter */
+
     json_t *direct_counters = json_object();
     if (direct_counters == NULL)
         return ENOMEM;
@@ -814,7 +828,11 @@ int do_table_get(int argc, char **argv)
     if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, &table_name, true) != NO_ERROR)
         goto clean_up;
 
-    /* 2. Get key */
+    /* 2. Check if table is indirect */
+    if (parse_table_type(&argc, &argv, &ctx) != NO_ERROR)
+        goto clean_up;
+
+    /* 3. Get key */
     if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
@@ -850,7 +868,7 @@ int do_table_help(int argc, char **argv)
             /* Support for this one might be preserved, but makes no sense, because indirect tables
              * has no default entry. In other words we do not forbid this syntax explicitly.
              * "       %1$s table default pipe ID TABLE ref data ACTION_REFS\n" */
-            "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
+            "       %1$s table get pipe ID TABLE [ref] [key MATCH_KEY]\n"
             "Unimplemented commands:\n"
             "       %1$s table default get pipe ID TABLE\n"
             "\n"
