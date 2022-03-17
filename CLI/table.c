@@ -445,7 +445,14 @@ clean_up:
 
 int do_table_default(int argc, char **argv)
 {
-    return do_table_write(argc, argv, TABLE_SET_DEFAULT_ENTRY);
+    if (is_keyword(*argv, "set")) {
+        NEXT_ARG();
+        return do_table_write(argc, argv, TABLE_SET_DEFAULT_ENTRY);
+    } else {
+        if (*argv != NULL)
+            fprintf(stderr, "%s: unknown keyword\n", *argv);
+        return do_table_help(argc, argv);
+    }
 }
 
 int do_table_help(int argc, char **argv)
@@ -457,13 +464,13 @@ int do_table_help(int argc, char **argv)
             "       %1$s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
             "       %1$s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table delete pipe ID TABLE [key MATCH_KEY]\n"
-            "       %1$s table default pipe ID TABLE ACTION [data ACTION_PARAMS]\n"
+            "       %1$s table default set pipe ID TABLE ACTION [data ACTION_PARAMS]\n"
             /* Support for this one might be preserved, but makes no sense, because indirect tables
              * has no default entry. In other words we do not forbid this syntax explicitly.
              * "       %1$s table default pipe ID TABLE ref data ACTION_REFS\n" */
             "Unimplemented commands:\n"
             "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
-            "       %1$s table default pipe ID TABLE\n"
+            "       %1$s table default get pipe ID TABLE\n"
             "\n"
             "       TABLE := { id TABLE_ID | name FILE | TABLE_FILE }\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
