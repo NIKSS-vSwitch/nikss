@@ -1924,7 +1924,7 @@ int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
         }
     }
 
-    clean_up:
+clean_up:
     if (value_buffer != NULL)
         free(value_buffer);
 
