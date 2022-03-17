@@ -62,10 +62,8 @@ static int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx
 }
 
 static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
-                              psabpf_action_t *action, bool *indirect_table, bool can_be_last)
+                              psabpf_action_t *action, bool can_be_last)
 {
-    *indirect_table = false;
-
     if (is_keyword(**argv, "id")) {
         NEXT_ARGP_RET();
         char *ptr;
@@ -75,7 +73,6 @@ static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t 
             return EINVAL;
         }
     } else if (is_keyword(**argv, "ref")) {
-        *indirect_table = true;
         psabpf_table_entry_ctx_mark_indirect(ctx);
     } else {
         fprintf(stderr, "specify an action by name is not supported yet\n");
@@ -223,8 +220,10 @@ static int parse_direct_meter_entry(int *argc, char ***argv,
 }
 
 static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
-                             psabpf_table_entry_t *entry, psabpf_action_t *action, bool indirect_table)
+                             psabpf_table_entry_t *entry, psabpf_action_t *action)
 {
+    bool indirect_table = psabpf_table_entry_ctx_is_indirect(ctx);
+
     if (!is_keyword(**argv, "data")) {
         if (indirect_table) {
             fprintf(stderr, "expected action reference\n");
@@ -665,7 +664,6 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
     psabpf_action_t action;
     psabpf_context_t psabpf_ctx;
     int error_code = EPERM;
-    bool table_is_indirect = false;
 
     psabpf_context_init(&psabpf_ctx);
     psabpf_table_entry_ctx_init(&ctx);
@@ -688,7 +686,7 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
 
     /* 2. Get action */
     bool can_ba_last_arg = write_type == TABLE_SET_DEFAULT_ENTRY ? true : false;
-    if (parse_table_action(&argc, &argv, &ctx, &action, &table_is_indirect, can_ba_last_arg) != NO_ERROR)
+    if (parse_table_action(&argc, &argv, &ctx, &action, can_ba_last_arg) != NO_ERROR)
         goto clean_up;
 
     /* 3. Get key - default entry has no key */
@@ -698,7 +696,7 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
     }
 
     /* 4. Get action parameters */
-    if (parse_action_data(&argc, &argv, &ctx, &entry, &action, table_is_indirect) != NO_ERROR)
+    if (parse_action_data(&argc, &argv, &ctx, &entry, &action) != NO_ERROR)
         goto clean_up;
 
     /* 5. Get entry priority - not applicable to default entry */
