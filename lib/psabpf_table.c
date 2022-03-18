@@ -2266,7 +2266,7 @@ static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabp
 
     for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
         psabpf_counter_entry_init(&entry->direct_counters[i].counter);
-        entry->direct_counters[i].counter_idx = ctx->direct_counters_ctx->counter_idx;
+        entry->direct_counters[i].counter_idx = ctx->direct_counters_ctx[i].counter_idx;
         convert_counter_data_to_entry(value + ctx->direct_counters_ctx[i].counter_offset,
                                       ctx->direct_counters_ctx[i].counter_size,
                                       ctx->direct_counters_ctx[i].counter_type,
