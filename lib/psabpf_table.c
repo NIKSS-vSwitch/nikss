@@ -1869,7 +1869,8 @@ clean_up:
 
 int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    uint64_t key = 0;
+    /* For default entry array map is used, it always has key 32-bit width and its value is assumed to be 0. */
+    const uint32_t key = 0;
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
 
@@ -1880,7 +1881,7 @@ int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
         fprintf(stderr, "can't add default entry: table not opened or table has no default entry\n");
         return EBADF;
     }
-    if (ctx->default_entry.key_size == 0 || ctx->default_entry.key_size > sizeof(key) ||
+    if (ctx->default_entry.key_size != sizeof(key) ||
         ctx->default_entry.value_size == 0 || ctx->default_entry.value_size != ctx->table.value_size) {
         fprintf(stderr, "key size or value is not supported\n");
         return ENOTSUP;
