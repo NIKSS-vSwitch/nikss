@@ -322,7 +322,7 @@ static int parse_table_type(int *argc, char ***argv, psabpf_table_entry_ctx_t *c
  * JSON functions
  *****************************************************************************/
 
-static json_t *create_JSON_match_key(psabpf_match_key_t *mk)
+static json_t *create_json_match_key(psabpf_match_key_t *mk)
 {
     json_t *root = json_object();
     if (root == NULL)
@@ -377,7 +377,7 @@ static json_t *create_JSON_match_key(psabpf_match_key_t *mk)
     return root;
 }
 
-static json_t *create_JSON_entry_key(psabpf_table_entry_t *entry)
+static json_t *create_json_entry_key(psabpf_table_entry_t *entry)
 {
     json_t *keys = json_array();
     if (keys == NULL)
@@ -385,7 +385,7 @@ static json_t *create_JSON_entry_key(psabpf_table_entry_t *entry)
 
     psabpf_match_key_t *mk = NULL;
     while ((mk = psabpf_table_entry_get_next_matchkey(entry)) != NULL) {
-        json_t *key_entry = create_JSON_match_key(mk);
+        json_t *key_entry = create_json_match_key(mk);
         if (key_entry == NULL)
             return NULL;
         json_array_append_new(keys, key_entry);
@@ -395,7 +395,7 @@ static json_t *create_JSON_entry_key(psabpf_table_entry_t *entry)
     return keys;
 }
 
-static json_t *create_JSON_entry_action_params(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_json_entry_action_params(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *param_root = json_array();
     if (param_root == NULL)
@@ -428,7 +428,7 @@ static json_t *create_JSON_entry_action_params(psabpf_table_entry_ctx_t *ctx, ps
     return param_root;
 }
 
-static json_t *create_JSON_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_json_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *action_root = json_object();
     if (action_root == NULL)
@@ -440,7 +440,7 @@ static json_t *create_JSON_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     if (action_name != NULL)
         json_object_set_new(action_root, "name", json_string(action_name));
 
-    json_t *action_params = create_JSON_entry_action_params(ctx, entry);
+    json_t *action_params = create_json_entry_action_params(ctx, entry);
     if (action_params == NULL) {
         json_decref(action_root);
         return NULL;
@@ -450,7 +450,7 @@ static json_t *create_JSON_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     return action_root;
 }
 
-static json_t *create_JSON_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_json_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *counters_root = json_object();
     if (counters_root == NULL)
@@ -494,7 +494,7 @@ static json_t *create_JSON_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, p
     return counters_root;
 }
 
-static json_t *create_JSON_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_json_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *meters_root = json_object();
     if (meters_root == NULL)
@@ -536,13 +536,13 @@ static json_t *create_JSON_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psa
     return meters_root;
 }
 
-static json_t *create_JSON_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_json_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *entry_root = json_object();
     if (entry_root == NULL)
         return NULL;
 
-    json_t *key = create_JSON_entry_key(entry);
+    json_t *key = create_json_entry_key(entry);
     if (key == NULL) {
         json_decref(entry_root);
         return NULL;
@@ -558,21 +558,21 @@ static json_t *create_JSON_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_ent
     if (psabpf_table_entry_ctx_is_indirect(ctx)) {
         /* TODO: references */
     } else {
-        json_t *action = create_JSON_entry_action(ctx, entry);
+        json_t *action = create_json_entry_action(ctx, entry);
         if (action == NULL) {
             json_decref(entry_root);
             return NULL;
         }
         json_object_set_new(entry_root, "action", action);
 
-        json_t *counters = create_JSON_entry_direct_counter(ctx, entry);
+        json_t *counters = create_json_entry_direct_counter(ctx, entry);
         if (counters == NULL) {
             json_decref(entry_root);
             return NULL;
         }
         json_object_set_new(entry_root, "DirectCounter", counters);
 
-        json_t *meters = create_JSON_entry_direct_meter(ctx, entry);
+        json_t *meters = create_json_entry_direct_meter(ctx, entry);
         if (meters == NULL) {
             json_decref(entry_root);
             return NULL;
@@ -583,7 +583,7 @@ static json_t *create_JSON_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_ent
     return entry_root;
 }
 
-static int build_JSON_table_metadata(psabpf_table_entry_ctx_t *ctx, json_t *parent)
+static int build_json_table_metadata(psabpf_table_entry_ctx_t *ctx, json_t *parent)
 {
     if (psabpf_table_entry_ctx_is_indirect(ctx))
         return NO_ERROR;
@@ -638,14 +638,14 @@ static int print_json_table_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_en
     }
     json_object_set(instance_name, "entries", entries);
 
-    json_t *parsed_entry = create_JSON_entry(ctx, entry);
+    json_t *parsed_entry = create_json_entry(ctx, entry);
     if (parsed_entry == NULL) {
         fprintf(stderr, "failed to create table JSON entry\n");
         goto clean_up;
     }
     json_array_append_new(entries, parsed_entry);
 
-    if (build_JSON_table_metadata(ctx, instance_name) != NO_ERROR) {
+    if (build_json_table_metadata(ctx, instance_name) != NO_ERROR) {
         fprintf(stderr, "failed to create table JSON entry metadata\n");
         goto clean_up;
     }

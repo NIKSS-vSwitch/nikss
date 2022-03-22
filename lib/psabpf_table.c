@@ -1777,14 +1777,17 @@ static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_
 
     if (ctx->table.fd < 0) {
         fprintf(stderr, "can't add entry: table not opened\n");
+        return_code = EBADF;
         goto clean_up;
     }
     if (ctx->table.key_size == 0 || ctx->table.value_size == 0) {
         fprintf(stderr, "zero-size key or value is not supported\n");
+        return_code = ENOTSUP;
         goto clean_up;
     }
     if (entry->action == NULL) {
         fprintf(stderr, "missing action specification\n");
+        return_code = ENODATA;
         goto clean_up;
     }
 
@@ -2338,10 +2341,7 @@ static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
 
 static int parse_table_value(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
 {
-    if (entry->action != NULL)
-        psabpf_action_free(entry->action);
-    else
-        entry->action = malloc(sizeof(psabpf_action_t));
+    entry->action = malloc(sizeof(psabpf_action_t));
     if (entry->action == NULL)
         return ENOMEM;
     psabpf_action_init(entry->action);
