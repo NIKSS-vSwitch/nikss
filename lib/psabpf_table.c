@@ -39,6 +39,7 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
 
     /* 0 is a valid file descriptor */
     ctx->table.fd = -1;
+    ctx->default_entry.fd = -1;
     ctx->btf_metadata.associated_prog = -1;
     ctx->prefixes.fd = -1;
     ctx->tuple_map.fd = -1;
@@ -53,6 +54,7 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     free_btf(&ctx->btf_metadata);
 
     close_object_fd(&(ctx->table.fd));
+    close_object_fd(&(ctx->default_entry.fd));
     close_object_fd(&(ctx->prefixes.fd));
     close_object_fd(&(ctx->tuple_map.fd));
     close_object_fd(&(ctx->cache.fd));
@@ -280,12 +282,20 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
         return ret;
     }
 
-    /* open cache table, this is optional feature for table */
-    char cache_name[256];
-    snprintf(cache_name, sizeof(cache_name), "%s_cache", name);
-    ret = open_bpf_map(psabpf_ctx, cache_name, &ctx->btf_metadata, &ctx->cache);
-    if (ret != NO_ERROR)
-        fprintf(stderr, "warning: cache for table %s not found: %s\n", name, strerror(ret));
+    /* TODO: detect if value type contains "u" union and then threat table as direct;
+     *       in other case as an indirect table (e.g. ActionProfile or ActionSelector).
+     *       This may require changes in API */
+
+    /* Open map with default entry, ignore error(s), because map is optional */
+    char map_name[256];
+    snprintf(map_name, sizeof(map_name), "%s_defaultAction", name);
+    open_bpf_map(psabpf_ctx, map_name, &ctx->btf_metadata, &ctx->default_entry);
+
+    /* open cache table, this is optional feature for table*/
+    snprintf(map_name, sizeof(map_name), "%s_cache", name);
+    ret = open_bpf_map(psabpf_ctx, map_name, &ctx->btf_metadata, &ctx->cache);
+    if (ret == NO_ERROR)
+        fprintf(stderr, "found cache for table: %s\n", name);
 
     ret = init_direct_objects(ctx);
     if (ret != NO_ERROR) {
@@ -1151,7 +1161,7 @@ static int construct_buffer(char * buffer, size_t buffer_len,
     return return_code;
 }
 
-static int handle_direct_counter_write(const char *key, char *value,
+static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_map_descriptor_t *map,
                                        psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
     /* 1. Entry provided - build counter based on it (on update and add)
@@ -1162,12 +1172,12 @@ static int handle_direct_counter_write(const char *key, char *value,
 
     if (bpf_flags == BPF_EXIST) {
         char *old_value_buffer = NULL;
-        old_value_buffer = malloc(ctx->table.value_size);
+        old_value_buffer = malloc(map->value_size);
         if (old_value_buffer == NULL)
             return ENOMEM;
-        memset(old_value_buffer, 0, ctx->table.value_size);
+        memset(old_value_buffer, 0, map->value_size);
 
-        int err = bpf_map_lookup_elem(ctx->table.fd, key, old_value_buffer);
+        int err = bpf_map_lookup_elem(map->fd, key, old_value_buffer);
         if (err != 0) {
             free(old_value_buffer);
             return ENOENT;
@@ -1221,7 +1231,7 @@ static int handle_direct_meter_write(char *value, psabpf_table_entry_ctx_t *ctx,
     return NO_ERROR;
 }
 
-static int handle_direct_objects_write(const char *key, char *value,
+static int handle_direct_objects_write(const char *key, char *value, psabpf_bpf_map_descriptor_t *map,
                                        psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
 {
     if (ctx->is_indirect || ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
@@ -1231,7 +1241,7 @@ static int handle_direct_objects_write(const char *key, char *value,
     if (ret != NO_ERROR)
         return ret;
 
-    return handle_direct_counter_write(key, value, ctx, entry, bpf_flags);
+    return handle_direct_counter_write(key, value, map, ctx, entry, bpf_flags);
 }
 
 struct ternary_table_prefix_metadata {
@@ -1593,7 +1603,7 @@ static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->table.key_size);
 
     /* Handle direct objects */
-    return_code = handle_direct_objects_write(key_buffer, value_buffer, ctx, entry, bpf_flags);
+    return_code = handle_direct_objects_write(key_buffer, value_buffer, &ctx->table, ctx, entry, bpf_flags);
     if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to handle direct objects: %s\n", strerror(return_code));
         goto clean_up;
@@ -1853,6 +1863,71 @@ clean_up:
         free(key_buffer);
     if (key_mask_buffer != NULL)
         free(key_mask_buffer);
+
+    return return_code;
+}
+
+int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    /* For default entry array map is used, it always has key 32-bit width and its value is assumed to be 0. */
+    const uint32_t key = 0;
+    char *value_buffer = NULL;
+    int return_code = NO_ERROR;
+
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    if (ctx->default_entry.fd < 0) {
+        fprintf(stderr, "can't add default entry: table not opened or table has no default entry\n");
+        return EBADF;
+    }
+    if (ctx->default_entry.key_size != sizeof(key) ||
+        ctx->default_entry.value_size == 0 || ctx->default_entry.value_size != ctx->table.value_size) {
+        fprintf(stderr, "key size or value is not supported\n");
+        return ENOTSUP;
+    }
+    if (entry->action == NULL) {
+        fprintf(stderr, "missing action specification\n");
+        return ENODATA;
+    }
+
+    /* prepare buffer for map value */
+    value_buffer = malloc(ctx->default_entry.value_size);
+    if (value_buffer == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        return ENOMEM;
+    }
+
+    return_code = construct_buffer(value_buffer, ctx->default_entry.value_size, ctx, entry,
+                                   fill_value_btf_info, fill_value_byte_by_byte);
+    if (return_code != NO_ERROR) {
+        fprintf(stderr, "failed to construct value\n");
+        goto clean_up;
+    }
+
+    /* Handle direct objects - default entry always exists
+     * and is treated like a regular entry, including with regards to direct resources */
+    return_code = handle_direct_objects_write((void *) &key, value_buffer, &ctx->default_entry, ctx, entry, BPF_EXIST);
+    if (return_code != NO_ERROR) {
+        fprintf(stderr, "failed to handle direct objects: %s\n", strerror(return_code));
+        goto clean_up;
+    }
+
+    /* update map */
+    return_code = bpf_map_update_elem(ctx->default_entry.fd, &key, value_buffer, BPF_ANY);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to set up entry: %s\n", strerror(errno));
+    } else {
+        return_code = clear_table_cache(&ctx->cache);
+        if (return_code != NO_ERROR) {
+            fprintf(stderr, "failed to clear cache: %s\n", strerror(return_code));
+        }
+    }
+
+clean_up:
+    if (value_buffer != NULL)
+        free(value_buffer);
 
     return return_code;
 }

@@ -59,7 +59,7 @@ static int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx
 }
 
 static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
-                              psabpf_action_t *action, bool *indirect_table)
+                              psabpf_action_t *action, bool *indirect_table, bool can_be_last)
 {
     *indirect_table = false;
 
@@ -78,7 +78,10 @@ static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t 
         fprintf(stderr, "specify an action by name is not supported yet\n");
         return ENOTSUP;
     }
-    NEXT_ARGP_RET();
+    if (can_be_last)
+        NEXT_ARGP();
+    else
+        NEXT_ARGP_RET();
 
     return NO_ERROR;
 }
@@ -310,7 +313,8 @@ static int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *e
 
 enum table_write_type_t {
     TABLE_ADD_NEW_ENTRY,
-    TABLE_UPDATE_EXISTING_ENTRY
+    TABLE_UPDATE_EXISTING_ENTRY,
+    TABLE_SET_DEFAULT_ENTRY
 };
 
 int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
@@ -342,20 +346,25 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
         goto clean_up;
 
     /* 2. Get action */
-    if (parse_table_action(&argc, &argv, &ctx, &action, &table_is_indirect) != NO_ERROR)
+    bool can_ba_last_arg = write_type == TABLE_SET_DEFAULT_ENTRY ? true : false;
+    if (parse_table_action(&argc, &argv, &ctx, &action, &table_is_indirect, can_ba_last_arg) != NO_ERROR)
         goto clean_up;
 
-    /* 3. Get key */
-    if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
-        goto clean_up;
+    /* 3. Get key - default entry has no key */
+    if (write_type != TABLE_SET_DEFAULT_ENTRY) {
+        if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
+            goto clean_up;
+    }
 
     /* 4. Get action parameters */
     if (parse_action_data(&argc, &argv, &ctx, &entry, &action, table_is_indirect) != NO_ERROR)
         goto clean_up;
 
-    /* 5. Get entry priority */
-    if (parse_entry_priority(&argc, &argv, &entry) != NO_ERROR)
-        goto clean_up;
+    /* 5. Get entry priority - not applicable to default entry */
+    if (write_type != TABLE_SET_DEFAULT_ENTRY) {
+        if (parse_entry_priority(&argc, &argv, &entry) != NO_ERROR)
+            goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -368,6 +377,8 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
         error_code = psabpf_table_entry_add(&ctx, &entry);
     else if (write_type == TABLE_UPDATE_EXISTING_ENTRY)
         error_code = psabpf_table_entry_update(&ctx, &entry);
+    else if (write_type == TABLE_SET_DEFAULT_ENTRY)
+        error_code = psabpf_table_entry_set_default_entry(&ctx, &entry);
 
 clean_up:
     psabpf_action_free(&action);
@@ -432,6 +443,18 @@ clean_up:
     return error_code;
 }
 
+int do_table_default(int argc, char **argv)
+{
+    if (is_keyword(*argv, "set")) {
+        NEXT_ARG();
+        return do_table_write(argc, argv, TABLE_SET_DEFAULT_ENTRY);
+    } else {
+        if (*argv != NULL)
+            fprintf(stderr, "%s: unknown keyword\n", *argv);
+        return do_table_help(argc, argv);
+    }
+}
+
 int do_table_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
@@ -441,10 +464,13 @@ int do_table_help(int argc, char **argv)
             "       %1$s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
             "       %1$s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table delete pipe ID TABLE [key MATCH_KEY]\n"
+            "       %1$s table default set pipe ID TABLE ACTION [data ACTION_PARAMS]\n"
+            /* Support for this one might be preserved, but makes no sense, because indirect tables
+             * has no default entry. In other words we do not forbid this syntax explicitly.
+             * "       %1$s table default pipe ID TABLE ref data ACTION_REFS\n" */
             "Unimplemented commands:\n"
             "       %1$s table get pipe ID TABLE [key MATCH_KEY]\n"
-            "       %1$s table default pipe ID TABLE set ACTION [data ACTION_PARAMS]\n"
-            "       %1$s table default pipe ID TABLE\n"
+            "       %1$s table default get pipe ID TABLE\n"
             "\n"
             "       TABLE := { id TABLE_ID | name FILE | TABLE_FILE }\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
