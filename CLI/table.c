@@ -452,6 +452,40 @@ static json_t *create_json_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     return action_root;
 }
 
+static json_t *create_json_entry_references(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    json_t *refs_root = json_array();
+    if (refs_root == NULL)
+        return NULL;
+
+    psabpf_action_param_t *ap = NULL;
+    while ((ap = psabpf_action_param_get_next(entry)) != NULL) {
+        const char *name = psabpf_action_param_get_name(ctx, entry, ap);
+        uint32_t ref_value = 0;
+        size_t ref_len = psabpf_action_param_get_data_len(ap);
+        json_t *ref = json_object();
+        if (ref_len > sizeof(ref_value) || ref == NULL) {
+            json_decref(ref);
+            json_decref(refs_root);
+            psabpf_action_param_free(ap);
+            return NULL;
+        }
+        memcpy(&ref_value, psabpf_action_param_get_data(ap), ref_len);
+
+        if (name != NULL)
+            json_object_set_new(ref, "target", json_string(name));
+        if (psabpf_action_param_is_group_reference(ap))
+            json_object_set_new(ref, "group_ref", json_integer(ref_value));
+        else
+            json_object_set_new(ref, "member_ref", json_integer(ref_value));
+        json_array_append_new(refs_root, ref);
+
+        psabpf_action_param_free(ap);
+    }
+
+    return refs_root;
+}
+
 static json_t *create_json_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *counters_root = json_object();
@@ -558,7 +592,12 @@ static json_t *create_json_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_ent
     }
 
     if (psabpf_table_entry_ctx_is_indirect(ctx)) {
-        /* TODO: references */
+        json_t *references = create_json_entry_references(ctx, entry);
+        if (references == NULL) {
+            json_decref(entry_root);
+            return NULL;
+        }
+        json_object_set_new(entry_root, "references", references);
     } else {
         json_t *action = create_json_entry_action(ctx, entry);
         if (action == NULL) {
