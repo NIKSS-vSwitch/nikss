@@ -123,7 +123,7 @@ static int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
             if (error_code != NO_ERROR)
                 return error_code;
             char *ptr;
-            psabpf_matchkey_prefix(&mk, strtoul(substr_ptr, &ptr, 0));
+            psabpf_matchkey_prefix_len(&mk, strtoul(substr_ptr, &ptr, 0));
             if (*ptr) {
                 fprintf(stderr, "%s: unable to parse prefix length\n", substr_ptr);
                 return EINVAL;
@@ -347,7 +347,7 @@ static json_t *create_json_match_key(psabpf_match_key_t *mk)
                 json_object_set_new(root, "value", json_string(value_str));
             else
                 failed = true;
-            json_object_set_new(root, "prefix_len", json_integer(psabpf_matchkey_get_prefix(mk)));
+            json_object_set_new(root, "prefix_len", json_integer(psabpf_matchkey_get_prefix_len(mk)));
             break;
 
         case PSABPF_TERNARY:
@@ -386,8 +386,10 @@ static json_t *create_json_entry_key(psabpf_table_entry_t *entry)
     psabpf_match_key_t *mk = NULL;
     while ((mk = psabpf_table_entry_get_next_matchkey(entry)) != NULL) {
         json_t *key_entry = create_json_match_key(mk);
-        if (key_entry == NULL)
+        if (key_entry == NULL) {
+            json_decref(keys);
             return NULL;
+        }
         json_array_append_new(keys, key_entry);
         psabpf_matchkey_free(mk);
     }

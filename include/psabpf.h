@@ -374,8 +374,8 @@ const void *psabpf_matchkey_get_data(psabpf_match_key_t *mk);
 size_t psabpf_matchkey_get_data_size(psabpf_match_key_t *mk);
 
 /* only for lpm */
-int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix);
-uint32_t psabpf_matchkey_get_prefix(psabpf_match_key_t *mk);
+int psabpf_matchkey_prefix_len(psabpf_match_key_t *mk, uint32_t prefix);
+uint32_t psabpf_matchkey_get_prefix_len(psabpf_match_key_t *mk);
 
 /* only for ternary */
 int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size);

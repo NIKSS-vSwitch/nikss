@@ -555,7 +555,7 @@ size_t psabpf_matchkey_get_data_size(psabpf_match_key_t *mk)
 }
 
 /* only for lpm */
-int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
+int psabpf_matchkey_prefix_len(psabpf_match_key_t *mk, uint32_t prefix)
 {
     if (mk == NULL)
         return EINVAL;
@@ -568,12 +568,12 @@ int psabpf_matchkey_prefix(psabpf_match_key_t *mk, uint32_t prefix)
 }
 
 /* only for lpm */
-uint32_t psabpf_matchkey_get_prefix(psabpf_match_key_t *mk)
+uint32_t psabpf_matchkey_get_prefix_len(psabpf_match_key_t *mk)
 {
     if (mk == NULL)
         return 0;
     if (mk->type != PSABPF_LPM)
-        return mk->key_size * 8;
+        return 0;
     return mk->u.lpm.prefix_len;
 }
 
