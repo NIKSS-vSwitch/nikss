@@ -70,8 +70,14 @@ int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_conte
         return ret;
     }
 
-    if (fill_key_btf_info(ctx) != NO_ERROR && fill_value_btf_info(ctx) != NO_ERROR) {
-        fprintf(stderr, "%s: not a Register instance\n", name);
+    if (fill_key_btf_info(ctx) != NO_ERROR) {
+        fprintf(stderr, "%s: couldn't get key BTF info of a Register instance\n", name);
+        close_object_fd(&ctx->reg.fd);
+        return EOPNOTSUPP;
+    }
+
+    if (fill_value_btf_info(ctx) != NO_ERROR) {
+        fprintf(stderr, "%s: couldn't get value BTF info of a Register instance\n", name);
         close_object_fd(&ctx->reg.fd);
         return EOPNOTSUPP;
     }

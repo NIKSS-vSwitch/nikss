@@ -156,8 +156,7 @@ int do_register_get(int argc, char **argv)
     json_t *root = json_object();
     json_t *extern_type = json_object();
     json_t *instance_name = json_object();
-    json_t *value = json_object();
-    if (root == NULL || extern_type == NULL || instance_name == NULL || value == NULL) {
+    if (root == NULL || extern_type == NULL || instance_name == NULL) {
         fprintf(stderr, "failed to prepare JSON\n");
         goto clean_up;
     }
