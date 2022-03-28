@@ -441,7 +441,7 @@ psabpf_match_key_t *psabpf_table_entry_get_next_matchkey(psabpf_table_entry_t *e
     }
 
     memcpy(&entry->current_match_key, entry->match_keys[entry->current_match_key_id], sizeof(psabpf_match_key_t));
-    entry->current_match_key.mem_can_be_free = false;
+    entry->current_match_key.mem_can_be_freed = false;
     entry->current_match_key_id += 1;
 
     return &entry->current_match_key;
@@ -491,7 +491,7 @@ void psabpf_matchkey_init(psabpf_match_key_t *mk)
     if (mk == NULL)
         return;
     memset(mk, 0, sizeof(psabpf_match_key_t));
-    mk->mem_can_be_free = true;
+    mk->mem_can_be_freed = true;
 }
 
 void psabpf_matchkey_free(psabpf_match_key_t *mk)
@@ -499,12 +499,12 @@ void psabpf_matchkey_free(psabpf_match_key_t *mk)
     if (mk == NULL)
         return;
 
-    if (mk->data != NULL && mk->mem_can_be_free == true)
+    if (mk->data != NULL && mk->mem_can_be_freed == true)
         free(mk->data);
     mk->data = NULL;
 
     if (mk->type == PSABPF_TERNARY) {
-        if (mk->u.ternary.mask != NULL && mk->mem_can_be_free == true)
+        if (mk->u.ternary.mask != NULL && mk->mem_can_be_freed == true)
             free(mk->u.ternary.mask);
         mk->u.ternary.mask = NULL;
     }
@@ -636,7 +636,7 @@ int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, s
         return EINVAL;
 
     param->is_group_reference = false;
-    param->mem_can_be_free = true;
+    param->mem_can_be_freed = true;
 
     param->len = size;
     if (size == 0) {
@@ -655,7 +655,7 @@ void psabpf_action_param_free(psabpf_action_param_t *param)
 {
     if (param == NULL)
         return;
-    if (param->data != NULL && param->mem_can_be_free == true)
+    if (param->data != NULL && param->mem_can_be_freed == true)
         free(param->data);
     param->data = NULL;
 }
@@ -682,7 +682,7 @@ psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry)
     memcpy(&entry->current_action_param,
            &entry->action->params[entry->current_action_param_id],
            sizeof(psabpf_action_param_t));
-    entry->current_action_param.mem_can_be_free = false;
+    entry->current_action_param.mem_can_be_freed = false;
 
     entry->current_action_param_id += 1;
 

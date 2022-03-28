@@ -27,7 +27,7 @@ void psabpf_direct_meter_ctx_init(psabpf_direct_meter_context_t *dm_ctx)
     if (dm_ctx == NULL)
         return;
     memset(dm_ctx, 0, sizeof(psabpf_direct_meter_context_t));
-    dm_ctx->mem_can_be_free = true;
+    dm_ctx->mem_can_be_freed = true;
 }
 
 void psabpf_direct_meter_ctx_free(psabpf_direct_meter_context_t *dm_ctx)
@@ -35,7 +35,7 @@ void psabpf_direct_meter_ctx_free(psabpf_direct_meter_context_t *dm_ctx)
     if (dm_ctx == NULL)
         return;
 
-    if (dm_ctx->name != NULL && dm_ctx->mem_can_be_free == true)
+    if (dm_ctx->name != NULL && dm_ctx->mem_can_be_freed == true)
         free((void *) dm_ctx->name);
     dm_ctx->name = NULL;
 }
@@ -101,7 +101,7 @@ psabpf_direct_meter_context_t *psabpf_direct_meter_get_next_ctx(psabpf_table_ent
     memcpy(&entry->current_direct_meter_ctx,
            &ctx->direct_meters_ctx[entry->current_direct_meter_ctx_id],
            sizeof(psabpf_direct_meter_context_t));
-    entry->current_direct_meter_ctx.mem_can_be_free = false;
+    entry->current_direct_meter_ctx.mem_can_be_freed = false;
 
     entry->current_direct_meter_ctx_id += 1;
 

@@ -243,18 +243,28 @@ typedef struct psabpf_match_key {
         } range;
     } u;
 
-    /* Used to tell whether instance is weak copy of another instance. In such case
-     * allocated memory cannot be freed, because only memory address is copied and
-     * pointed data is not copied into new area of memory */
-    bool mem_can_be_free;
+    /* Used to tell whether allocated memory for this psabpf_match_key_t instance
+     * can be freed or not. If true then this allocated memory can be freed. Otherwise, not.
+     * In some cases weak copy of instance is returned to client of this API.
+     * For a such weak copy new memory is not allocated, only address of area of
+     * memory from original instance is copied. In these weak copies field mem_can_be_freed
+     * is set to false and memory is not deallocated. Memory will be freed when
+     * freeing original object. */
+    bool mem_can_be_freed;
 } psabpf_match_key_t;
 
 typedef struct psabpf_action_param {
     char *data;  /* might be an action data or reference */
     size_t len;
     bool is_group_reference;
-    /* See comment for field mem_can_be_free in struct psabpf_match_key */
-    bool mem_can_be_free;
+    /* Used to tell whether allocated memory for this psabpf_match_key_t instance
+     * can be freed or not. If true then this allocated memory can be freed. Otherwise, not.
+     * In some cases weak copy of instance is returned to client of this API.
+     * For a such weak copy new memory is not allocated, only address of area of
+     * memory from original instance is copied. In these weak copies field mem_can_be_freed
+     * is set to false and memory is not deallocated. Memory will be freed when
+     * freeing original object. */
+    bool mem_can_be_freed;
     uint32_t param_id;
 } psabpf_action_param_t;
 
@@ -276,8 +286,14 @@ typedef struct psabpf_direct_counter_context {
     size_t counter_size;
     size_t counter_offset;
     unsigned counter_idx;
-    /* See comment for field mem_can_be_free in struct psabpf_match_key */
-    bool mem_can_be_free;
+    /* Used to tell whether allocated memory for this psabpf_match_key_t instance
+     * can be freed or not. If true then this allocated memory can be freed. Otherwise, not.
+     * In some cases weak copy of instance is returned to client of this API.
+     * For a such weak copy new memory is not allocated, only address of area of
+     * memory from original instance is copied. In these weak copies field mem_can_be_freed
+     * is set to false and memory is not deallocated. Memory will be freed when
+     * freeing original object. */
+    bool mem_can_be_freed;
 } psabpf_direct_counter_context_t;
 
 typedef struct psabpf_direct_meter_entry {
@@ -290,8 +306,14 @@ typedef struct psabpf_direct_meter_context {
     size_t meter_size;
     size_t meter_offset;
     unsigned meter_idx;
-    /* See comment for field mem_can_be_free in struct psabpf_match_key */
-    bool mem_can_be_free;
+    /* Used to tell whether allocated memory for this psabpf_match_key_t instance
+     * can be freed or not. If true then this allocated memory can be freed. Otherwise, not.
+     * In some cases weak copy of instance is returned to client of this API.
+     * For a such weak copy new memory is not allocated, only address of area of
+     * memory from original instance is copied. In these weak copies field mem_can_be_freed
+     * is set to false and memory is not deallocated. Memory will be freed when
+     * freeing original object. */
+    bool mem_can_be_freed;
 } psabpf_direct_meter_context_t;
 
 typedef struct psabpf_table_entry {
