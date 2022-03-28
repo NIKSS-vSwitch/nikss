@@ -151,7 +151,8 @@ int do_register_get(int argc, char **argv)
         goto clean_up;
     }
 
-    ret = psabpf_register_get(&ctx, &entry);
+    if (psabpf_register_get(&ctx, &entry) != NO_ERROR)
+        goto clean_up;
 
     json_t *root = json_object();
     json_t *extern_type = json_object();
