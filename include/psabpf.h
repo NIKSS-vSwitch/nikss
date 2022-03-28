@@ -243,14 +243,18 @@ typedef struct psabpf_match_key {
         } range;
     } u;
 
-    bool is_data_owner;
+    /* Used to tell whether instance is weak copy of another instance. In such case
+     * allocated memory cannot be freed, because only memory address is copied and
+     * pointed data is not copied into new area of memory */
+    bool mem_can_be_free;
 } psabpf_match_key_t;
 
 typedef struct psabpf_action_param {
     char *data;  /* might be an action data or reference */
     size_t len;
     bool is_group_reference;
-    bool is_data_owner;
+    /* See comment for field mem_can_be_free in struct psabpf_match_key */
+    bool mem_can_be_free;
     uint32_t param_id;
 } psabpf_action_param_t;
 
@@ -272,7 +276,8 @@ typedef struct psabpf_direct_counter_context {
     size_t counter_size;
     size_t counter_offset;
     unsigned counter_idx;
-    bool is_data_owner;
+    /* See comment for field mem_can_be_free in struct psabpf_match_key */
+    bool mem_can_be_free;
 } psabpf_direct_counter_context_t;
 
 typedef struct psabpf_direct_meter_entry {
@@ -285,7 +290,8 @@ typedef struct psabpf_direct_meter_context {
     size_t meter_size;
     size_t meter_offset;
     unsigned meter_idx;
-    bool is_data_owner;
+    /* See comment for field mem_can_be_free in struct psabpf_match_key */
+    bool mem_can_be_free;
 } psabpf_direct_meter_context_t;
 
 typedef struct psabpf_table_entry {

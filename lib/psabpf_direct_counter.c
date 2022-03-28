@@ -29,7 +29,7 @@ void psabpf_direct_counter_ctx_init(psabpf_direct_counter_context_t *dc_ctx)
 
     memset(dc_ctx, 0, sizeof(psabpf_direct_counter_context_t));
     dc_ctx->counter_idx = -1;
-    dc_ctx->is_data_owner = true;
+    dc_ctx->mem_can_be_free = true;
 }
 
 void psabpf_direct_counter_ctx_free(psabpf_direct_counter_context_t *dc_ctx)
@@ -37,7 +37,7 @@ void psabpf_direct_counter_ctx_free(psabpf_direct_counter_context_t *dc_ctx)
     if (dc_ctx == NULL)
         return;
 
-    if (dc_ctx->name != NULL && dc_ctx->is_data_owner == true)
+    if (dc_ctx->name != NULL && dc_ctx->mem_can_be_free == true)
         free((void *) dc_ctx->name);
     dc_ctx->name = NULL;
 }
@@ -55,7 +55,7 @@ int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
             dc_ctx->counter_size = table_ctx->direct_counters_ctx[i].counter_size;
             dc_ctx->counter_idx = i;
             dc_ctx->name = table_ctx->direct_counters_ctx[i].name;
-            dc_ctx->is_data_owner = false;
+            dc_ctx->mem_can_be_free = false;
             return NO_ERROR;
         }
     }
@@ -104,7 +104,7 @@ psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table
     memcpy(&entry->current_direct_counter_ctx,
            &ctx->direct_counters_ctx[entry->current_direct_counter_ctx_id],
            sizeof(psabpf_direct_counter_context_t));
-    entry->current_direct_counter_ctx.is_data_owner = false;
+    entry->current_direct_counter_ctx.mem_can_be_free = false;
 
     entry->current_direct_counter_ctx_id += 1;
 
