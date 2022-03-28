@@ -174,6 +174,39 @@ int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *en
 int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry);
 
 /*
+ * P4 Registers
+ */
+
+typedef struct psabpf_register_entry {
+    psabpf_struct_field_set_t entry_key;
+    void *raw_key;
+    void *raw_value;
+    size_t current_field_id;
+    psabpf_struct_field_t current;
+} psabpf_register_entry_t;
+
+typedef struct psabpf_register_context {
+    psabpf_bpf_map_descriptor_t reg;
+    psabpf_btf_t btf_metadata;
+    psabpf_struct_field_descriptor_set_t key_fds;
+    psabpf_struct_field_descriptor_set_t value_fds;
+} psabpf_register_context_t;
+
+void psabpf_register_ctx_init(psabpf_register_context_t *ctx);
+void psabpf_register_ctx_free(psabpf_register_context_t *ctx);
+int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_context_t *ctx, const char *name);
+
+void psabpf_register_entry_init(psabpf_register_entry_t *entry);
+void psabpf_register_entry_free(psabpf_register_entry_t *entry);
+
+int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *data, size_t data_len);
+psabpf_struct_field_t * psabpf_register_get_next_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
+
+int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
+int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
+int psabpf_register_reset(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
+
+/*
  * P4 Meters
  */
 
@@ -534,9 +567,6 @@ int psabpf_action_selector_set_default_group_action(psabpf_action_selector_conte
 /*
  * TODO: Action Profile
  */
-
-////// P4 Registers
-// TODO: to be implemented
 
 ////// PacketIn / PacketOut
 // TODO: to be implemented
