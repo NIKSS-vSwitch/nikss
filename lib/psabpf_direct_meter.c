@@ -27,6 +27,7 @@ void psabpf_direct_meter_ctx_init(psabpf_direct_meter_context_t *dm_ctx)
     if (dm_ctx == NULL)
         return;
     memset(dm_ctx, 0, sizeof(psabpf_direct_meter_context_t));
+    dm_ctx->mem_can_be_freed = true;
 }
 
 void psabpf_direct_meter_ctx_free(psabpf_direct_meter_context_t *dm_ctx)
@@ -34,7 +35,7 @@ void psabpf_direct_meter_ctx_free(psabpf_direct_meter_context_t *dm_ctx)
     if (dm_ctx == NULL)
         return;
 
-    if (dm_ctx->name != NULL)
+    if (dm_ctx->name != NULL && dm_ctx->mem_can_be_freed == true)
         free((void *) dm_ctx->name);
     dm_ctx->name = NULL;
 }
@@ -85,4 +86,47 @@ int psabpf_table_entry_set_direct_meter(psabpf_table_entry_t *entry, psabpf_dire
     entry->direct_meters[idx].meter_idx = dm_ctx->meter_idx;
 
     return NO_ERROR;
+}
+
+psabpf_direct_meter_context_t *psabpf_direct_meter_get_next_ctx(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL)
+        return NULL;
+
+    if (entry->current_direct_meter_ctx_id >= ctx->n_direct_meters) {
+        entry->current_direct_meter_ctx_id = 0;
+        return NULL;
+    }
+
+    memcpy(&entry->current_direct_meter_ctx,
+           &ctx->direct_meters_ctx[entry->current_direct_meter_ctx_id],
+           sizeof(psabpf_direct_meter_context_t));
+    entry->current_direct_meter_ctx.mem_can_be_freed = false;
+
+    entry->current_direct_meter_ctx_id += 1;
+
+    return &entry->current_direct_meter_ctx;
+}
+
+const char *psabpf_direct_meter_get_name(psabpf_direct_meter_context_t *dm_ctx)
+{
+    if (dm_ctx == NULL)
+        return NULL;
+    return dm_ctx->name;
+}
+
+int psabpf_direct_meter_get_entry(psabpf_direct_meter_context_t *dm_ctx, psabpf_table_entry_t *entry, psabpf_meter_entry_t *dm)
+{
+    if (dm_ctx == NULL || entry == NULL || dm == NULL)
+        return EINVAL;
+    psabpf_meter_entry_init(dm);
+
+    for (unsigned i = 0; i < entry->n_direct_meters; i++) {
+        if (dm_ctx->meter_idx == entry->direct_meters[i].meter_idx) {
+            memcpy(dm, &entry->direct_meters[i].meter, sizeof(psabpf_meter_entry_t));
+            return NO_ERROR;
+        }
+    }
+
+    return ENOENT;
 }

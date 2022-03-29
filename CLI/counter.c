@@ -166,6 +166,33 @@ static int build_json_counter_key(json_t *parent, psabpf_counter_context_t *ctx,
     return NO_ERROR;
 }
 
+int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf_counter_type_t type)
+{
+    /* For counter values we cannot use built-in JSON integer type because
+     * it is signed type, but we need unsigned one.*/
+    if (type == PSABPF_COUNTER_TYPE_BYTES || type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+        psabpf_counter_value_t bytes_value = psabpf_counter_entry_get_bytes(entry);
+        char *bytes_str = convert_bin_data_to_hexstr(&bytes_value, sizeof(psabpf_counter_value_t));
+        if (bytes_str != NULL) {
+            json_object_set_new(parent, "bytes", json_string(bytes_str));
+            free(bytes_str);
+        } else
+            return ENOMEM;
+    }
+
+    if (type == PSABPF_COUNTER_TYPE_PACKETS || type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+        psabpf_counter_value_t packets_value = psabpf_counter_entry_get_packets(entry);
+        char *packets_str = convert_bin_data_to_hexstr(&packets_value, sizeof(psabpf_counter_value_t));
+        if (packets_str != NULL) {
+            json_object_set_new(parent, "packets", json_string(packets_str));
+            free(packets_str);
+        } else
+            return ENOMEM;
+    }
+
+    return NO_ERROR;
+}
+
 static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
 {
     if (parent == NULL)
@@ -188,32 +215,23 @@ static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ct
         return ENOMEM;
     json_object_set(parent, "value", json_value);
 
-    /* For counter values we cannot use built-in JSON integer type because
-     * it is signed type, but we need unsigned one.*/
-    if (type == PSABPF_COUNTER_TYPE_BYTES || type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
-        psabpf_counter_value_t bytes_value = psabpf_counter_entry_get_bytes(entry);
-        char *bytes_str = convert_bin_data_to_hexstr(&bytes_value, sizeof(psabpf_counter_value_t));
-        if (bytes_str != NULL) {
-            json_object_set_new(json_value, "bytes", json_string(bytes_str));
-            free(bytes_str);
-        } else {
-            json_decref(json_value);
-            return ENOMEM;
-        }
-    }
-    if (type == PSABPF_COUNTER_TYPE_PACKETS || type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
-        psabpf_counter_value_t packets_value = psabpf_counter_entry_get_packets(entry);
-        char *packets_str = convert_bin_data_to_hexstr(&packets_value, sizeof(psabpf_counter_value_t));
-        if (packets_str != NULL) {
-            json_object_set_new(json_value, "packets", json_string(packets_str));
-            free(packets_str);
-        } else{
-            json_decref(json_value);
-            return ENOMEM;
-        }
-    }
-
+    int ret = build_json_counter_value(json_value, entry, type);
     json_decref(json_value);
+
+    return ret;
+}
+
+int build_json_counter_type(void *parent, psabpf_counter_type_t type)
+{
+    if (type == PSABPF_COUNTER_TYPE_BYTES)
+        json_object_set_new(parent, "type", json_string("BYTES"));
+    else if (type == PSABPF_COUNTER_TYPE_PACKETS)
+        json_object_set_new(parent, "type", json_string("PACKETS"));
+    else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
+        json_object_set_new(parent, "type", json_string("PACKETS_AND_BYTES"));
+    else
+        json_object_set_new(parent, "type", json_string("UNKNOWN"));
+
     return NO_ERROR;
 }
 
@@ -239,15 +257,7 @@ static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entr
     }
     json_object_set(root, "Counter", extern_type);
 
-    psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
-    if (type == PSABPF_COUNTER_TYPE_BYTES)
-        json_object_set_new(instance_name, "type", json_string("BYTES"));
-    else if (type == PSABPF_COUNTER_TYPE_PACKETS)
-        json_object_set_new(instance_name, "type", json_string("PACKETS"));
-    else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
-        json_object_set_new(instance_name, "type", json_string("PACKETS_AND_BYTES"));
-    else
-        json_object_set_new(instance_name, "type", json_string("UNKNOWN"));
+    build_json_counter_type(instance_name, psabpf_counter_get_type(ctx));
 
     if (entry_has_key) {
         if ((ret = psabpf_counter_get(ctx, entry)) != NO_ERROR)
