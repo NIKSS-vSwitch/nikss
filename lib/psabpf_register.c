@@ -107,6 +107,10 @@ void psabpf_register_entry_free(psabpf_register_entry_t *entry) {
     entry->raw_value = NULL;
 }
 
+void psabpf_register_entry_reset_field_iterator(psabpf_register_entry_t *entry) {
+    entry->current_field_id = 0;
+}
+
 int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *data, size_t data_len) {
     if (entry == NULL)
         return EINVAL;
@@ -143,7 +147,7 @@ static void *allocate_value_buffer(psabpf_register_context_t *ctx, psabpf_regist
     return entry->raw_value;
 }
 
-psabpf_struct_field_t * psabpf_register_get_next_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
+psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL)
         return NULL;
@@ -163,6 +167,68 @@ psabpf_struct_field_t * psabpf_register_get_next_field(psabpf_register_context_t
     entry->current_field_id = entry->current_field_id + 1;
 
     return &entry->current;
+}
+
+psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL)
+        return NULL;
+
+    psabpf_struct_field_descriptor_t *fd;
+    fd = get_struct_field_descriptor(&ctx->key_fds, entry->current_field_id);
+    if (fd == NULL) {
+        entry->current_field_id = 0;
+        return NULL;
+    }
+
+    entry->current.type = fd->type;
+    entry->current.data_len = fd->data_len;
+    entry->current.name = fd->name;
+    entry->current.data = entry->raw_key + fd->data_offset;
+
+    entry->current_field_id = entry->current_field_id + 1;
+
+    return &entry->current;
+}
+
+psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ctx)
+{
+    if (ctx == NULL)
+        return NULL;
+
+    if (allocate_key_buffer(ctx, &ctx->current_entry) == NULL)
+        return NULL;
+
+    /* on first call ctx->prev_entry_ke must be NULL */
+    if (bpf_map_get_next_key(ctx->reg.fd, ctx->prev_entry_key, ctx->current_entry.raw_key) != 0) {
+        /* no more entries, prepare for next iteration */
+        if (ctx->prev_entry_key != NULL)
+            free(ctx->prev_entry_key);
+        ctx->prev_entry_key = NULL;
+
+        return NULL;
+    }
+
+    if (ctx->prev_entry_key == NULL) {
+        ctx->prev_entry_key = malloc(ctx->reg.key_size);
+        if (ctx->prev_entry_key == NULL) {
+            fprintf(stderr, "not enough memory\n");
+            return NULL;
+        }
+    }
+
+    memcpy(ctx->prev_entry_key, ctx->current_entry.raw_key, ctx->reg.key_size);
+
+    if (allocate_value_buffer(ctx, &ctx->current_entry) == NULL)
+        return NULL;
+
+    int ret = bpf_map_lookup_elem(ctx->reg.fd, ctx->current_entry.raw_key, ctx->current_entry.raw_value);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "failed to read Register entry: %s\n", strerror(ret));
+        return NULL;
+    }
+
+    return &ctx->current_entry;
 }
 
 int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)

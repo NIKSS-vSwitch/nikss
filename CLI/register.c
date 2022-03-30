@@ -76,10 +76,11 @@ static int parse_register_key(int *argc, char ***argv, psabpf_register_entry_t *
     return NO_ERROR;
 }
 
-static int build_struct_json(json_t *parent, psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
+static int build_struct_json(json_t *parent, psabpf_register_context_t *ctx, psabpf_register_entry_t *entry,
+                             psabpf_struct_field_t * (*get_next_field)(psabpf_register_context_t*, psabpf_register_entry_t*))
 {
     psabpf_struct_field_t *field;
-    while ((field = psabpf_register_get_next_field(ctx, entry)) != NULL) {
+    while ((field = get_next_field(ctx, entry)) != NULL) {
         /* To build flat structure of output JSON just remove this and next conditional
          * statement. In other words, preserve only condition and instructions below it:
          *      if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA) continue; */
@@ -95,7 +96,7 @@ static int build_struct_json(json_t *parent, psabpf_register_context_t *ctx, psa
                 return EPERM;
             }
 
-            int ret = build_struct_json(sub_struct, ctx, entry);
+            int ret = build_struct_json(sub_struct, ctx, entry, get_next_field);
             json_decref(sub_struct);
             if (ret != NO_ERROR)
                 return ret;
@@ -125,6 +126,83 @@ static int build_struct_json(json_t *parent, psabpf_register_context_t *ctx, psa
     return NO_ERROR;
 }
 
+static int build_entry(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry,
+                       json_t *json_entry)
+{
+    json_t *index = json_object();
+    json_t *value = json_object();
+    if (json_entry == NULL || index == NULL || value == NULL) {
+        fprintf(stderr, "failed to prepare register in JSON\n");
+        return ENOMEM;
+    }
+
+    json_object_set_new(json_entry, "index", index);
+    json_object_set_new(json_entry, "value", value);
+
+    int ret = build_struct_json(value, ctx, entry, psabpf_register_get_next_value_field);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "failed to build register value in JSON\n");
+        return EINVAL;
+    }
+
+    ret = build_struct_json(index, ctx, entry, psabpf_register_get_next_index_field);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "failed to build register index in JSON\n");
+        return EINVAL;
+    }
+
+    return NO_ERROR;
+}
+
+static int get_and_print_register_json(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry,
+                                       const char *register_name, bool entry_has_key)
+{
+    int ret = EINVAL;
+    json_t *root = json_object();
+    json_t *instance_name = json_object();
+    json_t *entries = json_array();
+    if (root == NULL || instance_name == NULL || entries == NULL) {
+        fprintf(stderr, "failed to prepare JSON\n");
+        goto clean_up;
+    }
+
+    json_object_set(root, register_name, entries);
+
+    if (entry_has_key) {
+        if (psabpf_register_get(ctx, entry) != NO_ERROR) {
+            goto clean_up;
+        }
+        json_t *json_entry = json_object();
+        ret = build_entry(ctx, entry, json_entry);
+        json_array_append_new(entries, json_entry);
+    } else {
+        psabpf_register_entry_t *iter;
+        while ((iter = psabpf_register_get_next(ctx)) != NULL) {
+            json_t *json_entry = json_object();
+            ret = build_entry(ctx, iter, json_entry);
+            json_array_append_new(entries, json_entry);
+            psabpf_register_entry_free(iter);
+            if (ret != NO_ERROR)
+                break;
+        }
+    }
+
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "failed to build register JSON: %s\n", strerror(ret));
+        goto clean_up;
+    }
+
+    json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+    ret = NO_ERROR;
+
+clean_up:
+    json_decref(entries);
+    json_decref(instance_name);
+    json_decref(root);
+
+    return ret;
+}
+
 int do_register_get(int argc, char **argv)
 {
     int ret = EINVAL;
@@ -143,40 +221,18 @@ int do_register_get(int argc, char **argv)
     if (parse_dst_register(&argc, &argv, &register_name, &psabpf_ctx, &ctx) != NO_ERROR)
         goto clean_up;
 
-    if (parse_register_key(&argc, &argv, &entry) != NO_ERROR)
-        goto clean_up;
+    bool register_key_provided = (argc >= 1 && is_keyword(*argv, "key"));
+    if (register_key_provided) {
+        if (parse_register_key(&argc, &argv, &entry) != NO_ERROR)
+            goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
         goto clean_up;
     }
 
-    if (psabpf_register_get(&ctx, &entry) != NO_ERROR)
-        goto clean_up;
-
-    json_t *root = json_object();
-    json_t *extern_type = json_object();
-    json_t *instance_name = json_object();
-    if (root == NULL || extern_type == NULL || instance_name == NULL) {
-        fprintf(stderr, "failed to prepare JSON\n");
-        goto clean_up;
-    }
-
-    if (json_object_set(extern_type, register_name, instance_name)) {
-        fprintf(stderr, "failed to add JSON instance %s\n", register_name);
-        goto clean_up;
-    }
-    json_object_set(root, "Register", extern_type);
-
-    json_t *json_entry = json_object();
-    if (json_entry == NULL) {
-        fprintf(stderr, "failed to prepare register in JSON\n");
-        goto clean_up;
-    }
-    ret = build_struct_json(json_entry, &ctx, &entry);
-    json_object_set(instance_name, "value", json_entry);
-
-    json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+    ret = get_and_print_register_json(&ctx, &entry, register_name, register_key_provided);
 
 clean_up:
     psabpf_register_entry_free(&entry);
