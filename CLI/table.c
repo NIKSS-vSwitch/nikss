@@ -679,12 +679,27 @@ static int print_json_table_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_en
     }
     json_object_set(instance_name, "entries", entries);
 
-    json_t *parsed_entry = create_json_entry(ctx, entry);
-    if (parsed_entry == NULL) {
-        fprintf(stderr, "failed to create table JSON entry\n");
-        goto clean_up;
+    if (entry != NULL) {
+        /* Dump single entry */
+        json_t *parsed_entry = create_json_entry(ctx, entry);
+        if (parsed_entry == NULL) {
+            fprintf(stderr, "failed to create table JSON entry\n");
+            goto clean_up;
+        }
+        json_array_append_new(entries, parsed_entry);
+    } else {
+        /* Dump whole table */
+        psabpf_table_entry_t *current_entry;
+        while ((current_entry = psabpf_table_entry_get_next(ctx)) != NULL) {
+            json_t *parsed_entry = create_json_entry(ctx, current_entry);
+            if (parsed_entry == NULL) {
+                fprintf(stderr, "failed to create table JSON entry\n");
+                goto clean_up;
+            }
+            json_array_append_new(entries, parsed_entry);
+            psabpf_table_entry_free(current_entry);
+        }
     }
-    json_array_append_new(entries, parsed_entry);
 
     if (build_json_table_metadata(ctx, instance_name) != NO_ERROR) {
         fprintf(stderr, "failed to create table JSON entry metadata\n");
@@ -874,19 +889,23 @@ int do_table_get(int argc, char **argv)
         goto clean_up;
 
     /* 3. Get key */
-    if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
-        goto clean_up;
+    bool key_provided = (argc >= 1 && is_keyword(*argv, "key"));
+    if (key_provided) {
+        if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
+            goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
         goto clean_up;
     }
 
-    error_code = psabpf_table_entry_get(&ctx, &entry);
-    if (error_code != NO_ERROR)
-        goto clean_up;
-
-    error_code = print_json_table_entry(&ctx, &entry, table_name);
+    if (key_provided) {
+        error_code = psabpf_table_entry_get(&ctx, &entry);
+        if (error_code != NO_ERROR)
+            goto clean_up;
+    }
+    error_code = print_json_table_entry(&ctx, key_provided ? &entry : NULL, table_name);
 
 clean_up:
     psabpf_table_entry_free(&entry);

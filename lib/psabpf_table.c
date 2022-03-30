@@ -44,6 +44,8 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
     ctx->prefixes.fd = -1;
     ctx->tuple_map.fd = -1;
     ctx->cache.fd = -1;
+
+    psabpf_table_entry_init(&ctx->current_entry);
 }
 
 void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
@@ -77,6 +79,12 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
 
     free_struct_field_descriptor_set(&ctx->table_implementations);
     free_struct_field_descriptor_set(&ctx->table_implementation_group_marks);
+
+    if (ctx->current_raw_key == NULL)
+        free(ctx->current_raw_key);
+    ctx->current_raw_key = NULL;
+
+    psabpf_table_entry_free(&ctx->current_entry);
 }
 
 static uint32_t get_table_value_type_id(psabpf_table_entry_ctx_t *ctx)
@@ -437,6 +445,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
     if (entry->match_keys)
         free(entry->match_keys);
     entry->match_keys = NULL;
+    entry->n_keys = 0;
 
     /* free action data */
     if (entry->action != NULL) {
@@ -452,6 +461,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
         free(entry->direct_counters);
     }
     entry->direct_counters = NULL;
+    entry->n_direct_counters = 0;
 
     /* free DirectMeter instances */
     if (entry->direct_meters != NULL) {
@@ -460,6 +470,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
         free(entry->direct_meters);
     }
     entry->direct_meters = NULL;
+    entry->n_direct_meters = 0;
 
     /* Iterators */
     psabpf_matchkey_free(&entry->current_match_key);
@@ -2505,10 +2516,12 @@ int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 
     if (ctx->table.fd < 0) {
         fprintf(stderr, "can't get entry: table not opened\n");
+        return_code = EBADF;
         goto clean_up;
     }
     if (ctx->table.key_size == 0 || ctx->table.value_size == 0) {
         fprintf(stderr, "zero-size key or value is not supported\n");
+        return_code = EINVAL;
         goto clean_up;
     }
 
@@ -2568,12 +2581,123 @@ clean_up:
     return return_code;
 }
 
-int psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static int parse_table_key_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                                  const void *key, const void *key_mask)
 {
-    if (ctx == NULL || entry == NULL)
-        return EINVAL;
+    psabpf_match_key_t mk;
+    psabpf_matchkey_init(&mk);
+
+    if (ctx->is_ternary) {
+        psabpf_matchkey_type(&mk, PSABPF_TERNARY);
+        psabpf_matchkey_data(&mk, key, ctx->table.key_size);
+        psabpf_matchkey_mask(&mk, key_mask, ctx->table.key_size);
+    } else if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
+        psabpf_matchkey_type(&mk, PSABPF_LPM);
+        /* We should change byte order back to host order. It isn't doable because
+         * there is no information how long is the last field - this is the only one
+         * field in the network byte order. */
+        psabpf_matchkey_data(&mk, key + sizeof(uint32_t), ctx->table.key_size - sizeof(uint32_t));
+        psabpf_matchkey_prefix_len(&mk, *((uint32_t *) key));
+    } else {
+        psabpf_matchkey_type(&mk, PSABPF_EXACT);
+        psabpf_matchkey_data(&mk, key, ctx->table.key_size);
+    }
+
+    psabpf_table_entry_matchkey(entry, &mk);
+    psabpf_matchkey_free(&mk);
 
     return NO_ERROR;
+}
+
+//static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *key)
+//{
+//    return NO_ERROR;
+//}
+
+static int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                           const void *key, const void *key_mask)
+{
+//    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
+        return parse_table_key_no_btf(ctx, entry, key, key_mask);
+
+//    return parse_table_key_btf_info(ctx, entry, key);
+}
+
+psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
+{
+    psabpf_table_entry_t *ret_instance = NULL;
+    void *next_key = NULL; /* do not free */
+    void *value_buffer = NULL;
+
+    if (ctx == NULL)
+        return NULL;
+
+    /* TODO: add support for ternary table */
+
+    if (ctx->table.fd < 0) {
+        fprintf(stderr, "can't get entry: table not opened\n");
+        return NULL;
+    }
+    if (ctx->table.key_size == 0 || ctx->table.value_size == 0) {
+        fprintf(stderr, "zero-size key or value is not supported\n");
+        return NULL;
+    }
+
+    next_key = malloc(ctx->table.key_size);
+    if (next_key == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        goto clean_up;
+    }
+
+    if (bpf_map_get_next_key(ctx->table.fd, ctx->current_raw_key, next_key) != 0) {
+        /* restart iteration */
+        if (ctx->current_raw_key != NULL)
+            free(ctx->current_raw_key);
+        ctx->current_raw_key = NULL;
+        goto clean_up;
+    }
+
+    if (ctx->current_raw_key != NULL)
+        free(ctx->current_raw_key);
+    ctx->current_raw_key = next_key;
+
+    value_buffer = malloc(ctx->table.value_size);
+    if (value_buffer == NULL || ctx->current_raw_key == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        goto clean_up;
+    }
+
+    int return_code = bpf_map_lookup_elem(ctx->table.fd, ctx->current_raw_key, value_buffer);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to get entry: %s\n", strerror(return_code));
+        goto clean_up;
+    }
+
+    psabpf_table_entry_free(&ctx->current_entry);
+    psabpf_table_entry_init(&ctx->current_entry);
+
+    /* Parse key */
+    return_code = parse_table_key(ctx, &ctx->current_entry, ctx->current_raw_key, ctx->current_raw_key_mask);
+    if (return_code != NO_ERROR) {
+        fprintf(stderr, "failed to parse entry: %s\n", strerror(return_code));
+        goto clean_up;
+    }
+
+    /* Parse value */
+    return_code = parse_table_value(ctx, &ctx->current_entry, value_buffer);
+    if (return_code != NO_ERROR) {
+        fprintf(stderr, "failed to parse entry: %s\n", strerror(return_code));
+        goto clean_up;
+    }
+
+    ret_instance = &ctx->current_entry;
+
+clean_up:
+    if (value_buffer)
+        free(value_buffer);
+
+    return ret_instance;
 }
 
 int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
