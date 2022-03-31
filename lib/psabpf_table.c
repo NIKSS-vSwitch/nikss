@@ -101,8 +101,8 @@ static int get_value_type(psabpf_table_entry_ctx_t *ctx, const struct btf_type *
     return NO_ERROR;
 }
 
-static bool member_is_direct_object(psabpf_btf_t *btf, const struct btf_member *member,
-                                    const char **name, const char **type_name)
+static bool member_is_direct_or_implementation_object(psabpf_btf_t *btf, const struct btf_member *member,
+                                                      const char **name, const char **type_name)
 {
     *name = btf__name_by_offset(btf->btf, member->name_off);
     if (*name == NULL)
@@ -146,7 +146,7 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
     for (unsigned i = 0; i < entries; i++, member++) {
         const char *member_name = NULL;
         const char *member_type_name = NULL;
-        if (!member_is_direct_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
+        if (!member_is_direct_or_implementation_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
             continue;
 
         size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
@@ -213,7 +213,7 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
     for (unsigned i = 0; i < entries; i++, member++) {
         const char *member_name = NULL;
         const char *member_type_name = NULL;
-        if (!member_is_direct_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
+        if (!member_is_direct_or_implementation_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
             continue;
 
         size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
