@@ -182,7 +182,7 @@ typedef struct psabpf_register_entry {
     void *raw_key;
     void *raw_value;
     size_t current_field_id;
-    psabpf_struct_field_t current;
+    psabpf_struct_field_t current_field;
 } psabpf_register_entry_t;
 
 typedef struct psabpf_register_context {
@@ -200,7 +200,6 @@ int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_conte
 
 void psabpf_register_entry_init(psabpf_register_entry_t *entry);
 void psabpf_register_entry_free(psabpf_register_entry_t *entry);
-void psabpf_register_entry_reset_field_iterator(psabpf_register_entry_t *entry);
 psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ctx);
 
 int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *data, size_t data_len);

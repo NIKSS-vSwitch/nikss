@@ -107,10 +107,6 @@ void psabpf_register_entry_free(psabpf_register_entry_t *entry) {
     entry->raw_value = NULL;
 }
 
-void psabpf_register_entry_reset_field_iterator(psabpf_register_entry_t *entry) {
-    entry->current_field_id = 0;
-}
-
 int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *data, size_t data_len) {
     if (entry == NULL)
         return EINVAL;
@@ -159,14 +155,14 @@ psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_con
         return NULL;
     }
 
-    entry->current.type = fd->type;
-    entry->current.data_len = fd->data_len;
-    entry->current.name = fd->name;
-    entry->current.data = entry->raw_value + fd->data_offset;
+    entry->current_field.type = fd->type;
+    entry->current_field.data_len = fd->data_len;
+    entry->current_field.name = fd->name;
+    entry->current_field.data = entry->raw_value + fd->data_offset;
 
     entry->current_field_id = entry->current_field_id + 1;
 
-    return &entry->current;
+    return &entry->current_field;
 }
 
 psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
@@ -181,14 +177,14 @@ psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_con
         return NULL;
     }
 
-    entry->current.type = fd->type;
-    entry->current.data_len = fd->data_len;
-    entry->current.name = fd->name;
-    entry->current.data = entry->raw_key + fd->data_offset;
+    entry->current_field.type = fd->type;
+    entry->current_field.data_len = fd->data_len;
+    entry->current_field.name = fd->name;
+    entry->current_field.data = entry->raw_key + fd->data_offset;
 
     entry->current_field_id = entry->current_field_id + 1;
 
-    return &entry->current;
+    return &entry->current_field;
 }
 
 psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ctx)
