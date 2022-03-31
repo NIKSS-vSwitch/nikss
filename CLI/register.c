@@ -256,7 +256,7 @@ int do_register_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
-            "Usage: %1$s register get pipe ID REGISTER key DATA\n"
+            "Usage: %1$s register get pipe ID REGISTER [key DATA]\n"
             "Unimplemented commands:\n"
             "       %1$s register set pipe ID REGISTER key DATA value REGISTER_VALUE\n"
             "       %1$s register reset pipe ID REGISTER key DATA\n"
