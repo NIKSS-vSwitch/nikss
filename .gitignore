@@ -2,3 +2,7 @@ cmake-*
 build
 .idea
 install
+
+# P4c compiler outputs
+*.o
+*.bc
