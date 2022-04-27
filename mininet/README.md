@@ -22,7 +22,7 @@ In the first step, you must compile `simple_switch.p4` to eBPF bytecode. This gu
 To compile the P4 program, use the Make command provided by the eBPF backend of the P4 compiler (set `P4C_REPO` to the path of the `p4c/` root directory): 
 
 ```bash
-make -f ${P4C_REPO}/backends/ebpf/runtime/kernel.mk BPFOBJ=simple_switch.o P4FILE=demo.p4 ARGS="-DPSA_PORT_RECIRCULATE=2" P4ARGS="--Wdisable=unused" psa
+make -f ${P4C_REPO}/backends/ebpf/runtime/kernel.mk BPFOBJ=simple_switch.o P4FILE=simple_switch.p4 ARGS="-DPSA_PORT_RECIRCULATE=2" P4ARGS="--Wdisable=unused" psa
 ```
 
 The above command generates `simple_switch.o`, a BPF object file. 
