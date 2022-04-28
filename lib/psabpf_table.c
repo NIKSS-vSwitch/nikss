@@ -120,7 +120,7 @@ static bool member_is_direct_or_implementation_object(psabpf_btf_t *btf, const s
         return false;
 
     if (btf_is_int(type)) {
-        /* threat ActionSelector and ActionProfile references as a direct object */
+        /* treat ActionSelector and ActionProfile references as a direct object */
         if (str_ends_with(*name, "_ref") || str_ends_with(*name, "_key"))
             return true;
     }
