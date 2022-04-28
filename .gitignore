@@ -2,3 +2,8 @@ cmake-*
 build
 .idea
 install
+*.pyc
+
+# P4c compiler outputs
+*.o
+*.bc
