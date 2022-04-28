@@ -42,27 +42,33 @@ void psabpf_register_ctx_free(psabpf_register_context_t *ctx) {
     free_struct_field_descriptor_set(&ctx->value_fds);
 }
 
-static int fill_key_btf_info(psabpf_register_context_t *ctx)
+static int parse_key_type_from_btf(psabpf_register_context_t *ctx)
 {
-    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->reg.btf_type_id, "key");
-    return parse_struct_type(&ctx->btf_metadata, type_id, ctx->reg.key_size, &ctx->key_fds);
+    if (ctx->btf_metadata.btf != NULL) {
+        uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->reg.btf_type_id, "key");
+        return parse_struct_type(&ctx->btf_metadata, type_id, ctx->reg.key_size, &ctx->key_fds);
+    }
+
+    return ENODATA;
 }
 
-static int fill_value_btf_info(psabpf_register_context_t *ctx)
+static int parse_value_type_from_btf(psabpf_register_context_t *ctx)
 {
-    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->reg.btf_type_id, "value");
-    return parse_struct_type(&ctx->btf_metadata, type_id, ctx->reg.value_size, &ctx->value_fds);
+    if (ctx->btf_metadata.btf != NULL) {
+        uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->reg.btf_type_id, "value");
+        return parse_struct_type(&ctx->btf_metadata, type_id, ctx->reg.value_size, &ctx->value_fds);
+    }
+
+    return ENODATA;
 }
 
 int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_context_t *ctx, const char *name) {
     if (psabpf_ctx == NULL || ctx == NULL || name == NULL)
         return EINVAL;
 
-    /* get the BTF, will not work without it because there is too many possible configurations */
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
-        fprintf(stderr, "couldn't find a BTF info\n");
-        return ENOTSUP;
-    }
+//    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
+//        fprintf(stderr, "couldn't find a BTF info\n");
+//    }
 
     int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->reg);
     if (ret != NO_ERROR) {
@@ -70,16 +76,12 @@ int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_conte
         return ret;
     }
 
-    if (fill_key_btf_info(ctx) != NO_ERROR) {
+    if (parse_key_type_from_btf(ctx) != NO_ERROR) {
         fprintf(stderr, "%s: couldn't get key BTF info of a Register instance\n", name);
-        close_object_fd(&ctx->reg.fd);
-        return EOPNOTSUPP;
     }
 
-    if (fill_value_btf_info(ctx) != NO_ERROR) {
+    if (parse_value_type_from_btf(ctx) != NO_ERROR) {
         fprintf(stderr, "%s: couldn't get value BTF info of a Register instance\n", name);
-        close_object_fd(&ctx->reg.fd);
-        return EOPNOTSUPP;
     }
 
     return NO_ERROR;
