@@ -14,7 +14,7 @@ Using Mininet to run PSA-eBPF is as simple as using Python/Mininet objects in yo
 
 ## Demo
 
-This directory also contains a demonstration P4 program (`simple_switch.p4`) that implements a simple L2 forwarding and the demo Mininet topology defined in `demo.py`.
+The `mininet/` directory contains a demonstration P4 program (`simple_switch.p4`) that implements a simple L2 forwarding and the demo Mininet topology defined in `demo.py`.
 
 ### Compile P4 program
 
