@@ -52,24 +52,24 @@ static int parse_dst_register(int *argc, char ***argv, const char **register_nam
     return NO_ERROR;
 }
 
-static int parse_register_key(int *argc, char ***argv, psabpf_register_entry_t *entry)
+static int parse_register_index(int *argc, char ***argv, psabpf_register_entry_t *entry)
 {
-    if (!is_keyword(**argv, "key"))
-        return NO_ERROR; /* key is optional */
+    if (!is_keyword(**argv, "index"))
+        return NO_ERROR; /* index is optional */
     NEXT_ARGP_RET();
 
-    bool has_any_key = false;
+    bool has_any_index = false;
     while (*argc > 0) {
-        if (has_any_key) {
+        if (has_any_index) {
             if (is_keyword(**argv, "value"))
                 return NO_ERROR;
         }
 
-        int err = translate_data_to_bytes(**argv, entry, CTX_REGISTER_KEY);
+        int err = translate_data_to_bytes(**argv, entry, CTX_REGISTER_INDEX);
         if (err != NO_ERROR)
             return err;
 
-        has_any_key = true;
+        has_any_index = true;
         NEXT_ARGP();
     }
 
@@ -155,7 +155,7 @@ static int build_entry(psabpf_register_context_t *ctx, psabpf_register_entry_t *
 }
 
 static int get_and_print_register_json(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry,
-                                       const char *register_name, bool entry_has_key)
+                                       const char *register_name, bool entry_has_index)
 {
     int ret = EINVAL;
     json_t *root = json_object();
@@ -168,7 +168,7 @@ static int get_and_print_register_json(psabpf_register_context_t *ctx, psabpf_re
 
     json_object_set(root, register_name, entries);
 
-    if (entry_has_key) {
+    if (entry_has_index) {
         if (psabpf_register_get(ctx, entry) != NO_ERROR) {
             goto clean_up;
         }
@@ -221,9 +221,9 @@ int do_register_get(int argc, char **argv)
     if (parse_dst_register(&argc, &argv, &register_name, &psabpf_ctx, &ctx) != NO_ERROR)
         goto clean_up;
 
-    bool register_key_provided = (argc >= 1 && is_keyword(*argv, "key"));
-    if (register_key_provided) {
-        if (parse_register_key(&argc, &argv, &entry) != NO_ERROR)
+    bool register_index_provided = (argc >= 1 && is_keyword(*argv, "index"));
+    if (register_index_provided) {
+        if (parse_register_index(&argc, &argv, &entry) != NO_ERROR)
             goto clean_up;
     }
 
@@ -232,7 +232,7 @@ int do_register_get(int argc, char **argv)
         goto clean_up;
     }
 
-    ret = get_and_print_register_json(&ctx, &entry, register_name, register_key_provided);
+    ret = get_and_print_register_json(&ctx, &entry, register_name, register_index_provided);
 
 clean_up:
     psabpf_register_entry_free(&entry);
@@ -256,10 +256,10 @@ int do_register_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
-            "Usage: %1$s register get pipe ID REGISTER [key DATA]\n"
+            "Usage: %1$s register get pipe ID REGISTER [index DATA]\n"
             "Unimplemented commands:\n"
-            "       %1$s register set pipe ID REGISTER key DATA value REGISTER_VALUE\n"
-            "       %1$s register reset pipe ID REGISTER key DATA\n"
+            "       %1$s register set pipe ID REGISTER index DATA value REGISTER_VALUE\n"
+            "       %1$s register reset pipe ID REGISTER index DATA\n"
             "\n"
             "       REGISTER := { id REGISTER_ID | name REGISTER | REGISTER_FILE }\n"
             "       REGISTER_VALUE := { DATA }\n"
