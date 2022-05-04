@@ -24,4 +24,4 @@ TARGET_DIR=$ROOT_PATH/install
 
 mkdir -p "$BUILD_DIR" "$TARGET_DIR"
 
-make -C "$SRC_DIR" "-j$(nproc)" install install_uapi_headers BUILD_STATIC_ONLY=y "OBJDIR=$BUILD_DIR" "DESTDIR=$TARGET_DIR"
+make -C "$SRC_DIR" "-j$(nproc)" install install_uapi_headers BUILD_STATIC_ONLY=y "OBJDIR=$BUILD_DIR" "DESTDIR=$TARGET_DIR" CFLAGS="-fPIC -g -O2 -Werror -Wall"
