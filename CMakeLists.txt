@@ -21,7 +21,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
 
-set(PSABPFLIB_SRCS
+set(PSABPFCTL_SRCS
         lib/btf.c
         lib/common.c
         lib/psabpf.c
@@ -33,9 +33,7 @@ set(PSABPFLIB_SRCS
         lib/psabpf_meter.c
         lib/psabpf_counter.c
         lib/psabpf_direct_counter.c
-        lib/psabpf_direct_meter.c)
-
-set(PSABPFCTL_SRCS
+        lib/psabpf_direct_meter.c
         CLI/action_selector.c
         CLI/common.c
         CLI/clone_session.c
@@ -47,13 +45,9 @@ set(PSABPFCTL_SRCS
         CLI/counter.c
         main.c)
 
-add_library(psabpf SHARED ${PSABPFLIB_SRCS})
-target_link_libraries(psabpf ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.so z elf)
-install(TARGETS psabpf DESTINATION lib)
 add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/install/usr/include)
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/build)
 target_link_libraries(psabpf-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a)
-target_link_libraries(psabpf-ctl psabpf z elf gmp m jansson)
+target_link_libraries(psabpf-ctl z elf gmp m jansson)
 install(TARGETS psabpf-ctl RUNTIME DESTINATION bin)
