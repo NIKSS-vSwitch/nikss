@@ -1,0 +1,39 @@
+name: ipdk-plugin CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  # if workflow for PR or push is already running stop it, and start new one
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Build static library version of psabpf
+    - name: Run static build
+      run: |
+        ./build_libbpf.sh
+        mkdir build && pushd build || exit
+        cmake ..
+        make -j4
+        make install
+        popd || exit
+
+    # Build shared library version of psabpf
+    # NOTE: Assumes we already built libbpf here
+    - name: Run static build
+      run: |
+        mkdir build_shared && pushd build_shared || exit
+        cmake -DBUILD_SHARED=on ..
+        make -j4
+        make install
+        popd || exit
