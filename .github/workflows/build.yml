@@ -1,10 +1,9 @@
-name: ipdk-plugin CI
+name: psabpf CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
 
 concurrency:
   # if workflow for PR or push is already running stop it, and start new one
@@ -18,13 +17,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    # Install dependencies
+    - name: Install dependencies
+      run: |
+        sudo apt -y install iproute2 make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev
+
     # Build static library version of psabpf
     - name: Run static build
       run: |
         ./build_libbpf.sh
         mkdir build && pushd build || exit
         cmake ..
-        make -j4
+        make -j$(nproc)
         make install
         popd || exit
 
