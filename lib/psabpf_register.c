@@ -123,6 +123,18 @@ int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *da
     return ret;
 }
 
+int psabpf_register_entry_set_value(psabpf_register_entry_t *entry, const void *data, size_t data_len) {
+    if (entry == NULL)
+        return EINVAL;
+    if (data == NULL || data_len < 1)
+        return ENODATA;
+
+    int ret = struct_field_set_append(&entry->entry_value, data, data_len);
+    if (ret != NO_ERROR)
+        fprintf(stderr, "couldn't append value to an entry: %s\n", strerror(ret));
+    return ret;
+}
+
 static void *allocate_key_buffer(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
 {
     if (entry->raw_key != NULL)
@@ -254,7 +266,26 @@ int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t 
 }
 
 int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry) {
-    // TODO implement
+    if (allocate_key_buffer(ctx, entry) == NULL)
+        return ENOMEM;
+
+    int ret = construct_struct_from_fields(&entry->entry_key, &ctx->key_fds, entry->raw_key, ctx->reg.key_size);
+    if (ret != NO_ERROR)
+        return ret;
+
+    if (allocate_value_buffer(ctx, entry) == NULL)
+        return ENOMEM;
+
+    ret = construct_struct_from_fields(&entry->entry_value, &ctx->value_fds, entry->raw_value, ctx->reg.value_size);
+    if (ret != NO_ERROR)
+        return ret;
+
+    ret = bpf_map_update_elem(ctx->reg.fd, entry->raw_key, entry->raw_value, 0);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "failed to set a register: %s\n", strerror(ret));
+        return ret;
+    }
+
     return NO_ERROR;
 }
 

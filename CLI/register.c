@@ -76,6 +76,25 @@ static int parse_register_index(int *argc, char ***argv, psabpf_register_entry_t
     return NO_ERROR;
 }
 
+static int parse_register_value(int *argc, char ***argv, psabpf_register_entry_t *entry)
+{
+    if (!is_keyword(**argv, "value")) {
+        fprintf(stderr, "expected \'value\' keyword\n");
+        return EINVAL;
+    }
+    NEXT_ARGP_RET();
+
+    int ret = ENODATA;
+    while (*argc > 0) {
+        ret = translate_data_to_bytes(**argv, entry, CTX_REGISTER_DATA);
+        if (ret != NO_ERROR)
+            return ret;
+        NEXT_ARGP();
+    }
+
+    return ret;
+}
+
 static int build_struct_json(json_t *parent, psabpf_register_context_t *ctx, psabpf_register_entry_t *entry,
                              psabpf_struct_field_t * (*get_next_field)(psabpf_register_context_t*, psabpf_register_entry_t*))
 {
@@ -243,8 +262,41 @@ clean_up:
 }
 
 int do_register_set(int argc, char **argv) {
-    // TODO implement
-    return NO_ERROR;
+    int ret = EINVAL;
+    const char *register_name = NULL;
+    psabpf_context_t psabpf_ctx;
+    psabpf_register_context_t ctx;
+    psabpf_register_entry_t entry;
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_register_ctx_init(&ctx);
+    psabpf_register_entry_init(&entry);
+
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_dst_register(&argc, &argv, &register_name, &psabpf_ctx, &ctx) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_register_index(&argc, &argv, &entry) != NO_ERROR)
+        goto clean_up;
+
+    if (parse_register_value(&argc, &argv, &entry) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    ret = psabpf_register_set(&ctx, &entry);
+
+clean_up:
+    psabpf_register_entry_free(&entry);
+    psabpf_register_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
+
+    return ret;
 }
 
 int do_register_reset(int argc, char **argv) {
@@ -257,8 +309,8 @@ int do_register_help(int argc, char **argv)
     (void) argc; (void) argv;
     fprintf(stderr,
             "Usage: %1$s register get pipe ID REGISTER [index DATA]\n"
-            "Unimplemented commands:\n"
             "       %1$s register set pipe ID REGISTER index DATA value REGISTER_VALUE\n"
+            "Unimplemented commands:\n"
             "       %1$s register reset pipe ID REGISTER index DATA\n"
             "\n"
             "       REGISTER := { id REGISTER_ID | name REGISTER | REGISTER_FILE }\n"
