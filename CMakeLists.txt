@@ -21,7 +21,9 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
 
-set(PSABPFCTL_SRCS
+OPTION (BUILD_SHARED "Build a shared library which the psabpf-ctl program will link against. Useful for other programs to link against as well." OFF)
+
+set(PSABPFLIB_SRCS
         lib/btf.c
         lib/common.c
         lib/psabpf.c
@@ -33,7 +35,9 @@ set(PSABPFCTL_SRCS
         lib/psabpf_meter.c
         lib/psabpf_counter.c
         lib/psabpf_direct_counter.c
-        lib/psabpf_direct_meter.c
+        lib/psabpf_direct_meter.c)
+
+set(PSABPFCTL_SRCS
         CLI/action_selector.c
         CLI/common.c
         CLI/clone_session.c
@@ -45,9 +49,21 @@ set(PSABPFCTL_SRCS
         CLI/counter.c
         main.c)
 
-add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
+if (BUILD_SHARED)
+  add_library(psabpf SHARED ${PSABPFLIB_SRCS})
+  target_link_libraries(psabpf ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
+  install(TARGETS psabpf DESTINATION lib)
+  add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
+else ()
+  add_executable(psabpf-ctl ${PSABPFLIB_SRCS} ${PSABPFCTL_SRCS})
+endif ()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/install/usr/include)
-target_link_libraries(psabpf-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a)
-target_link_libraries(psabpf-ctl z elf gmp m jansson)
+if (BUILD_SHARED)
+  link_directories(${CMAKE_CURRENT_BINARY_DIR})
+  target_link_libraries(psabpf-ctl psabpf z elf gmp m jansson)
+else ()
+  target_link_libraries(psabpf-ctl z elf gmp m jansson)
+endif ()
+target_link_libraries(psabpf-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
 install(TARGETS psabpf-ctl RUNTIME DESTINATION bin)
