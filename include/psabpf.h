@@ -369,6 +369,11 @@ typedef struct psabpf_table_entry_context {
     size_t n_direct_meters;
     psabpf_direct_meter_context_t *direct_meters_ctx;
 
+    /* ActionSelector and ActionProfile
+     * TODO: use this to construct value*/
+    psabpf_struct_field_descriptor_set_t table_implementations;
+    psabpf_struct_field_descriptor_set_t table_implementation_group_marks;
+
     // below fields might be useful when iterating
     size_t curr_idx;
     psabpf_table_entry_t *prev;
@@ -419,6 +424,7 @@ int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, s
 void psabpf_action_param_free(psabpf_action_param_t *param);
 
 void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param);
+bool psabpf_action_param_is_group_reference(psabpf_action_param_t *param);
 
 psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry);
 void *psabpf_action_param_get_data(psabpf_action_param_t *param);

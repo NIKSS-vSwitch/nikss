@@ -74,11 +74,19 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
         ctx->direct_meters_ctx = NULL;
     }
     ctx->n_direct_meters = 0;
+
+    free_struct_field_descriptor_set(&ctx->table_implementations);
+    free_struct_field_descriptor_set(&ctx->table_implementation_group_marks);
+}
+
+static uint32_t get_table_value_type_id(psabpf_table_entry_ctx_t *ctx)
+{
+    return psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value");
 }
 
 static int get_value_type(psabpf_table_entry_ctx_t *ctx, const struct btf_type **value_type)
 {
-    uint32_t value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value");
+    uint32_t value_type_id = get_table_value_type_id(ctx);
     if (value_type_id == 0)
         return ENOENT;
     *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_type_id);
@@ -93,8 +101,8 @@ static int get_value_type(psabpf_table_entry_ctx_t *ctx, const struct btf_type *
     return NO_ERROR;
 }
 
-static bool member_is_direct_object(psabpf_btf_t *btf, const struct btf_member *member,
-                                    const char **name, const char **type_name)
+static bool member_is_direct_or_implementation_object(psabpf_btf_t *btf, const struct btf_member *member,
+                                                      const char **name, const char **type_name)
 {
     *name = btf__name_by_offset(btf->btf, member->name_off);
     if (*name == NULL)
@@ -105,12 +113,19 @@ static bool member_is_direct_object(psabpf_btf_t *btf, const struct btf_member *
     const struct btf_type *type = psabtf_get_type_by_id(btf->btf, member->type);
     if (type == NULL)
         return false;
-    if (!btf_is_struct(type))
-        return false;
     *type_name = btf__name_by_offset(btf->btf, type->name_off);
     if (*type_name == NULL)
         return false;
     if (strcmp(*type_name, "bpf_spin_lock") == 0)
+        return false;
+
+    if (btf_is_int(type)) {
+        /* treat ActionSelector and ActionProfile references as a direct object */
+        if (str_ends_with(*name, "_ref") || str_ends_with(*name, "_key"))
+            return true;
+    }
+
+    if (!btf_is_struct(type))
         return false;
 
     return true;
@@ -131,7 +146,7 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
     for (unsigned i = 0; i < entries; i++, member++) {
         const char *member_name = NULL;
         const char *member_type_name = NULL;
-        if (!member_is_direct_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
+        if (!member_is_direct_or_implementation_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
             continue;
 
         size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
@@ -142,13 +157,42 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
         } else if (strcmp(member_type_name, "meter_value") == 0 && member_size == DIRECT_METER_SIZE) {
             /* DirectMeter */
             ctx->n_direct_meters += 1;
+        } else if (str_ends_with(member_name, "_ref") || str_ends_with(member_name, "_key")) {
+            /* ActionSelector or ActionProfile, skip group mark */
+            if (str_ends_with(member_name, "_is_group_ref"))
+                continue;
+            ctx->table_implementations.n_fields += 1;
         } else {
-            fprintf(stderr, "%s: unknown type direct object instance, ignored", member_name);
+            fprintf(stderr, "%s: unknown type direct object instance, ignored\n", member_name);
             continue;
         }
     }
 
     return NO_ERROR;
+}
+
+static void try_find_group_mark_for_table_impl(psabpf_table_entry_ctx_t *ctx, unsigned table_impl_id)
+{
+    char expected_name[256];
+    psabtf_struct_member_md_t md;
+    uint32_t value_type_id = get_table_value_type_id(ctx);
+    if (value_type_id == 0)
+        return;
+
+    snprintf(expected_name, sizeof(expected_name), "%s_is_group_ref",
+             ctx->table_implementations.fields[table_impl_id].name);
+
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, expected_name, &md) != NO_ERROR)
+        return;
+
+    size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, md.effective_type_id);
+    if (size != sizeof(uint32_t))
+        return;
+
+    ctx->table_implementation_group_marks.fields[table_impl_id].name = NULL;
+    ctx->table_implementation_group_marks.fields[table_impl_id].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
+    ctx->table_implementation_group_marks.fields[table_impl_id].data_offset = md.bit_offset / 8;
+    ctx->table_implementation_group_marks.fields[table_impl_id].data_len = size;
 }
 
 static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
@@ -165,10 +209,11 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
     const struct btf_member *member = btf_members(value_type);
     unsigned current_counter = 0;
     unsigned current_meter = 0;
+    unsigned current_table_impl = 0;
     for (unsigned i = 0; i < entries; i++, member++) {
         const char *member_name = NULL;
         const char *member_type_name = NULL;
-        if (!member_is_direct_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
+        if (!member_is_direct_or_implementation_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
             continue;
 
         size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
@@ -198,6 +243,24 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
                 return ENOMEM;
 
             ++current_meter;
+        } else if (str_ends_with(member_name, "_ref") || str_ends_with(member_name, "_key")) {
+            if (!str_ends_with(member_name, "_is_group_ref")) {
+                char *tbl_impl_name = strdup(member_name);
+                ctx->table_implementations.fields[current_table_impl].data_offset = member_offset;
+                ctx->table_implementations.fields[current_table_impl].data_len = member_size;
+                ctx->table_implementations.fields[current_table_impl].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
+                if (tbl_impl_name == NULL)
+                    return ENOMEM;
+
+                /* Now name contains suffix "_ref" or "_key", remove it. */
+                unsigned len = strlen(tbl_impl_name);
+                tbl_impl_name[len - 4] = '\0';
+                ctx->table_implementations.fields[current_table_impl].name = tbl_impl_name;
+
+                try_find_group_mark_for_table_impl(ctx, current_table_impl);
+
+                current_table_impl++;
+            }
         }
     }
 
@@ -223,8 +286,32 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
 
     if (ctx->n_direct_meters > 0) {
         ctx->direct_meters_ctx = malloc(ctx->n_direct_meters * sizeof(psabpf_direct_meter_context_t));
-        if (ctx->direct_meters_ctx == NULL)
-            return ENOMEM; // TODO: deallocate counter ctx to avoid mem leak or memory corruption
+        if (ctx->direct_meters_ctx == NULL) {
+            /* Avoid memory corruption */
+            if (ctx->direct_counters_ctx != NULL)
+                free(ctx->direct_counters_ctx);
+            ctx->direct_counters_ctx = NULL;
+            return ENOMEM;
+        }
+    }
+
+    if (ctx->table_implementations.n_fields > 0) {
+        /* TODO: here mark table as indirect instead of finding union 'u'? */
+        ctx->table_implementations.fields = calloc(ctx->table_implementations.n_fields,
+                                                   sizeof(psabpf_struct_field_descriptor_t));
+        ctx->table_implementation_group_marks.n_fields = ctx->table_implementations.n_fields;
+        ctx->table_implementation_group_marks.fields = calloc(ctx->table_implementation_group_marks.n_fields,
+                                                              sizeof(psabpf_struct_field_descriptor_t));
+
+        if (ctx->table_implementations.fields == NULL || ctx->table_implementation_group_marks.fields == NULL) {
+            if (ctx->direct_counters_ctx != NULL)
+                free(ctx->direct_counters_ctx);
+            if (ctx->direct_meters_ctx != NULL)
+                free(ctx->direct_meters_ctx);
+            ctx->direct_counters_ctx = NULL;
+            ctx->direct_meters_ctx = NULL;
+            return ENOMEM;
+        }
     }
 
     return init_direct_objects_context(ctx);
@@ -667,6 +754,13 @@ void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param)
     param->is_group_reference = true;
 }
 
+bool psabpf_action_param_is_group_reference(psabpf_action_param_t *param)
+{
+    if (param == NULL)
+        return false;
+    return param->is_group_reference;
+}
+
 psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry)
 {
     if (entry == NULL)
@@ -710,10 +804,16 @@ const char *psabpf_action_param_get_name(psabpf_table_entry_ctx_t *ctx, psabpf_t
     if (entry->action == NULL || ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
         return NULL;
 
+    if (ctx->is_indirect) {
+        if (param->param_id >= ctx->table_implementations.n_fields)
+            return NULL;
+        return ctx->table_implementations.fields[param->param_id].name;
+    }
+
     /* Find out number of action parameters. Action parameter name is known
      * only if number of parameter from entry is equal to that number. */
 
-    uint32_t value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value");
+    uint32_t value_type_id = get_table_value_type_id(ctx);
     psabtf_struct_member_md_t union_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &union_md) != NO_ERROR)
         return NULL;
@@ -824,7 +924,7 @@ const char *psabpf_action_get_name(psabpf_table_entry_ctx_t *ctx, uint32_t actio
     if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
         return NULL;
 
-    uint32_t value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value");
+    uint32_t value_type_id = get_table_value_type_id(ctx);
     psabtf_struct_member_md_t union_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &union_md) != NO_ERROR)
         return NULL;
@@ -1192,7 +1292,7 @@ static int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psa
 {
     int ret;
 
-    uint32_t value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value");
+    uint32_t value_type_id = get_table_value_type_id(ctx);
     if (value_type_id == 0)
         return EAGAIN;
     const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_type_id);
@@ -2313,10 +2413,38 @@ static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabp
     return NO_ERROR;
 }
 
+static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+{
+    unsigned number_of_implementations = ctx->table_implementations.n_fields;
+    if (number_of_implementations < 1)
+        return NO_ERROR;
+
+    entry->action->params = malloc(number_of_implementations * sizeof(psabpf_action_param_t));
+    if (entry->action->params == NULL)
+        return ENOMEM;
+    entry->action->n_params = number_of_implementations;
+
+    for (unsigned i = 0; i < number_of_implementations; i++) {
+        psabpf_action_param_create(&entry->action->params[i],
+                                   value + ctx->table_implementations.fields[i].data_offset,
+                                   ctx->table_implementations.fields[i].data_len);
+        entry->action->params[i].param_id = i;
+
+        if (ctx->table_implementation_group_marks.fields[i].type == PSABPF_STRUCT_FIELD_TYPE_DATA) {
+            /* Has group mark */
+            const uint32_t *is_group = value + ctx->table_implementation_group_marks.fields[i].data_offset;
+            if (*is_group != 0)
+                entry->action->params[i].is_group_reference = true;
+        }
+    }
+
+    return NO_ERROR;
+}
+
 static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
 {
     int ret;
-    uint32_t value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "value");
+    uint32_t value_type_id = get_table_value_type_id(ctx);
     if (value_type_id == 0)
         return ENOENT;
 
@@ -2325,7 +2453,9 @@ static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
         if (ret != NO_ERROR)
             return ret;
     } else {
-        /* TODO: references */
+        ret = parse_table_value_references(ctx, entry, value);
+        if (ret != NO_ERROR)
+            return ret;
     }
 
     ret = parse_table_value_priority(ctx, entry, value, value_type_id);
