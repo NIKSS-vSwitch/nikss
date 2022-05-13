@@ -1,0 +1,43 @@
+name: psabpf CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+concurrency:
+  # if workflow for PR or push is already running stop it, and start new one
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Install dependencies
+    - name: Install dependencies
+      run: |
+        sudo apt -y install iproute2 make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev
+
+    # Build static library version of psabpf
+    - name: Run static build
+      run: |
+        ./build_libbpf.sh
+        mkdir build && pushd build || exit
+        cmake ..
+        make -j$(nproc)
+        make install
+        popd || exit
+
+    # Build shared library version of psabpf
+    # NOTE: Assumes we already built libbpf here
+    - name: Run static build
+      run: |
+        mkdir build_shared && pushd build_shared || exit
+        cmake -DBUILD_SHARED=on ..
+        make -j4
+        make install
+        popd || exit
