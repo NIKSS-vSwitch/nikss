@@ -30,7 +30,7 @@ jobs:
         mkdir build && pushd build || exit
         cmake ..
         make -j$(nproc)
-        make install
+        sudo make install
         popd || exit
 
     # Build shared library version of psabpf
@@ -39,5 +39,5 @@ jobs:
         mkdir build_shared && pushd build_shared || exit
         cmake -DBUILD_SHARED=on ..
         make -j$(nproc)
-        make install
+        sudo make install
         popd || exit
