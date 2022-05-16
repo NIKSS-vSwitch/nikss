@@ -1,4 +1,4 @@
-name: static build psabpf
+name: build psabpf
 
 on:
   push:
