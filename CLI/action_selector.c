@@ -42,7 +42,8 @@ static int parse_dst_action_selector(int *argc, char ***argv, psabpf_context_t *
     return NO_ERROR;
 }
 
-static int parse_action_selector_action(int *argc, char ***argv, psabpf_action_t *action)
+static int parse_action_selector_action(int *argc, char ***argv, psabpf_action_selector_context_t *ctx,
+                                        psabpf_action_t *action)
 {
     if (is_keyword(**argv, "id")) {
         NEXT_ARGP_RET();
@@ -53,8 +54,12 @@ static int parse_action_selector_action(int *argc, char ***argv, psabpf_action_t
             return EINVAL;
         }
     } else {
-        fprintf(stderr, "specify an action by name is not supported yet\n");
-        return ENOTSUP;
+        uint32_t action_id = psabpf_action_selector_get_action_id_by_name(ctx, **argv);
+        if (action_id == PSABPF_INVALID_ACTION_ID) {
+            fprintf(stderr, "%s: action not found\n", **argv);
+            return EINVAL;
+        }
+        psabpf_action_set_id(action, action_id);
     }
     NEXT_ARGP();
 
@@ -161,7 +166,7 @@ int do_action_selector_add_member(int argc, char **argv)
         goto clean_up;
 
     /* 2. Get action */
-    if (parse_action_selector_action(&argc, &argv, &action) != NO_ERROR)
+    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR)
         goto clean_up;
 
     /* 3. Get action parameters */
@@ -262,7 +267,7 @@ int do_action_selector_update_member(int argc, char **argv)
         goto clean_up;
 
     /* 3. Get action */
-    if (parse_action_selector_action(&argc, &argv, &action) != NO_ERROR)
+    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR)
         goto clean_up;
 
     /* 4. Get action parameters */
@@ -468,7 +473,7 @@ int do_action_selector_default_group_action(int argc, char **argv)
         goto clean_up;
 
     /* 2. Get action */
-    if (parse_action_selector_action(&argc, &argv, &action) != NO_ERROR)
+    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR)
         goto clean_up;
 
     /* 3. Get action parameters */

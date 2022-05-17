@@ -717,3 +717,14 @@ int psabpf_action_selector_set_default_group_action(psabpf_action_selector_conte
     /* Will also clear cache */
     return psabpf_table_entry_update(&tec, &te);
 }
+
+uint32_t psabpf_action_selector_get_action_id_by_name(psabpf_action_selector_context_t *ctx, const char *name)
+{
+    psabpf_table_entry_ctx_t table_ctx = {
+            .btf_metadata = ctx->btf,
+            .table = ctx->map_of_members,
+            .is_indirect = false,
+    };
+
+    return psabpf_table_get_action_id_by_name(&table_ctx, name);
+}

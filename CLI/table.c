@@ -65,8 +65,12 @@ static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t 
     } else if (is_keyword(**argv, "ref")) {
         psabpf_table_entry_ctx_mark_indirect(ctx);
     } else {
-        fprintf(stderr, "specify an action by name is not supported yet\n");
-        return ENOTSUP;
+        uint32_t action_id = psabpf_table_get_action_id_by_name(ctx, **argv);
+        if (action_id == PSABPF_INVALID_ACTION_ID) {
+            fprintf(stderr, "%s: action not found\n", **argv);
+            return EINVAL;
+        }
+        psabpf_action_set_id(action, action_id);
     }
     if (can_be_last)
         NEXT_ARGP();
