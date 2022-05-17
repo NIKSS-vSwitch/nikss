@@ -299,19 +299,12 @@ clean_up:
     return ret;
 }
 
-int do_register_reset(int argc, char **argv) {
-    // TODO implement
-    return NO_ERROR;
-}
-
 int do_register_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
             "Usage: %1$s register get pipe ID REGISTER [index DATA]\n"
             "       %1$s register set pipe ID REGISTER index DATA value REGISTER_VALUE\n"
-            "Unimplemented commands:\n"
-            "       %1$s register reset pipe ID REGISTER index DATA\n"
             "\n"
             "       REGISTER := { id REGISTER_ID | name REGISTER | REGISTER_FILE }\n"
             "       REGISTER_VALUE := { DATA }\n"

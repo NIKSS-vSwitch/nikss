@@ -288,8 +288,3 @@ int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t 
 
     return NO_ERROR;
 }
-
-int psabpf_register_reset(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry) {
-    // TODO implement
-    return NO_ERROR;
-}

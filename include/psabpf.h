@@ -210,7 +210,6 @@ psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_con
 
 int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
 int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
-int psabpf_register_reset(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
 
 /*
  * P4 Meters
