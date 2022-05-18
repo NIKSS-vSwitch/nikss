@@ -138,6 +138,7 @@ COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }
 
 ```shell
 psabpf-ctl register get pipe ID REGISTER [index DATA]
+psabpf-ctl register set pipe ID REGISTER index DATA value REGISTER_VALUE
 
 REGISTER := { id REGISTER_ID | name REGISTER | REGISTER_FILE }
 REGISTER_VALUE := { DATA }
