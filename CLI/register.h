@@ -22,14 +22,12 @@
 
 int do_register_get(int argc, char **argv);
 int do_register_set(int argc, char **argv);
-int do_register_reset(int argc, char **argv);
 int do_register_help(int argc, char **argv);
 
 static const struct cmd register_cmds[] = {
         {"help", do_register_help},
         {"get", do_register_get},
         {"set", do_register_set},
-        {"reset", do_register_reset},
         {0}
 };
 

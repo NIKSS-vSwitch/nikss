@@ -179,6 +179,7 @@ int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *
 
 typedef struct psabpf_register_entry {
     psabpf_struct_field_set_t entry_key;
+    psabpf_struct_field_set_t entry_value;
     void *raw_key;
     void *raw_value;
     size_t current_field_id;
@@ -203,12 +204,12 @@ void psabpf_register_entry_free(psabpf_register_entry_t *entry);
 psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ctx);
 
 int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *data, size_t data_len);
+int psabpf_register_entry_set_value(psabpf_register_entry_t *entry, const void *data, size_t data_len);
 psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
 psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
 
 int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
 int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
-int psabpf_register_reset(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry);
 
 /*
  * P4 Meters

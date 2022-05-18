@@ -61,6 +61,7 @@ enum destination_ctx_type_t {
     CTX_METER_INDEX,
     CTX_COUNTER_KEY,
     CTX_REGISTER_INDEX,
+    CTX_REGISTER_DATA,
 };
 
 int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type);
