@@ -2623,6 +2623,82 @@ static int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 //    return parse_table_key_btf_info(ctx, entry, key);
 }
 
+static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
+{
+    int ret_code = NO_ERROR;
+    void *prefix_value = NULL;
+    void *next_key = NULL;
+    uint8_t has_next_mask;
+    uint32_t tuple_id;
+    uint32_t inner_map_id;
+    struct ternary_table_prefix_metadata prefix_md;
+
+    if ((ret_code = get_ternary_table_prefix_md(ctx, &prefix_md)) != NO_ERROR)
+        return ret_code;
+
+    prefix_value = malloc(ctx->prefixes.value_size);
+    next_key = malloc(ctx->table.key_size);
+
+    /* Iterate in order assumed by data plane algorithm */
+    if (ctx->current_raw_key_mask == NULL)
+        ctx->current_raw_key_mask = calloc(1, ctx->prefixes.key_size);
+
+    if (prefix_value == NULL || next_key == NULL || ctx->current_raw_key_mask == NULL) {
+        ret_code = ENOMEM;
+        goto clean_up;
+    }
+
+    while (true) {
+        /* Let's see if current mask has next key entry. */
+        if (ctx->table.fd >= 0) {
+            if (bpf_map_get_next_key(ctx->table.fd, ctx->current_raw_key, next_key) == 0)
+                break;
+        }
+
+        /* No next key, get current mask metadata. */
+        if (bpf_map_lookup_elem(ctx->prefixes.fd, ctx->current_raw_key_mask, prefix_value) != 0) {
+            ret_code = ENOENT;
+            break;
+        }
+        has_next_mask = *((uint8_t *) (prefix_value + prefix_md.has_next_offset));
+
+        if (has_next_mask == 0)
+            break;
+
+        /* Restart get next key for next tuple. */
+        if (ctx->current_raw_key != NULL)
+            free(ctx->current_raw_key);
+        ctx->current_raw_key = NULL;
+
+        /* Go to the next tuple. */
+        ternary_table_close_tuple(ctx);
+        memcpy(ctx->current_raw_key_mask, prefix_value + prefix_md.next_mask_offset, ctx->prefixes.key_size);
+        if (bpf_map_lookup_elem(ctx->prefixes.fd, ctx->current_raw_key_mask, prefix_value) != 0) {
+            ret_code = ENOENT;
+            break;
+        }
+        tuple_id = *((uint32_t *) (prefix_value + prefix_md.tuple_id_offset));
+        if (bpf_map_lookup_elem(ctx->tuple_map.fd, &tuple_id, &inner_map_id) != 0) {
+            ret_code = ENOENT;
+            break;
+        }
+        ctx->table.fd = bpf_map_get_fd_by_id(inner_map_id);
+    }
+
+clean_up:
+    if (prefix_value != NULL)
+        free(prefix_value);
+    if (next_key != NULL)
+        free(next_key);
+
+    if (ret_code != NO_ERROR && ctx->current_raw_key_mask != NULL) {
+        free(ctx->current_raw_key_mask);
+        ctx->current_raw_key_mask = NULL;
+    }
+
+    return ret_code;
+}
+
 psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
 {
     psabpf_table_entry_t *ret_instance = NULL;
@@ -2632,7 +2708,12 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
     if (ctx == NULL)
         return NULL;
 
-    /* TODO: add support for ternary table */
+    if (ctx->is_ternary) {
+        if (get_next_ternary_table_key_mask(ctx) != NO_ERROR) {
+            fprintf(stderr, "failed to iterate over table key masks\n");
+            return NULL;
+        }
+    }
 
     if (ctx->table.fd < 0) {
         fprintf(stderr, "can't get entry: table not opened\n");
@@ -2651,9 +2732,15 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
 
     if (bpf_map_get_next_key(ctx->table.fd, ctx->current_raw_key, next_key) != 0) {
         /* restart iteration */
+        if (ctx->is_ternary)
+            ternary_table_close_tuple(ctx);
         if (ctx->current_raw_key != NULL)
             free(ctx->current_raw_key);
         ctx->current_raw_key = NULL;
+        if (ctx->current_raw_key_mask != NULL)
+            free(ctx->current_raw_key_mask);
+        ctx->current_raw_key_mask = NULL;
+
         goto clean_up;
     }
 
