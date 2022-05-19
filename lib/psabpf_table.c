@@ -2609,18 +2609,116 @@ static int parse_table_key_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_en
     return NO_ERROR;
 }
 
-//static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *key)
-//{
-//    return NO_ERROR;
-//}
+static enum psabpf_matchkind_t decode_key_field_type_btf_info(psabpf_table_entry_ctx_t *ctx, const void *field_mask,
+                                                              size_t field_len, uint32_t type_fields, uint32_t field_id)
+{
+    if (ctx->is_ternary) {
+        /* LPM is not distinguishable from ternary field. Exact can be detected when mask has all-set bits. */
+        for (size_t i = 0; i < field_len; ++i) {
+            if (*((uint8_t *)(field_mask + i)) != 0xFF)
+                return PSABPF_TERNARY;
+        }
+    } else if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
+        /* Last field is lpm, others are exact. */
+        if (field_id + 1 == type_fields)
+            return PSABPF_LPM;
+    }
+
+    return PSABPF_EXACT;
+}
+
+static int parse_table_key_add_key_field(psabpf_table_entry_t *entry, int field_type, const void *field_data,
+                                         const void *field_mask, uint32_t prefix, size_t field_len)
+{
+    if (field_len < 1)
+        return ENODATA;
+
+    psabpf_match_key_t mk;
+    psabpf_matchkey_init(&mk);
+
+    if (field_type == PSABPF_TERNARY) {
+        psabpf_matchkey_type(&mk, PSABPF_TERNARY);
+        psabpf_matchkey_data(&mk, field_data, field_len);
+        psabpf_matchkey_mask(&mk, field_mask, field_len);
+    } else if (field_type == PSABPF_LPM) {
+        psabpf_matchkey_type(&mk, PSABPF_LPM);
+        psabpf_matchkey_data(&mk, field_data, field_len);
+        /* Convert network byte order into host order */
+        for (size_t i = 0; i < mk.key_size / 2; ++i) {
+            uint8_t *byte1 = (uint8_t *) (mk.data + i);
+            uint8_t *byte2 = (uint8_t *) (mk.data + mk.key_size - 1 - i);
+            uint8_t tmp = *byte1;
+            *byte1 = *byte2;
+            *byte2 = tmp;
+        }
+        psabpf_matchkey_prefix_len(&mk, prefix);
+    } else if (field_type == PSABPF_EXACT) {
+        psabpf_matchkey_type(&mk, PSABPF_EXACT);
+        psabpf_matchkey_data(&mk, field_data, field_len);
+    }
+
+    int ret = psabpf_table_entry_matchkey(entry, &mk);
+    psabpf_matchkey_free(&mk);
+
+    return ret;
+}
+
+static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                                    const void *key, const void *key_mask)
+{
+    uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "key");
+    if (key_type_id == 0)
+        return EINVAL;
+    const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, key_type_id);
+    if (key_type == NULL)
+        return EINVAL;
+
+    if (btf_kind(key_type) == BTF_KIND_INT) {
+        int field_type = decode_key_field_type_btf_info(ctx, key_mask, ctx->table.key_size, 1, 0);
+        uint32_t prefix = 0;
+        if (field_type == PSABPF_LPM) {
+            prefix = *((uint32_t *) key);
+            key = key + sizeof(uint32_t);
+        }
+        return parse_table_key_add_key_field(entry, field_type, key, key_mask, prefix, ctx->table.key_size);
+    }
+
+    if (btf_kind(key_type) != BTF_KIND_STRUCT)
+        return EINVAL;
+
+    const struct btf_member *member = btf_members(key_type);
+    unsigned entries = btf_vlen(key_type);
+    uint32_t global_prefix = 0;
+
+    for (unsigned member_idx = 0; member_idx < entries; member_idx++, member++) {
+        if (member_idx == 0 && ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
+            global_prefix = *((uint32_t *) key);
+            continue;
+        }
+        if (is_table_dummy_key(ctx, key_type, key_type_id))
+            continue;
+
+        /* assume that every field is byte aligned */
+        unsigned offset = btf_member_bit_offset(key_type, member_idx) / 8;
+        unsigned member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
+        int field_type = decode_key_field_type_btf_info(ctx, key_mask + offset, member_size, entries, member_idx);
+        uint32_t prefix = global_prefix + 32 - offset * 8;
+
+        int ret = parse_table_key_add_key_field(entry, field_type, key + offset, key_mask + offset, prefix, member_size);
+        if (ret != NO_ERROR)
+            return ret;
+    }
+
+    return NO_ERROR;
+}
 
 static int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
                            const void *key, const void *key_mask)
 {
-//    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
+    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
         return parse_table_key_no_btf(ctx, entry, key, key_mask);
 
-//    return parse_table_key_btf_info(ctx, entry, key);
+    return parse_table_key_btf_info(ctx, entry, key, key_mask);
 }
 
 static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
@@ -2710,6 +2808,8 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
 
     if (ctx->is_ternary) {
         if (get_next_ternary_table_key_mask(ctx) != NO_ERROR) {
+            if (ctx->table.fd < 0)
+                return NULL;  /* Silently ignore error when table is empty */
             fprintf(stderr, "failed to iterate over table key masks\n");
             return NULL;
         }
