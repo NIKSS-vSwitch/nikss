@@ -660,7 +660,7 @@ static int build_json_table_metadata(psabpf_table_entry_ctx_t *ctx, json_t *pare
     return NO_ERROR;
 }
 
-static int print_json_table_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *table_name)
+static int print_json_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *table_name)
 {
     int ret = EINVAL;
     json_t *root = json_object();
@@ -905,7 +905,7 @@ int do_table_get(int argc, char **argv)
         if (error_code != NO_ERROR)
             goto clean_up;
     }
-    error_code = print_json_table_entry(&ctx, key_provided ? &entry : NULL, table_name);
+    error_code = print_json_table(&ctx, key_provided ? &entry : NULL, table_name);
 
 clean_up:
     psabpf_table_entry_free(&entry);

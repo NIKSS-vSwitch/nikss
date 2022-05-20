@@ -2644,13 +2644,7 @@ static int parse_table_key_add_key_field(psabpf_table_entry_t *entry, int field_
         psabpf_matchkey_type(&mk, PSABPF_LPM);
         psabpf_matchkey_data(&mk, field_data, field_len);
         /* Convert network byte order into host order */
-        for (size_t i = 0; i < mk.key_size / 2; ++i) {
-            uint8_t *byte1 = (uint8_t *) (mk.data + i);
-            uint8_t *byte2 = (uint8_t *) (mk.data + mk.key_size - 1 - i);
-            uint8_t tmp = *byte1;
-            *byte1 = *byte2;
-            *byte2 = tmp;
-        }
+        swap_byte_order(mk.data, mk.key_size);
         psabpf_matchkey_prefix_len(&mk, prefix);
     } else if (field_type == PSABPF_EXACT) {
         psabpf_matchkey_type(&mk, PSABPF_EXACT);
