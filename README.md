@@ -1,3 +1,6 @@
+**This project is still a work in progress. We make no guarantee for the stability of the API or CLI and may modify
+existing functions in the API or CLI.**
+
 # Installation
 
 ## Dependencies
