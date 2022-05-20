@@ -2740,7 +2740,6 @@ static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
         goto clean_up;
     }
 
-    /* Avoid infinite loop by iteration for every possible mask. */
     for (unsigned i = 0; i < ctx->prefixes.max_entries; ++i) {
         /* Let's see if current mask has next key entry. */
         if (ctx->table.fd >= 0) {
