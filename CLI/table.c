@@ -562,23 +562,25 @@ static json_t *create_json_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psa
     return meters_root;
 }
 
-static json_t *create_json_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static json_t *create_json_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, bool is_default_entry)
 {
     json_t *entry_root = json_object();
     if (entry_root == NULL)
         return NULL;
 
-    json_t *key = create_json_entry_key(entry);
-    if (key == NULL) {
-        json_decref(entry_root);
-        return NULL;
-    }
-    json_object_set_new(entry_root, "key", key);
+    if (!is_default_entry) {
+        json_t *key = create_json_entry_key(entry);
+        if (key == NULL) {
+            json_decref(entry_root);
+            return NULL;
+        }
+        json_object_set_new(entry_root, "key", key);
 
-    if (psabpf_table_entry_ctx_has_priority(ctx)) {
-        json_object_set_new(entry_root,
-                            "priority",
-                            json_integer(psabpf_table_entry_get_priority(entry)));
+        if (psabpf_table_entry_ctx_has_priority(ctx)) {
+            json_object_set_new(entry_root,
+                                "priority",
+                                json_integer(psabpf_table_entry_get_priority(entry)));
+        }
     }
 
     if (psabpf_table_entry_ctx_is_indirect(ctx)) {
@@ -650,7 +652,14 @@ static int build_json_table_metadata(psabpf_table_entry_ctx_t *ctx, json_t *pare
     return NO_ERROR;
 }
 
-static int print_json_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *table_name)
+enum table_print_mode {
+    PRINT_SINGLE_ENTRY,
+    PRINT_WHOLE_TABLE,
+    PRINT_DEFAULT_ENTRY
+};
+
+static int print_json_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                            const char *table_name, enum table_print_mode mode)
 {
     int ret = EINVAL;
     json_t *root = json_object();
@@ -667,21 +676,23 @@ static int print_json_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t 
         fprintf(stderr, "failed to add JSON key %s\n", table_name);
         goto clean_up;
     }
-    json_object_set(instance_name, "entries", entries);
 
-    if (entry != NULL) {
-        /* Dump single entry */
-        json_t *parsed_entry = create_json_entry(ctx, entry);
+    if (mode == PRINT_SINGLE_ENTRY || mode == PRINT_WHOLE_TABLE)
+        json_object_set(instance_name, "entries", entries);
+
+    if (entry != NULL && mode == PRINT_SINGLE_ENTRY) {
+        json_t *parsed_entry = create_json_entry(ctx, entry, false);
         if (parsed_entry == NULL) {
             fprintf(stderr, "failed to create table JSON entry\n");
             goto clean_up;
         }
         json_array_append_new(entries, parsed_entry);
-    } else {
-        /* Dump whole table */
+    }
+
+    if (mode == PRINT_WHOLE_TABLE) {
         psabpf_table_entry_t *current_entry;
         while ((current_entry = psabpf_table_entry_get_next(ctx)) != NULL) {
-            json_t *parsed_entry = create_json_entry(ctx, current_entry);
+            json_t *parsed_entry = create_json_entry(ctx, current_entry, false);
             if (parsed_entry == NULL) {
                 fprintf(stderr, "failed to create table JSON entry\n");
                 goto clean_up;
@@ -689,6 +700,22 @@ static int print_json_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t 
             json_array_append_new(entries, parsed_entry);
             psabpf_table_entry_free(current_entry);
         }
+    }
+
+    if (mode == PRINT_DEFAULT_ENTRY || mode == PRINT_WHOLE_TABLE) {
+        psabpf_table_entry_t default_entry;
+        psabpf_table_entry_init(&default_entry);
+
+        if (psabpf_table_entry_ctx_is_indirect(ctx) == false
+            && psabpf_table_entry_get_default_entry(ctx, &default_entry) == NO_ERROR) {
+            json_t *parsed_entry = create_json_entry(ctx, &default_entry, true);
+            if (parsed_entry == NULL) {
+                fprintf(stderr, "failed to create table JSON default entry\n");
+                goto clean_up;
+            }
+            json_object_set_new(instance_name, "default_action", parsed_entry);
+        }
+        psabpf_table_entry_free(&default_entry);
     }
 
     if (build_json_table_metadata(ctx, instance_name) != NO_ERROR) {
@@ -842,11 +869,46 @@ clean_up:
     return error_code;
 }
 
+static int do_table_default_get(int argc, char **argv)
+{
+    psabpf_table_entry_ctx_t ctx;
+    psabpf_context_t psabpf_ctx;
+    int error_code = EPERM;
+    const char *table_name = NULL;
+
+    psabpf_context_init(&psabpf_ctx);
+    psabpf_table_entry_ctx_init(&ctx);
+
+    /* 0. Get the pipeline id */
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+        goto clean_up;
+
+    /* 1. Get table */
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, &table_name, true) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    error_code = print_json_table(&ctx, NULL, table_name, PRINT_DEFAULT_ENTRY);
+
+clean_up:
+    psabpf_table_entry_ctx_free(&ctx);
+    psabpf_context_free(&psabpf_ctx);
+
+    return error_code;
+}
+
 int do_table_default(int argc, char **argv)
 {
     if (is_keyword(*argv, "set")) {
         NEXT_ARG();
         return do_table_write(argc, argv, TABLE_SET_DEFAULT_ENTRY);
+    } if (is_keyword(*argv, "get")) {
+        NEXT_ARG_RET();
+        return do_table_default_get(argc, argv);
     } else {
         if (*argv != NULL)
             fprintf(stderr, "%s: unknown keyword\n", *argv);
@@ -861,6 +923,7 @@ int do_table_get(int argc, char **argv)
     psabpf_context_t psabpf_ctx;
     int error_code = EPERM;
     const char *table_name = NULL;
+    enum table_print_mode print_mode = PRINT_WHOLE_TABLE;
 
     psabpf_context_init(&psabpf_ctx);
     psabpf_table_entry_ctx_init(&ctx);
@@ -881,6 +944,7 @@ int do_table_get(int argc, char **argv)
     /* 3. Get key */
     bool key_provided = (argc >= 1 && is_keyword(*argv, "key"));
     if (key_provided) {
+        print_mode = PRINT_SINGLE_ENTRY;
         if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
             goto clean_up;
     }
@@ -895,7 +959,7 @@ int do_table_get(int argc, char **argv)
         if (error_code != NO_ERROR)
             goto clean_up;
     }
-    error_code = print_json_table(&ctx, key_provided ? &entry : NULL, table_name);
+    error_code = print_json_table(&ctx, &entry, table_name, print_mode);
 
 clean_up:
     psabpf_table_entry_free(&entry);
@@ -914,13 +978,12 @@ int do_table_help(int argc, char **argv)
             "       %1$s table add pipe ID TABLE_NAME ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
             "       %1$s table update pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table delete pipe ID TABLE_NAME [key MATCH_KEY]\n"
+            "       %1$s table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]\n"
             "       %1$s table default set pipe ID TABLE_NAME ACTION [data ACTION_PARAMS]\n"
+            "       %1$s table default get pipe ID TABLE_NAME\n"
             /* Support for this one might be preserved, but makes no sense, because indirect tables
              * has no default entry. In other words we do not forbid this syntax explicitly.
              * "       %1$s table default pipe ID TABLE_NAME ref data ACTION_REFS\n" */
-            "       %1$s table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]\n"
-            "Unimplemented commands:\n"
-            "       %1$s table default get pipe ID TABLE_NAME\n"
             "\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
             "       ACTION_REFS := { MEMBER_REF | group GROUP_REF } \n"
