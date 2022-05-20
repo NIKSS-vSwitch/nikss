@@ -75,6 +75,30 @@ system-wide. It is a submodule for this repository.
 
 *See [command reference](docs/command%20reference.md) for all the possible commands. Here listed only the most important ones.*
 
+## Naming convention
+
+All objects can be accessed by name  created by the `p4c` compiler. These names follow format `<pipeline>_<extern name>`.
+For example so defined table and actions:
+
+```p4
+control ingress(/* ... */) {
+    action a() {}
+    action b() {}
+    
+    table example_table {
+        key = { /* ... */ }
+        actions = { NoAction; a1; a2; }
+    }
+    /* ... */
+}
+```
+
+Table `example_table` can be accessed with name `ingress_example_table`, and action `a` with name `ingress_a`.
+`NoAction` can be accessed with name `_NoAction` because it is not define within pipeline. In the same way names for all
+other externs are created.
+
+## Description of selected commands
+
 Load pipeline into kernel bpf subsystem:
 ```shell
 psabpf-ctl pipeline load id <ID> <FILENAME>
