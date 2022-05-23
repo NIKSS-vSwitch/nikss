@@ -42,12 +42,12 @@ void mem_bitwise_and(uint32_t *dst, uint32_t *mask, size_t len)
     }
 }
 
-void swap_byte_order(uint8_t *data, size_t len)
+void swap_byte_order(char *data, size_t len)
 {
     for (size_t i = 0; i < len / 2; ++i) {
-        uint8_t *byte1 = data + i;
-        uint8_t *byte2 = data + len - 1 - i;
-        uint8_t tmp = *byte1;
+        char *byte1 = data + i;
+        char *byte2 = data + len - 1 - i;
+        char tmp = *byte1;
         *byte1 = *byte2;
         *byte2 = tmp;
     }
