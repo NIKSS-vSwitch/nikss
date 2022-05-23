@@ -31,22 +31,14 @@ static int parse_digest(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
         fprintf(stderr, "too few parameters\n");
         return EPERM;
     }
-    if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "id: digest access not supported\n");
-        return ENOTSUP;
-    } else if (is_keyword(**argv, "name")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "name: digest access not supported yet\n");
-        return ENOTSUP;
-    } else {
-        int error_code = psabpf_digest_ctx_name(psabpf_ctx, ctx, **argv);
-        if (error_code != NO_ERROR) {
-            fprintf(stderr, "failed to open digest %s: %s\n", **argv, strerror(error_code));
-            return error_code;
-        }
-        *instance_name = **argv;
+
+    int error_code = psabpf_digest_ctx_name(psabpf_ctx, ctx, **argv);
+    if (error_code != NO_ERROR) {
+        fprintf(stderr, "failed to open digest %s: %s\n", **argv, strerror(error_code));
+        return error_code;
     }
+    *instance_name = **argv;
+
     NEXT_ARGP();
 
     return NO_ERROR;
@@ -174,10 +166,7 @@ int do_digest_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
-            "Usage: %1$s digest get pipe ID DIGEST\n"
-            "\n"
-            "       DIGEST := { id DIGEST_ID | name FILE | DIGEST_FILE }\n"
-            "",
+            "Usage: %1$s digest get pipe ID DIGEST_NAME\n",
             program_name);
     return 0;
 }

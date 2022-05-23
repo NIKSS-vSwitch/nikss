@@ -29,19 +29,9 @@
 static int parse_dst_action_selector(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
                              psabpf_action_selector_context_t *ctx, bool is_last)
 {
-    if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "id: Action Selector access not supported\n");
-        return ENOTSUP;
-    } else if (is_keyword(**argv, "name")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "name: Action Selector access not supported yet\n");
-        return ENOTSUP;
-    } else {
-        int error_code = psabpf_action_selector_ctx_name(psabpf_ctx, ctx, **argv);
-        if (error_code != NO_ERROR)
-            return error_code;
-    }
+    int error_code = psabpf_action_selector_ctx_name(psabpf_ctx, ctx, **argv);
+    if (error_code != NO_ERROR)
+        return error_code;
 
     if (is_last) {
         NEXT_ARGP();
@@ -505,19 +495,18 @@ int do_action_selector_help(int argc, char **argv)
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %1$s action-selector add_member pipe ID ACTION_SELECTOR ACTION [data ACTION_PARAMS]\n"
-            "       %1$s action-selector delete_member pipe ID ACTION_SELECTOR MEMBER_REF\n"
-            "       %1$s action-selector update_member pipe ID ACTION_SELECTOR MEMBER_REF ACTION [data ACTION_PARAMS]\n"
+            "Usage: %1$s action-selector add_member pipe ID ACTION_SELECTOR_NAME ACTION [data ACTION_PARAMS]\n"
+            "       %1$s action-selector delete_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF\n"
+            "       %1$s action-selector update_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF ACTION [data ACTION_PARAMS]\n"
             ""
-            "       %1$s action-selector create_group pipe ID ACTION_SELECTOR\n"
-            "       %1$s action-selector delete_group pipe ID ACTION_SELECTOR GROUP_REF\n"
+            "       %1$s action-selector create_group pipe ID ACTION_SELECTOR_NAME\n"
+            "       %1$s action-selector delete_group pipe ID ACTION_SELECTOR_NAME GROUP_REF\n"
             ""
-            "       %1$s action-selector add_to_group pipe ID ACTION_SELECTOR MEMBER_REF to GROUP_REF\n"
-            "       %1$s action-selector delete_from_group pipe ID ACTION_SELECTOR MEMBER_REF from GROUP_REF\n"
+            "       %1$s action-selector add_to_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF\n"
+            "       %1$s action-selector delete_from_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF\n"
             ""
-            "       %1$s action-selector default_group_action pipe ID ACTION_SELECTOR ACTION [data ACTION_PARAMS]\n"
+            "       %1$s action-selector default_group_action pipe ID ACTION_SELECTOR_NAME ACTION [data ACTION_PARAMS]\n"
             "\n"
-            "       ACTION_SELECTOR := { id ACTION_SELECTOR_ID | name FILE | ACTION_SELECTOR_FILE }\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
             "       ACTION_PARAMS := { DATA }\n"
             "",

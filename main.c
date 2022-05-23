@@ -58,7 +58,7 @@ static int do_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
-            "Usage: %s [OPTIONS] OBJECT {COMMAND | help }\n"
+            "Usage: %s [OPTIONS] OBJECT { COMMAND | help }\n"
             "       %s help\n"
             "\n"
             "       OBJECT := { clone-session |\n"

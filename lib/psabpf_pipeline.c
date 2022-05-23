@@ -246,7 +246,7 @@ static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_n
     const char *ternary_tbl_name_lst_char_ptr = strstr(tuple_name, suffix);
 
     if (ternary_tbl_name_lst_char_ptr) {
-        char tuples_map_name[256];
+        char tuples_map_name[268];
         int ternary_map_name_length = (int)(ternary_tbl_name_lst_char_ptr - tuple_name);
         char map_name[256];
         strncpy(map_name, tuple_name, ternary_map_name_length);

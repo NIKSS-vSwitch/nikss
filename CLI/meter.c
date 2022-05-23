@@ -40,19 +40,9 @@ int convert_str_to_meter_value(const char *str, psabpf_meter_value_t *value) {
 int parse_dst_meter(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
                     psabpf_meter_ctx_t *ctx)
 {
-    if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "id: meter access not supported\n");
-        return ENOTSUP;
-    } else if (is_keyword(**argv, "name")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "name: meter access not supported yet\n");
-        return ENOTSUP;
-    } else {
-        int error_code = psabpf_meter_ctx_name(ctx, psabpf_ctx, **argv);
-        if (error_code != NO_ERROR)
-            return error_code;
-    }
+    int error_code = psabpf_meter_ctx_name(ctx, psabpf_ctx, **argv);
+    if (error_code != NO_ERROR)
+        return error_code;
 
     NEXT_ARGP_RET();
 
@@ -230,11 +220,10 @@ int do_meter_help(int argc, char **argv) {
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %1$s meter get pipe ID METER index INDEX\n"
-            "       %1$s meter update pipe ID METER index INDEX PIR:PBS CIR:CBS\n"
-            "       %1$s meter reset pipe ID METER index INDEX\n"
+            "Usage: %1$s meter get pipe ID METER_NAME index INDEX\n"
+            "       %1$s meter update pipe ID METER_NAME index INDEX PIR:PBS CIR:CBS\n"
+            "       %1$s meter reset pipe ID METER_NAME index INDEX\n"
             "\n"
-            "       METER := { id METER_ID | name FILE | METER_FILE }\n"
             "       INDEX := { DATA }\n"
             "       PIR := { DATA }\n"
             "       PBS := { DATA }\n"
