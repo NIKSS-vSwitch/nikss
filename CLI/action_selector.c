@@ -60,6 +60,7 @@ static int parse_action_selector_action(int *argc, char ***argv, psabpf_action_s
             return EINVAL;
         }
     } else if (is_keyword(**argv, "name")) {
+        NEXT_ARGP_RET();
         uint32_t action_id = psabpf_action_selector_get_action_id_by_name(ctx, **argv);
         if (action_id == PSABPF_INVALID_ACTION_ID) {
             fprintf(stderr, "%s: action not found\n", **argv);

@@ -68,6 +68,7 @@ static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t 
                 return EINVAL;
             }
         } else if (is_keyword(**argv, "name")) {
+            NEXT_ARGP_RET();
             uint32_t action_id = psabpf_table_get_action_id_by_name(ctx, **argv);
             if (action_id == PSABPF_INVALID_ACTION_ID) {
                 fprintf(stderr, "%s: action not found\n", **argv);
