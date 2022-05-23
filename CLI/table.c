@@ -54,24 +54,35 @@ static int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx
 static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t *ctx,
                               psabpf_action_t *action, bool can_be_last)
 {
-    if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_RET();
-        char *ptr;
-        psabpf_action_set_id(action, strtoul(**argv, &ptr, 0));
-        if (*ptr) {
-            fprintf(stderr, "%s: unable to parse as an action id\n", **argv);
-            return EINVAL;
-        }
-    } else if (is_keyword(**argv, "ref")) {
+    if (is_keyword(**argv, "ref")) {
         psabpf_table_entry_ctx_mark_indirect(ctx);
-    } else {
-        uint32_t action_id = psabpf_table_get_action_id_by_name(ctx, **argv);
-        if (action_id == PSABPF_INVALID_ACTION_ID) {
-            fprintf(stderr, "%s: action not found\n", **argv);
+    } else if (is_keyword(**argv, "action")) {
+        NEXT_ARGP_RET();
+
+        if (is_keyword(**argv, "id")) {
+            NEXT_ARGP_RET();
+            char *ptr;
+            psabpf_action_set_id(action, strtoul(**argv, &ptr, 0));
+            if (*ptr) {
+                fprintf(stderr, "%s: unable to parse as an action id\n", **argv);
+                return EINVAL;
+            }
+        } else if (is_keyword(**argv, "name")) {
+            uint32_t action_id = psabpf_table_get_action_id_by_name(ctx, **argv);
+            if (action_id == PSABPF_INVALID_ACTION_ID) {
+                fprintf(stderr, "%s: action not found\n", **argv);
+                return EINVAL;
+            }
+            psabpf_action_set_id(action, action_id);
+        } else {
+            fprintf(stderr, "%s: unknown action specification", **argv);
             return EINVAL;
         }
-        psabpf_action_set_id(action, action_id);
+    } else {
+        fprintf(stderr, "%s: unknown keyword ", **argv);
+        return EINVAL;
     }
+
     if (can_be_last)
         NEXT_ARGP();
     else
@@ -978,18 +989,18 @@ int do_table_help(int argc, char **argv)
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %1$s table add pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
+            "Usage: %1$s table add pipe ID TABLE_NAME action ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table add pipe ID TABLE_NAME ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
-            "       %1$s table update pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
+            "       %1$s table update pipe ID TABLE_NAME action ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
             "       %1$s table delete pipe ID TABLE_NAME [key MATCH_KEY]\n"
             "       %1$s table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]\n"
-            "       %1$s table default set pipe ID TABLE_NAME ACTION [data ACTION_PARAMS]\n"
+            "       %1$s table default set pipe ID TABLE_NAME action ACTION [data ACTION_PARAMS]\n"
             "       %1$s table default get pipe ID TABLE_NAME\n"
             /* Support for this one might be preserved, but makes no sense, because indirect tables
              * has no default entry. In other words we do not forbid this syntax explicitly.
              * "       %1$s table default pipe ID TABLE_NAME ref data ACTION_REFS\n" */
             "\n"
-            "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
+            "       ACTION := { id ACTION_ID | name ACTION_NAME }\n"
             "       ACTION_REFS := { MEMBER_REF | group GROUP_REF } \n"
             "       MATCH_KEY := { EXACT_KEY | LPM_KEY | RANGE_KEY | TERNARY_KEY | none }\n"
             "       EXACT_KEY := { DATA }\n"

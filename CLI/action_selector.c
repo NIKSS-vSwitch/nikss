@@ -45,6 +45,12 @@ static int parse_dst_action_selector(int *argc, char ***argv, psabpf_context_t *
 static int parse_action_selector_action(int *argc, char ***argv, psabpf_action_selector_context_t *ctx,
                                         psabpf_action_t *action)
 {
+    if (!is_keyword(**argv, "action")) {
+        fprintf(stderr, "%s: expected keyword \'action\'", **argv);
+        return EINVAL;
+    }
+    NEXT_ARGP_RET();
+
     if (is_keyword(**argv, "id")) {
         NEXT_ARGP_RET();
         char *ptr;
@@ -53,14 +59,18 @@ static int parse_action_selector_action(int *argc, char ***argv, psabpf_action_s
             fprintf(stderr, "%s: unable to parse as an action id\n", **argv);
             return EINVAL;
         }
-    } else {
+    } else if (is_keyword(**argv, "name")) {
         uint32_t action_id = psabpf_action_selector_get_action_id_by_name(ctx, **argv);
         if (action_id == PSABPF_INVALID_ACTION_ID) {
             fprintf(stderr, "%s: action not found\n", **argv);
             return EINVAL;
         }
         psabpf_action_set_id(action, action_id);
+    } else {
+        fprintf(stderr, "%s: unknown action specification", **argv);
+        return EINVAL;
     }
+
     NEXT_ARGP();
 
     return NO_ERROR;
@@ -500,9 +510,9 @@ int do_action_selector_help(int argc, char **argv)
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %1$s action-selector add_member pipe ID ACTION_SELECTOR_NAME ACTION [data ACTION_PARAMS]\n"
+            "Usage: %1$s action-selector add_member pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]\n"
             "       %1$s action-selector delete_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF\n"
-            "       %1$s action-selector update_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF ACTION [data ACTION_PARAMS]\n"
+            "       %1$s action-selector update_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]\n"
             ""
             "       %1$s action-selector create_group pipe ID ACTION_SELECTOR_NAME\n"
             "       %1$s action-selector delete_group pipe ID ACTION_SELECTOR_NAME GROUP_REF\n"
@@ -510,9 +520,9 @@ int do_action_selector_help(int argc, char **argv)
             "       %1$s action-selector add_to_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF\n"
             "       %1$s action-selector delete_from_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF\n"
             ""
-            "       %1$s action-selector default_group_action pipe ID ACTION_SELECTOR_NAME ACTION [data ACTION_PARAMS]\n"
+            "       %1$s action-selector default_group_action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]\n"
             "\n"
-            "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
+            "       ACTION := { id ACTION_ID | name ACTION_NAME }\n"
             "       ACTION_PARAMS := { DATA }\n"
             "",
             program_name);
