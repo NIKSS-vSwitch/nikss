@@ -36,21 +36,11 @@
 static int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
                            psabpf_table_entry_ctx_t *ctx, const char **table_name, bool can_be_last)
 {
-    if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "id: table access not supported\n");
-        return ENOTSUP;
-    } else if (is_keyword(**argv, "name")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "name: table access not supported yet\n");
-        return ENOTSUP;
-    } else {
-        if (table_name != NULL)
-            *table_name = **argv;
-        int error_code = psabpf_table_entry_ctx_tblname(psabpf_ctx, ctx, **argv);
-        if (error_code != NO_ERROR)
-            return error_code;
-    }
+    if (table_name != NULL)
+        *table_name = **argv;
+    int error_code = psabpf_table_entry_ctx_tblname(psabpf_ctx, ctx, **argv);
+    if (error_code != NO_ERROR)
+        return error_code;
 
     if (can_be_last) {
         NEXT_ARGP();
@@ -920,19 +910,18 @@ int do_table_help(int argc, char **argv)
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %1$s table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "       %1$s table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
-            "       %1$s table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
-            "       %1$s table delete pipe ID TABLE [key MATCH_KEY]\n"
-            "       %1$s table default set pipe ID TABLE ACTION [data ACTION_PARAMS]\n"
+            "Usage: %1$s table add pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
+            "       %1$s table add pipe ID TABLE_NAME ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]\n"
+            "       %1$s table update pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]\n"
+            "       %1$s table delete pipe ID TABLE_NAME [key MATCH_KEY]\n"
+            "       %1$s table default set pipe ID TABLE_NAME ACTION [data ACTION_PARAMS]\n"
             /* Support for this one might be preserved, but makes no sense, because indirect tables
              * has no default entry. In other words we do not forbid this syntax explicitly.
-             * "       %1$s table default pipe ID TABLE ref data ACTION_REFS\n" */
-            "       %1$s table get pipe ID TABLE [ref] [key MATCH_KEY]\n"
+             * "       %1$s table default pipe ID TABLE_NAME ref data ACTION_REFS\n" */
+            "       %1$s table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]\n"
             "Unimplemented commands:\n"
-            "       %1$s table default get pipe ID TABLE\n"
+            "       %1$s table default get pipe ID TABLE_NAME\n"
             "\n"
-            "       TABLE := { id TABLE_ID | name FILE | TABLE_FILE }\n"
             "       ACTION := { id ACTION_ID | ACTION_NAME }\n"
             "       ACTION_REFS := { MEMBER_REF | group GROUP_REF } \n"
             "       MATCH_KEY := { EXACT_KEY | LPM_KEY | RANGE_KEY | TERNARY_KEY | none }\n"

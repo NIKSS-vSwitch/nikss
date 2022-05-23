@@ -33,21 +33,11 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
         return EINVAL;
     }
 
-    if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "id: counter access not supported\n");
-        return ENOTSUP;
-    } else if (is_keyword(**argv, "name")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "name: counter access not supported yet\n");
-        return ENOTSUP;
-    } else {
-        if (counter_name != NULL)
-            *counter_name = **argv;
-        int error_code = psabpf_counter_ctx_name(psabpf_ctx, ctx, **argv);
-        if (error_code != NO_ERROR)
-            return error_code;
-    }
+    if (counter_name != NULL)
+        *counter_name = **argv;
+    int error_code = psabpf_counter_ctx_name(psabpf_ctx, ctx, **argv);
+    if (error_code != NO_ERROR)
+        return error_code;
 
     NEXT_ARGP();
     return NO_ERROR;
@@ -55,6 +45,7 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
 
 static int parse_counter_key(int *argc, char ***argv, psabpf_counter_entry_t *entry)
 {
+    /* TODO: replace 'key' keyword with 'index' */
     if (!is_keyword(**argv, "key"))
         return NO_ERROR; /* key is optional */
     NEXT_ARGP_RET();
@@ -411,11 +402,10 @@ int do_counter_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
-            "Usage: %1$s counter get pipe ID COUNTER [key DATA]\n"
-            "       %1$s counter set pipe ID COUNTER [key DATA] value COUNTER_VALUE\n"
-            "       %1$s counter reset pipe ID COUNTER [key DATA]\n"
+            "Usage: %1$s counter get pipe ID COUNTER_NAME [key DATA]\n"
+            "       %1$s counter set pipe ID COUNTER_NAME [key DATA] value COUNTER_VALUE\n"
+            "       %1$s counter reset pipe ID COUNTER_NAME [key DATA]\n"
             "\n"
-            "       COUNTER := { id COUNTER_ID | name COUNTER | COUNTER_FILE }\n"
             "       COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }\n"
             "",
             program_name);

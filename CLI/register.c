@@ -32,21 +32,11 @@ static int parse_dst_register(int *argc, char ***argv, const char **register_nam
         return EINVAL;
     }
 
-    if (is_keyword(**argv, "id")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "id: register access not supported\n");
-        return ENOTSUP;
-    } else if (is_keyword(**argv, "name")) {
-        NEXT_ARGP_RET();
-        fprintf(stderr, "name: register access not supported yet\n");
-        return ENOTSUP;
-    } else {
-        if (register_name != NULL)
-            *register_name = **argv;
-        int error_code = psabpf_register_ctx_name(psabpf_ctx, ctx, **argv);
-        if (error_code != NO_ERROR)
-            return error_code;
-    }
+    if (register_name != NULL)
+        *register_name = **argv;
+    int error_code = psabpf_register_ctx_name(psabpf_ctx, ctx, **argv);
+    if (error_code != NO_ERROR)
+        return error_code;
 
     NEXT_ARGP();
     return NO_ERROR;
@@ -303,10 +293,9 @@ int do_register_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
-            "Usage: %1$s register get pipe ID REGISTER [index DATA]\n"
-            "       %1$s register set pipe ID REGISTER index DATA value REGISTER_VALUE\n"
+            "Usage: %1$s register get pipe ID REGISTER_NAME [index DATA]\n"
+            "       %1$s register set pipe ID REGISTER_NAME index DATA value REGISTER_VALUE\n"
             "\n"
-            "       REGISTER := { id REGISTER_ID | name REGISTER | REGISTER_FILE }\n"
             "       REGISTER_VALUE := { DATA }\n"
             "",
             program_name);

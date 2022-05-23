@@ -55,14 +55,13 @@ psabpf-ctl del-port pipe id ID dev DEV
 # Tables
 
 ```shell
-psabpf-ctl table add pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
-psabpf-ctl table add pipe ID TABLE ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]
-psabpf-ctl table update pipe ID TABLE ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
-psabpf-ctl table delete pipe ID TABLE [key MATCH_KEY]
-psabpf-ctl table default set pipe ID TABLE ACTION [data ACTION_PARAMS]
-psabpf-ctl table get pipe ID TABLE [ref] [key MATCH_KEY]
+psabpf-ctl table add pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
+psabpf-ctl table add pipe ID TABLE_NAME ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]
+psabpf-ctl table update pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
+psabpf-ctl table delete pipe ID TABLE_NAME [key MATCH_KEY]
+psabpf-ctl table default set pipe ID TABLE_NAME ACTION [data ACTION_PARAMS]
+psabpf-ctl table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]
 
-TABLE := { id TABLE_ID | name FILE | TABLE_FILE }
 ACTION := { id ACTION_ID | ACTION_NAME }
 ACTION_REFS := { MEMBER_REF | group GROUP_REF } 
 MATCH_KEY := { EXACT_KEY | LPM_KEY | RANGE_KEY | TERNARY_KEY | none }
@@ -77,7 +76,7 @@ METER_VALUE := { PIR:PBS CIR:CBS }
 
 Commands to implement:
 ```shell
-psabpf-ctl table default get pipe ID TABLE
+psabpf-ctl table default get pipe ID TABLE_NAME
 ```
 
 `ref` keyword means that table has an implementation, `ActionProfile` or `ActionSelector`, and then behave according to
@@ -86,16 +85,15 @@ this situation.
 # Action Selectors
 
 ```shell
-psabpf-ctl action-selector add_member pipe ID ACTION_SELECTOR ACTION [data ACTION_PARAMS]
-psabpf-ctl action-selector delete_member pipe ID ACTION_SELECTOR MEMBER_REF
-psabpf-ctl action-selector update_member pipe ID ACTION_SELECTOR MEMBER_REF ACTION [data ACTION_PARAMS]
-psabpf-ctl action-selector create_group pipe ID ACTION_SELECTOR
-psabpf-ctl action-selector delete_group pipe ID ACTION_SELECTOR GROUP_REF
-psabpf-ctl action-selector add_to_group pipe ID ACTION_SELECTOR MEMBER_REF to GROUP_REF
-psabpf-ctl action-selector delete_from_group pipe ID ACTION_SELECTOR MEMBER_REF from GROUP_REF
-psabpf-ctl action-selector default_group_action pipe ID ACTION_SELECTOR ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector add_member pipe ID ACTION_SELECTOR_NAME ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector delete_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF
+psabpf-ctl action-selector update_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector create_group pipe ID ACTION_SELECTOR_NAME
+psabpf-ctl action-selector delete_group pipe ID ACTION_SELECTOR_NAME GROUP_REF
+psabpf-ctl action-selector add_to_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF
+psabpf-ctl action-selector delete_from_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF
+psabpf-ctl action-selector default_group_action pipe ID ACTION_SELECTOR_NAME ACTION [data ACTION_PARAMS]
 
-ACTION_SELECTOR := { id ACTION_SELECTOR_ID | name FILE | ACTION_SELECTOR_FILE }
 ACTION := { id ACTION_ID | ACTION_NAME }
 ACTION_PARAMS := { DATA }
 ```
@@ -103,11 +101,10 @@ ACTION_PARAMS := { DATA }
 # Meters
 
 ```shell
-psabpf-ctl meter get pipe ID METER index INDEX
-psabpf-ctl meter update pipe ID METER index INDEX PIR:PBS CIR:CBS
-psabpf-ctl meter reset pipe ID METER index INDEX
+psabpf-ctl meter get pipe ID METER_NAME index INDEX
+psabpf-ctl meter update pipe ID METER_NAME index INDEX PIR:PBS CIR:CBS
+psabpf-ctl meter reset pipe ID METER_NAME index INDEX
 
-METER := { id METER_ID | name FILE | METER_FILE }
 INDEX := { DATA }
 PIR := { DATA }
 PBS := { DATA }
@@ -118,34 +115,24 @@ CBS := { DATA }
 # Digests
 
 ```shell
-psabpf-ctl digest get pipe ID DIGEST
-
-DIGEST := { id DIGEST_ID | name FILE | DIGEST_FILE }
+psabpf-ctl digest get pipe ID DIGEST_NAME
 ```
 
 # Counters
 
 ```shell
-psabpf-ctl counter get pipe ID COUNTER [key DATA]
-psabpf-ctl counter set pipe ID COUNTER [key DATA] value COUNTER_VALUE
-psabpf-ctl counter reset pipe ID COUNTER [key DATA]
+psabpf-ctl counter get pipe ID COUNTER_NAME [key DATA]
+psabpf-ctl counter set pipe ID COUNTER_NAME [key DATA] value COUNTER_VALUE
+psabpf-ctl counter reset pipe ID COUNTER_NAME [key DATA]
 
-COUNTER := { id COUNTER_ID | name COUNTER | COUNTER_FILE }
 COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }
 ```
 
 # Registers
 
 ```shell
-psabpf-ctl register get pipe ID REGISTER [index DATA]
-psabpf-ctl register set pipe ID REGISTER index DATA value REGISTER_VALUE
+psabpf-ctl register get pipe ID REGISTER_NAME [index DATA]
+psabpf-ctl register set pipe ID REGISTER_NAME index DATA value REGISTER_VALUE
 
-REGISTER := { id REGISTER_ID | name REGISTER | REGISTER_FILE }
 REGISTER_VALUE := { DATA }
-```
-
-Commands to implement:
-```shell
-psabpf-ctl register set pipe ID REGISTER index DATA value REGISTER_VALUE
-psabpf-ctl register reset pipe ID REGISTER index DATA
 ```
