@@ -412,9 +412,10 @@ typedef struct psabpf_table_entry_context {
     psabpf_struct_field_descriptor_set_t table_implementations;
     psabpf_struct_field_descriptor_set_t table_implementation_group_marks;
 
-    // below fields might be useful when iterating
-    size_t curr_idx;
-    psabpf_table_entry_t *prev;
+    /* for iteration over table */
+    void *current_raw_key;
+    void *current_raw_key_mask;
+    psabpf_table_entry_t current_entry;
 } psabpf_table_entry_ctx_t;
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx);
@@ -480,7 +481,7 @@ int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
-int psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
+psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx);
 
 int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);

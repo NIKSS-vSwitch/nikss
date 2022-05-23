@@ -25,6 +25,7 @@ int str_ends_with(const char *str, const char *suffix);
 
 /* Data len must be aligned to 4B */
 void mem_bitwise_and(uint32_t *dst, uint32_t *mask, size_t len);
+void swap_byte_order(char *data, size_t len);
 
 void close_object_fd(int *fd);
 
