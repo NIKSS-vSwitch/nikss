@@ -231,22 +231,20 @@ static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entr
 {
     int ret = EINVAL;
     json_t *root = json_object();
-    json_t *extern_type = json_object();
     json_t *instance_name = json_object();
     json_t *entries = json_array();
 
-    if (root == NULL || extern_type == NULL || instance_name == NULL || entries == NULL) {
+    if (root == NULL || instance_name == NULL || entries == NULL) {
         fprintf(stderr, "failed to prepare JSON\n");
         ret = ENOMEM;
         goto clean_up;
     }
 
     json_object_set(instance_name, "entries", entries);
-    if (json_object_set(extern_type, counter_name, instance_name)) {
+    if (json_object_set(root, counter_name, instance_name)) {
         fprintf(stderr, "failed to add JSON key %s\n", counter_name);
         goto clean_up;
     }
-    json_object_set(root, "Counter", extern_type);
 
     build_json_counter_type(instance_name, psabpf_counter_get_type(ctx));
 
@@ -278,7 +276,6 @@ static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entr
     ret = NO_ERROR;
 
 clean_up:
-    json_decref(extern_type);
     json_decref(instance_name);
     json_decref(entries);
     json_decref(root);

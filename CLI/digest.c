@@ -115,20 +115,18 @@ int do_digest_get(int argc, char **argv)
     }
 
     json_t *root = json_object();
-    json_t *extern_type = json_object();
     json_t *instance_name = json_object();
     json_t *entries = json_array();
-    if (root == NULL || extern_type == NULL || instance_name == NULL || entries == NULL) {
+    if (root == NULL || instance_name == NULL || entries == NULL) {
         fprintf(stderr, "failed to prepare JSON\n");
         goto clean_up;
     }
 
     json_object_set(instance_name, "digests", entries);
-    if (json_object_set(extern_type, digest_instance_name, instance_name)) {
+    if (json_object_set(root, digest_instance_name, instance_name)) {
         fprintf(stderr, "failed to add JSON key %s\n", digest_instance_name);
         goto clean_up;
     }
-    json_object_set(root, "Digest", extern_type);
 
     psabpf_digest_t digest;
     while (psabpf_digest_get_next(&ctx, &digest) == NO_ERROR) {
@@ -150,7 +148,6 @@ int do_digest_get(int argc, char **argv)
     error_code = 0;
 
 clean_up:
-    json_decref(extern_type);
     json_decref(instance_name);
     json_decref(entries);
     json_decref(root);
