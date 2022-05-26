@@ -218,8 +218,11 @@ int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t 
 typedef uint64_t psabpf_meter_value_t;
 
 typedef struct {
-    size_t index_size;
-    void *index;
+    psabpf_struct_field_set_t index_sfs;
+    void *raw_index;
+    size_t current_index_field_id;
+    psabpf_struct_field_t current_index_field;
+
     psabpf_meter_value_t pbs;
     psabpf_meter_value_t pir;
     psabpf_meter_value_t cbs;
@@ -227,9 +230,9 @@ typedef struct {
 } psabpf_meter_entry_t;
 
 typedef struct {
-    int table_fd;
-    uint32_t index_size;
-    uint32_t value_size;
+    psabpf_btf_t btf_metadata;
+    psabpf_bpf_map_descriptor_t meter;
+    psabpf_struct_field_descriptor_set_t index_fds;
 } psabpf_meter_ctx_t;
 
 void psabpf_meter_entry_init(psabpf_meter_entry_t *entry);
@@ -241,12 +244,19 @@ int psabpf_meter_entry_data(psabpf_meter_entry_t *entry,
                             psabpf_meter_value_t cir,
                             psabpf_meter_value_t cbs);
 
+int psabpf_meter_entry_get_data(psabpf_meter_entry_t *entry,
+                                psabpf_meter_value_t *pir,
+                                psabpf_meter_value_t *pbs,
+                                psabpf_meter_value_t *cir,
+                                psabpf_meter_value_t *cbs);
+psabpf_struct_field_t * psabpf_meter_entry_get_next_index_field(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+
 void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx);
 void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx);
 int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name);
-int psabpf_meter_ctx_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
-int psabpf_meter_ctx_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
-int psabpf_meter_ctx_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 
 /*
  * Tables

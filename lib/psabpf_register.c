@@ -44,21 +44,13 @@ void psabpf_register_ctx_free(psabpf_register_context_t *ctx) {
 
 static int parse_key_type(psabpf_register_context_t *ctx)
 {
-    uint32_t type_id = 0;
-    if (ctx->btf_metadata.btf != NULL) {
-        type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->reg.btf_type_id, "key");
-    }
-
+    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->reg.btf_type_id, "key");
     return parse_struct_type(&ctx->btf_metadata, type_id, ctx->reg.key_size, &ctx->key_fds);
 }
 
 static int parse_value_type(psabpf_register_context_t *ctx)
 {
-    uint32_t type_id = 0;
-    if (ctx->btf_metadata.btf != NULL) {
-        type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->reg.btf_type_id, "value");
-    }
-
+    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->reg.btf_type_id, "value");
     return parse_struct_type(&ctx->btf_metadata, type_id, ctx->reg.value_size, &ctx->value_fds);
 }
 
