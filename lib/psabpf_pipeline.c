@@ -379,7 +379,7 @@ int psabpf_pipeline_unload(psabpf_context_t *ctx)
     return system(cmd);
 }
 
-int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface)
+int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *ifindex)
 {
     char pinned_file[256];
     bool isXDP = false;
@@ -389,13 +389,13 @@ int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface)
     build_ebpf_prog_filename(pinned_file, sizeof(pinned_file), ctx, XDP_HELPER_PROG);
     isXDP = access(pinned_file, F_OK) != 0;
 
-    int ifindex = (int) if_nametoindex(interface);
-    if (!ifindex) {
+    *ifindex = (int) if_nametoindex(interface);
+    if (!*ifindex) {
         fprintf(stderr, "no such interface: %s\n", interface);
         return ENODEV;
     }
 
-    return isXDP ? xdp_port_add(ctx, interface, ifindex) : tc_port_add(ctx, interface, ifindex);
+    return isXDP ? xdp_port_add(ctx, interface, *ifindex) : tc_port_add(ctx, interface, *ifindex);
 }
 
 int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)

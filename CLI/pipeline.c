@@ -20,11 +20,19 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <jansson.h>
 
 #include "../include/psabpf.h"
 #include "../include/psabpf_pipeline.h"
 #include "common.h"
 
+static void print_port(const char *intf, int ifindex) {
+    json_t *root = json_object();
+    json_object_set(root, "name", json_string(intf));
+    json_object_set(root, "port_id", json_integer((json_int_t) ifindex));
+    json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+    json_decref(root);
+}
 
 int do_pipeline_load(int argc, char **argv)
 {
@@ -150,9 +158,12 @@ int do_pipeline_port_add(int argc, char **argv)
         goto err;
     }
 
-    ret = psabpf_pipeline_add_port(&ctx, intf);
+    int ifindex = 0;
+    ret = psabpf_pipeline_add_port(&ctx, intf, &ifindex);
     if (ret) {
         fprintf(stderr, "failed to add port: %s\n", strerror(ret));
+    } else {
+        print_port(intf, ifindex);
     }
 
 err:
