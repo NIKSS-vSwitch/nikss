@@ -2886,5 +2886,49 @@ int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
     if (ctx == NULL || entry == NULL)
         return EINVAL;
 
-    return NO_ERROR;
+    uint32_t key_buffer = 0;
+    char *value_buffer = NULL;
+    int return_code = NO_ERROR;
+
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    if (ctx->default_entry.fd < 0) {
+        fprintf(stderr, "can't get default entry: table not opened or not exists\n");
+        return EBADF;
+    }
+    if (ctx->default_entry.value_size == 0 || ctx->default_entry.value_size != ctx->table.value_size) {
+        fprintf(stderr, "invalid value size for a default entry\n");
+        return EINVAL;
+    }
+
+    /* Prepare entry - remove everything from entry */
+    psabpf_table_entry_free(entry);
+    psabpf_table_entry_init(entry);
+
+    value_buffer = malloc(ctx->table.value_size);
+    if (value_buffer == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        return ENOMEM;
+    }
+
+    return_code = bpf_map_lookup_elem(ctx->default_entry.fd, &key_buffer, value_buffer);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to get default entry: %s\n", strerror(return_code));
+        goto clean_up;
+    }
+
+    /* No need to parse key - it does not exist */
+
+    /* Parse value */
+    return_code = parse_table_value(ctx, entry, value_buffer);
+    if (return_code != NO_ERROR)
+        fprintf(stderr, "failed to parse default entry: %s\n", strerror(return_code));
+
+clean_up:
+    if (value_buffer != NULL)
+        free(value_buffer);
+
+    return return_code;
 }

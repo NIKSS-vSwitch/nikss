@@ -59,8 +59,9 @@ psabpf-ctl table add pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS
 psabpf-ctl table add pipe ID TABLE_NAME ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]
 psabpf-ctl table update pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
 psabpf-ctl table delete pipe ID TABLE_NAME [key MATCH_KEY]
-psabpf-ctl table default set pipe ID TABLE_NAME ACTION [data ACTION_PARAMS]
 psabpf-ctl table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]
+psabpf-ctl table default set pipe ID TABLE_NAME ACTION [data ACTION_PARAMS]
+psabpf-ctl table default get pipe ID TABLE_NAME
 
 ACTION := { id ACTION_ID | ACTION_NAME }
 ACTION_REFS := { MEMBER_REF | group GROUP_REF } 
@@ -72,11 +73,6 @@ TERNARY_KEY := { DATA^MASK }
 ACTION_PARAMS := { DATA | counter COUNTER_NAME COUNTER_VALUE | meter METER_NAME METER_VALUE }
 COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }
 METER_VALUE := { PIR:PBS CIR:CBS }
-```
-
-Commands to implement:
-```shell
-psabpf-ctl table default get pipe ID TABLE_NAME
 ```
 
 `ref` keyword means that table has an implementation, `ActionProfile` or `ActionSelector`, and then behave according to
