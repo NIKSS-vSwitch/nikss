@@ -28,8 +28,8 @@
 
 static void print_port(const char *intf, int ifindex) {
     json_t *root = json_object();
-    json_object_set(root, "name", json_string(intf));
-    json_object_set(root, "port_id", json_integer((json_int_t) ifindex));
+    json_object_set_new(root, "name", json_string(intf));
+    json_object_set_new(root, "port_id", json_integer((json_int_t) ifindex));
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
     json_decref(root);
 }
