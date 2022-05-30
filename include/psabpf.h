@@ -233,6 +233,9 @@ typedef struct psabpf_meter_ctx {
     psabpf_btf_t btf_metadata;
     psabpf_bpf_map_descriptor_t meter;
     psabpf_struct_field_descriptor_set_t index_fds;
+
+    psabpf_meter_entry_t current_entry;
+    void *previous_index;
 } psabpf_meter_ctx_t;
 
 void psabpf_meter_entry_init(psabpf_meter_entry_t *entry);
@@ -255,6 +258,7 @@ void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx);
 void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx);
 int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name);
 int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx);
 int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 

@@ -91,16 +91,6 @@ int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_
     return NO_ERROR;
 }
 
-static int check_index(const psabpf_meter_ctx_t *ctx, const psabpf_meter_entry_t *entry) {
-    (void) ctx;
-    if (entry->index_sfs.n_fields == 0) {
-        fprintf(stderr, "Index is not provided");
-        return EINVAL;
-    }
-
-    return NO_ERROR;
-}
-
 void psabpf_meter_entry_init(psabpf_meter_entry_t *entry) {
     if (entry == NULL)
         return;
@@ -195,6 +185,7 @@ void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx) {
 
     memset(ctx, 0, sizeof(psabpf_meter_ctx_t));
 
+    psabpf_meter_entry_init(&ctx->current_entry);
     ctx->meter.fd = -1;
     ctx->btf_metadata.associated_prog = -1;
 }
@@ -203,9 +194,14 @@ void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx) {
     if (ctx == NULL)
         return;
 
+    psabpf_meter_entry_free(&ctx->current_entry);
     free_btf(&ctx->btf_metadata);
     free_struct_field_descriptor_set(&ctx->index_fds);
     close_object_fd(&ctx->meter.fd);
+
+    if (ctx->previous_index != NULL)
+        free(ctx->previous_index);
+    ctx->previous_index = NULL;
 }
 
 int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name) {
@@ -245,9 +241,13 @@ int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
     uint64_t bpf_flags = BPF_F_LOCK;
     char *value_buffer = NULL;
 
-    return_code = check_index(ctx, entry);
-    if (return_code != NO_ERROR)
-        return return_code;
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    if (entry->index_sfs.n_fields == 0) {
+        fprintf(stderr, "Index not provided");
+        return EINVAL;
+    }
 
     if (entry->raw_index == NULL)
         entry->raw_index = malloc(ctx->meter.key_size);
@@ -279,15 +279,80 @@ clean_up:
     return return_code;
 }
 
+psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx) {
+    psabpf_meter_entry_t *ret_instance = NULL;
+    void *next_key = NULL;
+    void *value_buffer = NULL;
+
+    if (ctx == NULL)
+        return NULL;
+
+    next_key = malloc(ctx->meter.key_size);
+    value_buffer = malloc(ctx->meter.value_size);
+    if (next_key == NULL || value_buffer == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        goto clean_up;
+    }
+
+    if (bpf_map_get_next_key(ctx->meter.fd, ctx->previous_index, next_key) != 0) {
+        /* restart iteration */
+        if (ctx->previous_index != NULL)
+            free(ctx->previous_index);
+        ctx->previous_index = NULL;
+
+        goto clean_up;
+    }
+
+    if (ctx->previous_index == NULL)
+        ctx->previous_index = malloc(ctx->meter.key_size);
+    if (ctx->previous_index == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        goto clean_up;
+    }
+
+    if (ctx->current_entry.raw_index != NULL)
+        free(ctx->current_entry.raw_index);
+    ctx->current_entry.raw_index = next_key;
+    memcpy(ctx->previous_index, next_key, ctx->meter.key_size);
+    next_key = NULL;
+
+    int return_code = bpf_map_lookup_elem(ctx->meter.fd, ctx->current_entry.raw_index, value_buffer);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to get entry: %s\n", strerror(return_code));
+        goto clean_up;
+    }
+
+    psabpf_meter_data_t data;
+    memcpy(&data, value_buffer, sizeof(data));
+    return_code = convert_meter_data_to_entry(&data, &ctx->current_entry);
+    if (return_code != NO_ERROR)
+        goto clean_up;
+
+    ret_instance = &ctx->current_entry;
+
+clean_up:
+    if (next_key != NULL)
+        free(next_key);
+    if (value_buffer == NULL)
+        free(value_buffer);
+
+    return ret_instance;
+}
+
 int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
     int return_code = NO_ERROR;
     uint64_t bpf_flags = BPF_F_LOCK;
     char *value_buffer = NULL;
     psabpf_meter_data_t data;
 
-    return_code = check_index(ctx, entry);
-    if (return_code != NO_ERROR)
-        return return_code;
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    if (entry->index_sfs.n_fields == 0) {
+        fprintf(stderr, "Index not provided");
+        return EINVAL;
+    }
 
     return_code = convert_meter_entry_to_data(entry, &data);
     if (return_code != NO_ERROR)

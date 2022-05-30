@@ -22,7 +22,7 @@
 
 #include <jansson.h>
 
-#include "../include/psabpf.h"
+#include <psabpf.h>
 #include "meter.h"
 
 /******************************************************************************
@@ -49,7 +49,7 @@ int parse_dst_meter(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
     if (instance_name != NULL)
         *instance_name = **argv;
 
-    NEXT_ARGP_RET();
+    NEXT_ARGP();
 
     return NO_ERROR;
 }
@@ -172,7 +172,7 @@ json_t *create_json_meter_entry(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *m
     return entry_root;
 }
 
-int print_single_meter_entry(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *meter, const char *meter_name) {
+int print_meter(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry, const char *meter_name) {
     int ret = EINVAL;
     json_t *root = json_object();
     json_t *instance_name = json_object();
@@ -190,12 +190,25 @@ int print_single_meter_entry(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *mete
     }
     json_object_set(instance_name, "entries", entries);
 
-    json_t *parsed_entry = create_json_meter_entry(ctx, meter);
-    if (parsed_entry == NULL) {
-        fprintf(stderr, "failed to create table JSON entry\n");
-        goto clean_up;
+    if (entry != NULL) {
+        json_t *parsed_entry = create_json_meter_entry(ctx, entry);
+        if (parsed_entry == NULL) {
+            fprintf(stderr, "failed to create table JSON entry\n");
+            goto clean_up;
+        }
+        json_array_append_new(entries, parsed_entry);
+    } else {
+        psabpf_meter_entry_t *current_entry;
+        while ((current_entry = psabpf_meter_get_next(ctx)) != NULL) {
+            json_t *parsed_entry = create_json_meter_entry(ctx, current_entry);
+            if (parsed_entry == NULL) {
+                fprintf(stderr, "failed to create table JSON entry\n");
+                goto clean_up;
+            }
+            json_array_append_new(entries, parsed_entry);
+            psabpf_meter_entry_free(current_entry);
+        }
     }
-    json_array_append_new(entries, parsed_entry);
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
     ret = NO_ERROR;
@@ -232,20 +245,26 @@ int do_meter_get(int argc, char **argv) {
         goto clean_up;
 
     /* 2. Get index */
-    if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
-        goto clean_up;
-
-    /* 3. Get meter value */
-    if (psabpf_meter_entry_get(&meter_ctx, &entry) != NO_ERROR)
-        goto clean_up;
+    bool index_provided = argc > 0 && is_keyword(*argv, "index");
+    if (index_provided) {
+        if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
+            goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
         goto clean_up;
     }
 
-    /* 4. Display meter entry */
-    error_code = print_single_meter_entry(&meter_ctx, &entry, meter_name);
+    /* 3. Get meter value and display it */
+    if (index_provided) {
+        if (psabpf_meter_entry_get(&meter_ctx, &entry) != NO_ERROR)
+            goto clean_up;
+
+        error_code = print_meter(&meter_ctx, &entry, meter_name);
+    } else {
+        error_code = print_meter(&meter_ctx, NULL, meter_name);
+    }
 
 clean_up:
     psabpf_meter_entry_free(&entry);
@@ -336,7 +355,7 @@ int do_meter_help(int argc, char **argv) {
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %1$s meter get pipe ID METER_NAME index INDEX\n"
+            "Usage: %1$s meter get pipe ID METER_NAME [index INDEX]\n"
             "       %1$s meter update pipe ID METER_NAME index INDEX PIR:PBS CIR:CBS\n"
             "       %1$s meter reset pipe ID METER_NAME index INDEX\n"
             "\n"
