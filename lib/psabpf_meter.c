@@ -194,6 +194,9 @@ void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx) {
         return;
 
     memset(ctx, 0, sizeof(psabpf_meter_ctx_t));
+
+    ctx->meter.fd = -1;
+    ctx->btf_metadata.associated_prog = -1;
 }
 
 void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx) {
@@ -202,7 +205,7 @@ void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx) {
 
     free_btf(&ctx->btf_metadata);
     free_struct_field_descriptor_set(&ctx->index_fds);
-    memset(ctx, 0, sizeof(psabpf_meter_ctx_t));
+    close_object_fd(&ctx->meter.fd);
 }
 
 int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name) {

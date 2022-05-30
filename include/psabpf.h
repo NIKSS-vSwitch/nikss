@@ -217,7 +217,7 @@ int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t 
 
 typedef uint64_t psabpf_meter_value_t;
 
-typedef struct {
+typedef struct psabpf_meter_entry {
     psabpf_struct_field_set_t index_sfs;
     void *raw_index;
     size_t current_index_field_id;
@@ -229,7 +229,7 @@ typedef struct {
     psabpf_meter_value_t cir;
 } psabpf_meter_entry_t;
 
-typedef struct {
+typedef struct psabpf_meter_ctx {
     psabpf_btf_t btf_metadata;
     psabpf_bpf_map_descriptor_t meter;
     psabpf_struct_field_descriptor_set_t index_fds;

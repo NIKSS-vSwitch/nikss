@@ -124,7 +124,7 @@ int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
  * JSON functions
  *****************************************************************************/
 
-json_t *create_json_meter_config(psabpf_meter_entry_t *meter) {
+void *create_json_meter_config(psabpf_meter_entry_t *meter) {
     json_t *meter_config = json_object();
     if (meter_config == NULL)
         return NULL;
