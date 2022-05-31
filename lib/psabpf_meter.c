@@ -28,6 +28,7 @@
 #include "btf.h"
 #include "common.h"
 #include "psabpf_meter.h"
+#include "psabpf_table.h"
 
 /**
  * This function comes from DPDK
@@ -386,8 +387,35 @@ clean_up:
 }
 
 int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
-    int return_code = psabpf_meter_entry_data(entry, 0, 0, 0, 0);
+    if (ctx == NULL || entry == NULL)
+        return EINVAL;
+
+    if (entry->index_sfs.n_fields < 1)
+        return delete_all_map_entries(&ctx->meter);
+
+    if (ctx->meter.type == BPF_MAP_TYPE_ARRAY) {
+        int return_code = psabpf_meter_entry_data(entry, 0, 0, 0, 0);
+        if (return_code != NO_ERROR)
+            return return_code;
+        return psabpf_meter_entry_update(ctx, entry);
+    }
+
+    void *key_buffer = malloc(ctx->meter.key_size);
+    if (key_buffer == NULL) {
+        fprintf(stderr, "not enough memory\n");
+        return ENOMEM;
+    }
+
+    int return_code = construct_struct_from_fields(&entry->index_sfs, &ctx->index_fds, key_buffer, ctx->meter.key_size);
     if (return_code != NO_ERROR)
-        return return_code;
-    return psabpf_meter_entry_update(ctx, entry);
+        goto clean_up;
+
+    if (bpf_map_delete_elem(ctx->meter.fd, key_buffer) != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to reset meter entry: %s\n", strerror(return_code));
+    }
+
+clean_up:
+    free(key_buffer);
+    return return_code;
 }

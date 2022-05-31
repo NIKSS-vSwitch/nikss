@@ -32,7 +32,7 @@
 int convert_str_to_meter_value(const char *str, psabpf_meter_value_t *value) {
     char * end_ptr = NULL;
     *value = strtoull(str, &end_ptr, 0);
-    if (*value == 0 || end_ptr == NULL) {
+    if (*end_ptr != '\0') {
         fprintf(stderr, "%s: failed to parse value\n", str);
         return EINVAL;
     }
@@ -334,8 +334,11 @@ int do_meter_reset(int argc, char **argv) {
         goto clean_up;
 
     /* 2. Get index */
-    if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
-        goto clean_up;
+    bool index_provided = argc > 0 && is_keyword(*argv, "index");
+    if (index_provided) {
+        if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
+            goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -357,7 +360,7 @@ int do_meter_help(int argc, char **argv) {
     fprintf(stderr,
             "Usage: %1$s meter get pipe ID METER_NAME [index INDEX]\n"
             "       %1$s meter update pipe ID METER_NAME index INDEX PIR:PBS CIR:CBS\n"
-            "       %1$s meter reset pipe ID METER_NAME index INDEX\n"
+            "       %1$s meter reset pipe ID METER_NAME [index INDEX]\n"
             "\n"
             "       INDEX := { DATA }\n"
             "       PIR := { DATA }\n"
