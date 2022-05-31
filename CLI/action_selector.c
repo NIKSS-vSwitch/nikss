@@ -19,8 +19,8 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include "common.h"
 #include "action_selector.h"
+#include "common.h"
 
 /******************************************************************************
  * Command line parsing functions

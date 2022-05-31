@@ -28,6 +28,7 @@
 #include "CLI/digest.h"
 #include "CLI/counter.h"
 #include "CLI/register.h"
+#include "CLI/value_set.h"
 
 const char *program_name;
 
@@ -71,7 +72,8 @@ static int do_help(int argc, char **argv)
             "                   meter |\n"
             "                   digest |\n"
             "                   counter |\n"
-            "                   register }\n"
+            "                   register |\n"
+            "                   value_set }\n"
             "       OPTIONS := {}\n"
             "",
             program_name, program_name);
@@ -145,6 +147,11 @@ static int do_register(int argc, char **argv)
     return cmd_select(register_cmds, argc, argv, do_register_help);
 }
 
+static int do_value_set(int argc, char **argv)
+{
+    return cmd_select(value_set_cmds, argc, argv, do_value_set_help);
+}
+
 static const struct cmd cmds[] = {
         { "help",            do_help },
         { "pipeline",        do_pipeline },
@@ -158,6 +165,7 @@ static const struct cmd cmds[] = {
         { "digest",          do_digest },
         { "counter",         do_counter },
         { "register",        do_register },
+        { "value_set",       do_value_set },
         { 0 }
 };
 

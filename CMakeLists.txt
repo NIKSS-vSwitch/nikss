@@ -36,7 +36,8 @@ set(PSABPFLIB_SRCS
         lib/psabpf_counter.c
         lib/psabpf_register.c
         lib/psabpf_direct_counter.c
-        lib/psabpf_direct_meter.c)
+        lib/psabpf_direct_meter.c
+        lib/psabpf_value_set.c)
 
 set(PSABPFCTL_SRCS
         CLI/action_selector.c
@@ -49,6 +50,7 @@ set(PSABPFCTL_SRCS
         CLI/meter.c
         CLI/counter.c
         CLI/register.c
+        CLI/value_set.c
         main.c)
 
 if (BUILD_SHARED)

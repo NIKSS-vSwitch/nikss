@@ -19,6 +19,7 @@
 #include "../include/psabpf.h"
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <jansson.h>
 
 #ifndef P4C_COMMON_H
 #define P4C_COMMON_H
@@ -65,9 +66,12 @@ enum destination_ctx_type_t {
     CTX_COUNTER_KEY,
     CTX_REGISTER_INDEX,
     CTX_REGISTER_DATA,
+    CTX_VALUE_SET_DATA,
 };
 
 int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type);
 char * convert_bin_data_to_hexstr(const void *data, size_t len);
+int build_struct_json(json_t *parent, void *ctx, void *entry,
+                      psabpf_struct_field_t * (*get_next_field)(void*, void*));
 
 #endif //P4C_COMMON_H

@@ -25,6 +25,7 @@
 
 #include "common.h"
 #include <psabpf_pipeline.h>
+#include <psabpf_value_set.h>
 
 bool is_keyword(const char *word, const char *str)
 {
@@ -177,6 +178,8 @@ static int update_context(const char *data, size_t len, void *ctx, enum destinat
         return psabpf_register_entry_set_key(ctx, data, len);
     else if (ctx_type == CTX_REGISTER_DATA)
         return psabpf_register_entry_set_value(ctx, data, len);
+    else if (ctx_type == CTX_VALUE_SET_DATA)
+        return psabpf_value_set_set_value(ctx, data, len);
 
     return EPERM;
 }
@@ -339,4 +342,54 @@ char * convert_bin_data_to_hexstr(const void *data, size_t len)
     }
 
     return buff;
+}
+
+int build_struct_json(json_t *parent, void *ctx, void *entry,
+                      psabpf_struct_field_t * (*get_next_field)(void*, void*))
+{
+    psabpf_struct_field_t *field;
+    while ((field = get_next_field(ctx, entry)) != NULL) {
+        /* To build flat structure of output JSON just remove this and next conditional
+         * statement. In other words, preserve only condition and instructions below it:
+         *      if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA) continue; */
+        if (psabpf_struct_get_field_type(field) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_START) {
+            json_t *sub_struct = json_object();
+            if (sub_struct == NULL) {
+                fprintf(stderr, "failed to prepare message sub-object JSON\n");
+                return ENOMEM;
+            }
+            if (json_object_set(parent, psabpf_struct_get_field_name(field), sub_struct)) {
+                fprintf(stderr, "failed to add message sub-object JSON\n");
+                json_decref(sub_struct);
+                return EPERM;
+            }
+
+            int ret = build_struct_json(sub_struct, ctx, entry, get_next_field);
+            json_decref(sub_struct);
+            if (ret != NO_ERROR)
+                return ret;
+
+            continue;
+        }
+
+        if (psabpf_struct_get_field_type(field) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_END)
+            return NO_ERROR;
+
+        if (psabpf_struct_get_field_type(field) != PSABPF_STRUCT_FIELD_TYPE_DATA)
+            continue;
+
+        const char *encoded_data = convert_bin_data_to_hexstr(psabpf_struct_get_field_data(field),
+                                                              psabpf_struct_get_field_data_len(field));
+        if (encoded_data == NULL) {
+            fprintf(stderr, "not enough memory\n");
+            return ENOMEM;
+        }
+        const char *field_name = psabpf_struct_get_field_name(field);
+        if (field_name == NULL)
+            field_name = "";
+        json_object_set_new(parent, field_name, json_string(encoded_data));
+        free((void *) encoded_data);
+    }
+
+    return NO_ERROR;
 }
