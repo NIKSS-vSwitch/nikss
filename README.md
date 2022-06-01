@@ -162,11 +162,11 @@ psabpf-ctl multicast-group add-member pipe <ID> id <MULTICAST_GROUP_ID> egress-p
 
 Add an entry to a table without implementation:
 ```shell
-psabpf-ctl table add pipe <ID> <TABLE> <ACTION> key <KEY> data <DATA> [priority <PRIORITY>]
+psabpf-ctl table add pipe <ID> <TABLE> action <ACTION> key <KEY> data <DATA> [priority <PRIORITY>]
 ```
 - ID - ID of the pipeline, natural number.
 - TABLE - name of the table, with full path.
-- ACTION - executed action. For supported only by ID, e.g. `id 2`.
+- ACTION - executed action. Can be specified by ID, e.g. `id 2` or by name, e.g. `name _NoAction`.
 - KEY - list of table keys. Supported types for each key in the list:
    - exact - value, e.g. `2`.
    - lpm - value and prefix length separated by `/`, e.g. `192.168.1.0/24`

@@ -874,10 +874,30 @@ void psabpf_action_free(psabpf_action_t *action)
     action->params = NULL;
 }
 
-void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id) {
+void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id)
+{
     if (action == NULL)
         return;
     action->action_id = action_id;
+}
+
+uint32_t psabpf_table_get_action_id_by_name(psabpf_table_entry_ctx_t *ctx, const char *name)
+{
+    if (ctx == NULL || name == NULL)
+        return PSABPF_INVALID_ACTION_ID;
+    if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0 || ctx->is_indirect)
+        return PSABPF_INVALID_ACTION_ID;
+
+    uint32_t value_type_id = get_table_value_type_id(ctx);
+    psabtf_struct_member_md_t union_md = {};
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &union_md) != NO_ERROR)
+        return PSABPF_INVALID_ACTION_ID;
+
+    psabtf_struct_member_md_t action_md = {};
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, union_md.effective_type_id, name, &action_md) != NO_ERROR)
+        return PSABPF_INVALID_ACTION_ID;
+
+    return action_md.index;
 }
 
 int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)

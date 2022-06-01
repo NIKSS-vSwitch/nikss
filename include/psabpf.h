@@ -473,6 +473,9 @@ const char *psabpf_action_param_get_name(psabpf_table_entry_ctx_t *ctx, psabpf_t
 void psabpf_action_init(psabpf_action_t *action);
 void psabpf_action_free(psabpf_action_t *action);
 void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id);
+#define PSABPF_INVALID_ACTION_ID 0xFFFFFFFF
+/* Returns action ID or PSABPF_INVALID_ACTION_ID on error */
+uint32_t psabpf_table_get_action_id_by_name(psabpf_table_entry_ctx_t *ctx, const char *name);
 int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param);
 uint32_t psabpf_action_get_id(psabpf_table_entry_t *entry);
 const char *psabpf_action_get_name(psabpf_table_entry_ctx_t *ctx, uint32_t action_id);
@@ -569,6 +572,8 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
 
 /* Reuse table API */
 int psabpf_action_selector_set_default_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action);
+/* See psabpf_table_get_action_id_by_name() */
+uint32_t psabpf_action_selector_get_action_id_by_name(psabpf_action_selector_context_t *ctx, const char *name);
 
 /*
  * TODO: Action Profile

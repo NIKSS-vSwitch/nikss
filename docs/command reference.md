@@ -55,15 +55,15 @@ psabpf-ctl del-port pipe id ID dev DEV
 # Tables
 
 ```shell
-psabpf-ctl table add pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
+psabpf-ctl table add pipe ID TABLE_NAME action ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
 psabpf-ctl table add pipe ID TABLE_NAME ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]
-psabpf-ctl table update pipe ID TABLE_NAME ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
+psabpf-ctl table update pipe ID TABLE_NAME action ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
 psabpf-ctl table delete pipe ID TABLE_NAME [key MATCH_KEY]
 psabpf-ctl table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]
-psabpf-ctl table default set pipe ID TABLE_NAME ACTION [data ACTION_PARAMS]
+psabpf-ctl table default set pipe ID TABLE_NAME action ACTION [data ACTION_PARAMS]
 psabpf-ctl table default get pipe ID TABLE_NAME
 
-ACTION := { id ACTION_ID | ACTION_NAME }
+ACTION := { id ACTION_ID | name ACTION_NAME }
 ACTION_REFS := { MEMBER_REF | group GROUP_REF } 
 MATCH_KEY := { EXACT_KEY | LPM_KEY | RANGE_KEY | TERNARY_KEY | none }
 EXACT_KEY := { DATA }
@@ -81,16 +81,16 @@ this situation.
 # Action Selectors
 
 ```shell
-psabpf-ctl action-selector add_member pipe ID ACTION_SELECTOR_NAME ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector add_member pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
 psabpf-ctl action-selector delete_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF
-psabpf-ctl action-selector update_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector update_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]
 psabpf-ctl action-selector create_group pipe ID ACTION_SELECTOR_NAME
 psabpf-ctl action-selector delete_group pipe ID ACTION_SELECTOR_NAME GROUP_REF
 psabpf-ctl action-selector add_to_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF
 psabpf-ctl action-selector delete_from_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF
-psabpf-ctl action-selector default_group_action pipe ID ACTION_SELECTOR_NAME ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector default_group_action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
 
-ACTION := { id ACTION_ID | ACTION_NAME }
+ACTION := { id ACTION_ID | name ACTION_NAME }
 ACTION_PARAMS := { DATA }
 ```
 
