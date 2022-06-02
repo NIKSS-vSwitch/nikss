@@ -21,11 +21,13 @@
 #include "common.h"
 
 int do_digest_get(int argc, char **argv);
+int do_digest_get_all(int argc, char **argv);
 int do_digest_help(int argc, char **argv);
 
 static const struct cmd digest_cmds[] = {
-        {"help", do_digest_help},
-        {"get",  do_digest_get},
+        {"help",    do_digest_help},
+        {"get",     do_digest_get},
+        {"get-all", do_digest_get_all},
         {0}
 };
 

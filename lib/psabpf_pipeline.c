@@ -248,9 +248,7 @@ static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_n
     if (ternary_tbl_name_lst_char_ptr) {
         char tuples_map_name[268];
         int ternary_map_name_length = (int)(ternary_tbl_name_lst_char_ptr - tuple_name);
-        char map_name[256];
-        strncpy(map_name, tuple_name, ternary_map_name_length);
-        snprintf(tuples_map_name, sizeof(tuples_map_name), "%s_tuples_map", map_name);
+        snprintf(tuples_map_name, sizeof(tuples_map_name), "%.*s_tuples_map", ternary_map_name_length, tuple_name);
 
         psabpf_bpf_map_descriptor_t tuple_map;
         int ret = open_bpf_map(ctx, tuples_map_name, NULL, &tuple_map);
