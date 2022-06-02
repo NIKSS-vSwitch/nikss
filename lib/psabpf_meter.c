@@ -335,7 +335,7 @@ psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx) {
 clean_up:
     if (next_key != NULL)
         free(next_key);
-    if (value_buffer == NULL)
+    if (value_buffer != NULL)
         free(value_buffer);
 
     return ret_instance;
