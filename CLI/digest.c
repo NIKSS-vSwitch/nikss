@@ -93,7 +93,7 @@ static int build_struct_json(json_t *parent, psabpf_digest_context_t *ctx, psabp
     return NO_ERROR;
 }
 
-int do_digest_get(int argc, char **argv)
+int get_digests_and_print(int argc, char **argv, bool only_single_entry)
 {
     psabpf_context_t psabpf_ctx;
     psabpf_digest_context_t ctx;
@@ -141,6 +141,9 @@ int do_digest_get(int argc, char **argv)
 
         if (ret != NO_ERROR)
             break;
+
+        if (only_single_entry)
+            break;
     }
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
@@ -159,11 +162,22 @@ clean_up_psabpf:
     return error_code;
 }
 
+int do_digest_get(int argc, char **argv)
+{
+    return get_digests_and_print(argc, argv, true);
+}
+
+int do_digest_get_all(int argc, char **argv)
+{
+    return get_digests_and_print(argc, argv, false);
+}
+
 int do_digest_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
     fprintf(stderr,
-            "Usage: %1$s digest get pipe ID DIGEST_NAME\n",
+            "Usage: %1$s digest get pipe ID DIGEST_NAME\n"
+            "       %1$s digest get-all pipe ID DIGEST_NAME\n",
             program_name);
     return 0;
 }

@@ -112,6 +112,7 @@ CBS := { DATA }
 
 ```shell
 psabpf-ctl digest get pipe ID DIGEST_NAME
+psabpf-ctl digest get-all pipe ID DIGEST_NAME
 ```
 
 # Counters
