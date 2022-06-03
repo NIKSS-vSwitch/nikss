@@ -387,10 +387,10 @@ clean_up:
 }
 
 int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL)
         return EINVAL;
 
-    if (entry->index_sfs.n_fields < 1)
+    if (entry == NULL || entry->index_sfs.n_fields < 1)
         return delete_all_map_entries(&ctx->meter);
 
     if (ctx->meter.type == BPF_MAP_TYPE_ARRAY) {

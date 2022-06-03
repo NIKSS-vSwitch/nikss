@@ -260,6 +260,7 @@ int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx,
 int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx);
 int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
+/* When entry is null or it has no index provided then resets all entries in meter */
 int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry);
 
 /*
