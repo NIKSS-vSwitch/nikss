@@ -163,13 +163,6 @@ psabpf_value_set_t * psabpf_value_set_get_next(psabpf_value_set_context_t *ctx)
     }
 
     memcpy(ctx->prev_entry_key, ctx->current_value.raw_data, ctx->set_map.key_size);
-//
-//    void *empty_value = calloc(1, ctx->set_map.value_size);
-//    int ret = bpf_map_lookup_elem(ctx->set_map.fd, ctx->current_value.raw_data, empty_value);
-//    if (ret != NO_ERROR) {
-//        fprintf(stderr, "failed to read value_set entry: %s\n", strerror(ret));
-//        return NULL;
-//    }
 
     return &ctx->current_value;
 }

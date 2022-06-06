@@ -73,8 +73,7 @@ static int build_entry(psabpf_value_set_context_t *ctx, psabpf_value_set_t *entr
     json_object_set_new(json_entry, "value", value);
 
     int ret = build_struct_json(value, ctx, entry,
-                                (psabpf_struct_field_t *(*)(void *,
-                                                            void *))psabpf_value_set_get_next_value_field);
+                                (get_next_field_func_t) psabpf_value_set_get_next_value_field);
     if (ret != NO_ERROR) {
         fprintf(stderr, "failed to build register value in JSON\n");
         return EINVAL;
