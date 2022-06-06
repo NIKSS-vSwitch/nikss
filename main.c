@@ -73,7 +73,7 @@ static int do_help(int argc, char **argv)
             "                   digest |\n"
             "                   counter |\n"
             "                   register |\n"
-            "                   value_set }\n"
+            "                   value-set }\n"
             "       OPTIONS := {}\n"
             "",
             program_name, program_name);
@@ -165,7 +165,7 @@ static const struct cmd cmds[] = {
         { "digest",          do_digest },
         { "counter",         do_counter },
         { "register",        do_register },
-        { "value_set",       do_value_set },
+        { "value-set",       do_value_set },
         { 0 }
 };
 

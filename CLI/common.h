@@ -19,7 +19,6 @@
 #include "../include/psabpf.h"
 #include <arpa/inet.h>
 #include <ctype.h>
-#include <jansson.h>
 
 #ifndef P4C_COMMON_H
 #define P4C_COMMON_H
