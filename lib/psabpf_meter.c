@@ -390,6 +390,7 @@ int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entr
     if (ctx == NULL)
         return EINVAL;
 
+    /* Remove all entries if psabpf_meter_entry_index were not executed on meter entry. */
     if (entry == NULL || entry->index_sfs.n_fields < 1)
         return delete_all_map_entries(&ctx->meter);
 
