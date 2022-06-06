@@ -81,7 +81,7 @@ int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set
     }
 
     if (parse_key_type(ctx) != NO_ERROR) {
-        fprintf(stderr, "%s: couldn't get key BTF info of a value_set instance\n", name);
+        fprintf(stderr, "%s: couldn't parse structure of a value_set instance\n", name);
         return EOPNOTSUPP;
     }
 
