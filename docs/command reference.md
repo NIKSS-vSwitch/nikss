@@ -97,9 +97,9 @@ ACTION_PARAMS := { DATA }
 # Meters
 
 ```shell
-psabpf-ctl meter get pipe ID METER_NAME index INDEX
+psabpf-ctl meter get pipe ID METER_NAME [index INDEX]
 psabpf-ctl meter update pipe ID METER_NAME index INDEX PIR:PBS CIR:CBS
-psabpf-ctl meter reset pipe ID METER_NAME index INDEX
+psabpf-ctl meter reset pipe ID METER_NAME [index INDEX]
 
 INDEX := { DATA }
 PIR := { DATA }

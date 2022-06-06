@@ -1845,21 +1845,22 @@ static void ternary_table_close_tuple(psabpf_table_entry_ctx_t *ctx)
         close_object_fd(&(ctx->table.fd));
 }
 
-static int delete_all_table_entries(int fd, size_t key_size)
+int delete_all_map_entries(psabpf_bpf_map_descriptor_t *map)
 {
     fprintf(stderr, "removing all entries from table\n");
 
-    char * key = malloc(key_size);
-    char * next_key = malloc(key_size);
+    char * key = malloc(map->key_size);
+    char * next_key = malloc(map->key_size);
+    char * value = calloc(1, map->value_size);
     int error_code = NO_ERROR;
 
-    if (key == NULL || next_key == NULL) {
+    if (key == NULL || next_key == NULL || value == NULL) {
         fprintf(stderr, "not enough memory\n");
         error_code = ENOMEM;
         goto clean_up;
     }
 
-    if (bpf_map_get_next_key(fd, NULL, next_key) != 0)
+    if (bpf_map_get_next_key(map->fd, NULL, next_key) != 0)
         goto clean_up;  /* table empty */
     do {
         /* Swap buffers, so next_key will become key and next_key may be reused */
@@ -1869,15 +1870,21 @@ static int delete_all_table_entries(int fd, size_t key_size)
 
         /* Ignore error(s) from bpf_map_delete_elem(). In some cases key may exist
          * but entry not exists (e.g. array map in map). So in any case we have to
-         * iterate over all keys and try to delete it. */
-        bpf_map_delete_elem(fd, key);
-    } while (bpf_map_get_next_key(fd, key, next_key) == 0);
+         * iterate over all keys and try to delete it. It is not possible to remove
+         * entry from array map, in such case reset entries to zero value. */
+        if (map->type == BPF_MAP_TYPE_ARRAY)
+            bpf_map_update_elem(map->fd, key, value, BPF_ANY);
+        else
+            bpf_map_delete_elem(map->fd, key);
+    } while (bpf_map_get_next_key(map->fd, key, next_key) == 0);
 
 clean_up:
     if (key)
         free(key);
     if (next_key)
         free(next_key);
+    if (value)
+        free(value);
     return error_code;
 }
 
@@ -1887,7 +1894,7 @@ int clear_table_cache(psabpf_bpf_map_descriptor_t *map)
         return NO_ERROR;
 
     fprintf(stderr, "clearing table cache: ");
-    return delete_all_table_entries(map->fd, map->key_size);
+    return delete_all_map_entries(map);
 }
 
 static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
@@ -1998,9 +2005,9 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     if (entry->n_keys != 0)
         return ternary_table_open_tuple(ctx, entry, key_mask, BPF_EXIST);
 
-    delete_all_table_entries(ctx->prefixes.fd, ctx->prefixes.key_size);
+    delete_all_map_entries(&ctx->prefixes);
     fprintf(stderr, "removing entries from tuples_map, this may take a while\n");
-    delete_all_table_entries(ctx->tuple_map.fd, ctx->tuple_map.key_size);
+    delete_all_map_entries(&ctx->tuple_map);
 
     /* Unpinning inner maps for our table is not required
      * because they are not pinned by this tool. */
@@ -2160,7 +2167,7 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     if (entry->n_keys == 0) {
         if (ctx->table.type == BPF_MAP_TYPE_ARRAY)
             fprintf(stderr, "removing entries from array map may take a while\n");
-        return_code = delete_all_table_entries(ctx->table.fd, ctx->table.key_size);
+        return_code = delete_all_map_entries(&ctx->table);
         if (return_code == NO_ERROR) {
             return_code = clear_table_cache(&ctx->cache);
             if (return_code != NO_ERROR) {

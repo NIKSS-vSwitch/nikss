@@ -34,5 +34,6 @@ static const struct cmd meter_cmds[] = {
 };
 
 int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry);
+void *create_json_meter_config(psabpf_meter_entry_t *meter);
 
 #endif // __PSABPFCTL_METER_H

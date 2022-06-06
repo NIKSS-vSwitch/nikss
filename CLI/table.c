@@ -547,24 +547,16 @@ static json_t *create_json_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psa
         psabpf_meter_entry_t meter;
         const char *name = psabpf_direct_meter_get_name(dm_ctx);
         int ret = psabpf_direct_meter_get_entry(dm_ctx, entry, &meter);
-        json_t *meter_entry = json_object();
+        json_t *meter_entry = create_json_meter_config(&meter);
+
+        psabpf_meter_entry_free(&meter);
 
         if (name == NULL || ret != NO_ERROR || meter_entry == NULL) {
             json_decref(meters_root);
             json_decref(meter_entry);
-            psabpf_meter_entry_free(&meter);
             psabpf_direct_meter_ctx_free(dm_ctx);
             return NULL;
         }
-
-        /* json_int_t is signed type, so if we expect values larger than 2^63
-         * they should be converted to string in such case
-         * TODO: move to meter.c */
-        json_object_set_new(meter_entry, "pir", json_integer((json_int_t) meter.pir));
-        json_object_set_new(meter_entry, "pbs", json_integer((json_int_t) meter.pbs));
-        json_object_set_new(meter_entry, "cir", json_integer((json_int_t) meter.cir));
-        json_object_set_new(meter_entry, "cbs", json_integer((json_int_t) meter.cbs));
-        psabpf_meter_entry_free(&meter);
 
         ret = json_object_set_new(meters_root, name, meter_entry);
         psabpf_direct_meter_ctx_free(dm_ctx);

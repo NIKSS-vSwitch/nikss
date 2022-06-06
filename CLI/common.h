@@ -52,6 +52,9 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx);
 /* Optional values are not written when they are missing on command line, so they must be initialized */
 int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair_t *kv_pairs);
 
+typedef psabpf_struct_field_t *(*get_next_field_func_t)(void*, void*);
+int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_func_t get_next_field);
+
 extern const char *program_name;
 
 enum destination_ctx_type_t {
