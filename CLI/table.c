@@ -420,6 +420,7 @@ static json_t *create_json_entry_action_params(psabpf_table_entry_ctx_t *ctx, ps
                                                 psabpf_action_param_get_data_len(ap));
         if (data == NULL) {
             json_decref(param_root);
+            json_decref(param_entry);
             return NULL;
         }
         const char *name = psabpf_action_param_get_name(ctx, entry, ap);

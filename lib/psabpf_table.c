@@ -872,6 +872,7 @@ void psabpf_action_free(psabpf_action_t *action)
     if (action->params != NULL)
         free(action->params);
     action->params = NULL;
+    action->n_params = 0;
 }
 
 void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id)

@@ -89,6 +89,7 @@ psabpf-ctl action-selector delete_group pipe ID ACTION_SELECTOR_NAME GROUP_REF
 psabpf-ctl action-selector add_to_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF
 psabpf-ctl action-selector delete_from_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF
 psabpf-ctl action-selector default_group_action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | default_group_action]
 
 ACTION := { id ACTION_ID | name ACTION_NAME }
 ACTION_PARAMS := { DATA }
