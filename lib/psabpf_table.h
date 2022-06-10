@@ -23,5 +23,11 @@ int clear_table_cache(psabpf_bpf_map_descriptor_t *map);
 
 void move_action(psabpf_action_t *dst, psabpf_action_t *src);
 int delete_all_map_entries(psabpf_bpf_map_descriptor_t *map);
+int construct_buffer(char * buffer, size_t buffer_len,
+                            psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                            int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
+                            int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *));
+int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
+int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 
 #endif  /* P4C_PSABPF_TABLE_H */

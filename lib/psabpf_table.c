@@ -999,7 +999,7 @@ static int write_buffer_btf(char * buffer, size_t buffer_len, size_t offset,
     return NO_ERROR;
 }
 
-static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     size_t bytes_to_write = ctx->table.key_size;
     uint32_t *lpm_prefix = NULL;
@@ -1062,7 +1062,7 @@ static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_t
     return false;
 }
 
-static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "key");
     if (key_type_id == 0)
@@ -1484,7 +1484,7 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
 }
 
 /* Please use this function instead of using directly family of fill_*() functions */
-static int construct_buffer(char * buffer, size_t buffer_len,
+int construct_buffer(char * buffer, size_t buffer_len,
                             psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
                             int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
                             int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *))

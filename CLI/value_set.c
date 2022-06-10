@@ -42,50 +42,20 @@ static int parse_dst_value_set(int *argc, char ***argv, const char **value_set_n
     return NO_ERROR;
 }
 
-static int parse_value_set_value(int *argc, char ***argv, psabpf_value_set_t *value)
+static int parse_value_set_value(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
     if (!is_keyword(**argv, "value")) {
         fprintf(stderr, "expected \'value\' keyword\n");
         return EINVAL;
     }
-    NEXT_ARGP_RET();
 
-    int ret = ENODATA;
-    while (*argc > 0) {
-        ret = translate_data_to_bytes(**argv, value, CTX_VALUE_SET_DATA);
-        if (ret != NO_ERROR)
-            return ret;
-        NEXT_ARGP();
-    }
-
-    return ret;
-}
-
-static int build_entry(psabpf_value_set_context_t *ctx, psabpf_value_set_t *entry,
-                       json_t *json_entry)
-{
-    json_t *value = json_object();
-    if (json_entry == NULL || value == NULL) {
-        fprintf(stderr, "failed to prepare register in JSON\n");
-        return ENOMEM;
-    }
-
-    json_object_set_new(json_entry, "value", value);
-
-    int ret = build_struct_json(value, ctx, entry,
-                                (get_next_field_func_t) psabpf_value_set_get_next_value_field);
-    if (ret != NO_ERROR) {
-        fprintf(stderr, "failed to build register value in JSON\n");
-        return EINVAL;
-    }
-
-    return NO_ERROR;
+    return parse_key_data(argc, argv, entry);
 }
 
 static int get_and_print_value_set_json(psabpf_value_set_context_t *ctx,
                                         const char *value_set_name)
 {
-    int ret = EINVAL;
+    int ret = NO_ERROR;
     json_t *root = json_object();
     json_t *instance_name = json_object();
     json_t *entries = json_array();
@@ -96,18 +66,26 @@ static int get_and_print_value_set_json(psabpf_value_set_context_t *ctx,
 
     json_object_set(root, value_set_name, entries);
 
-    psabpf_value_set_t *iter;
-    while ((iter = psabpf_value_set_get_next(ctx)) != NULL) {
+    psabpf_table_entry_ctx_t tec = {
+            .table = ctx->set_map,
+            .btf_metadata = ctx->btf_metadata,
+    };
+    psabpf_table_entry_t *current_entry = NULL;
+    while ((current_entry = psabpf_table_entry_get_next(&tec)) != NULL) {
         json_t *json_entry = json_object();
-        ret = build_entry(ctx, iter, json_entry);
-        json_array_append_new(entries, json_entry);
-        psabpf_value_set_free(iter);
-        if (ret != NO_ERROR)
+        json_t *key = create_json_entry_key(current_entry);
+        if (key == NULL) {
+            fprintf(stderr, "failed to build value_set value in JSON\n");
+            ret = EINVAL;
             break;
+        }
+        json_object_set_new(json_entry, "value", key);
+        json_array_append_new(entries, json_entry);
+        psabpf_table_entry_free(current_entry);
     }
 
     if (ret != NO_ERROR) {
-        fprintf(stderr, "failed to build register JSON: %s\n", strerror(ret));
+        fprintf(stderr, "failed to build value_set JSON: %s\n", strerror(ret));
         goto clean_up;
     }
 
@@ -128,11 +106,11 @@ int do_value_set_delete(int argc, char **argv)
     const char *value_set_name = NULL;
     psabpf_context_t psabpf_ctx;
     psabpf_value_set_context_t ctx;
-    psabpf_value_set_t value;
+    psabpf_table_entry_t entry;
 
     psabpf_context_init(&psabpf_ctx);
     psabpf_value_set_context_init(&ctx);
-    psabpf_value_set_init(&value);
+    psabpf_table_entry_init(&entry);
 
     if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
         goto clean_up;
@@ -140,7 +118,7 @@ int do_value_set_delete(int argc, char **argv)
     if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR)
         goto clean_up;
 
-    if (parse_value_set_value(&argc, &argv, &value) != NO_ERROR)
+    if (parse_value_set_value(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
     if (argc > 0) {
@@ -148,10 +126,10 @@ int do_value_set_delete(int argc, char **argv)
         goto clean_up;
     }
 
-    ret = psabpf_value_set_delete(&ctx, &value);
+    ret = psabpf_value_set_delete(&ctx, &entry);
 
 clean_up:
-    psabpf_value_set_free(&value);
+    psabpf_table_entry_free(&entry);
     psabpf_value_set_context_free(&ctx);
     psabpf_context_free(&psabpf_ctx);
 
@@ -164,11 +142,11 @@ int do_value_set_insert(int argc, char **argv)
     const char *value_set_name = NULL;
     psabpf_context_t psabpf_ctx;
     psabpf_value_set_context_t ctx;
-    psabpf_value_set_t value;
+    psabpf_table_entry_t entry;
 
     psabpf_context_init(&psabpf_ctx);
     psabpf_value_set_context_init(&ctx);
-    psabpf_value_set_init(&value);
+    psabpf_table_entry_init(&entry);
 
     if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
         goto clean_up;
@@ -176,7 +154,7 @@ int do_value_set_insert(int argc, char **argv)
     if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR)
         goto clean_up;
 
-    if (parse_value_set_value(&argc, &argv, &value) != NO_ERROR)
+    if (parse_value_set_value(&argc, &argv, &entry) != NO_ERROR)
         goto clean_up;
 
     if (argc > 0) {
@@ -184,10 +162,10 @@ int do_value_set_insert(int argc, char **argv)
         goto clean_up;
     }
 
-    ret = psabpf_value_set_insert(&ctx, &value);
+    ret = psabpf_value_set_insert(&ctx, &entry);
 
 clean_up:
-    psabpf_value_set_free(&value);
+    psabpf_table_entry_free(&entry);
     psabpf_value_set_context_free(&ctx);
     psabpf_context_free(&psabpf_ctx);
 
@@ -200,11 +178,11 @@ int do_value_set_get(int argc, char **argv)
     const char *value_set_name = NULL;
     psabpf_context_t psabpf_ctx;
     psabpf_value_set_context_t ctx;
-    psabpf_value_set_t value;
+    psabpf_table_entry_t entry;
 
     psabpf_context_init(&psabpf_ctx);
     psabpf_value_set_context_init(&ctx);
-    psabpf_value_set_init(&value);
+    psabpf_table_entry_init(&entry);
 
     if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
         goto clean_up;
@@ -220,7 +198,7 @@ int do_value_set_get(int argc, char **argv)
     ret = get_and_print_value_set_json(&ctx, value_set_name);
 
 clean_up:
-    psabpf_value_set_free(&value);
+    psabpf_table_entry_free(&entry);
     psabpf_value_set_context_free(&ctx);
     psabpf_context_free(&psabpf_ctx);
 

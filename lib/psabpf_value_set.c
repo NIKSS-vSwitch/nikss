@@ -15,13 +15,16 @@
  * limitations under the License.
  */
 
-#include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <bpf/bpf.h>
+#include <linux/bpf.h>
 
 #include <psabpf.h>
 #include <psabpf_value_set.h>
+#include "psabpf_table.h"
 #include "common.h"
 #include "btf.h"
 
@@ -39,24 +42,6 @@ void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx) {
     free_btf(&ctx->btf_metadata);
     close_object_fd(&(ctx->set_map.fd));
     free_struct_field_descriptor_set(&ctx->fds);
-}
-
-void psabpf_value_set_init(psabpf_value_set_t *value) {
-    if (value == NULL)
-        return;
-
-    memset(value, 0, sizeof(psabpf_value_set_t));
-}
-
-void psabpf_value_set_free(psabpf_value_set_t *value) {
-    if (value == NULL)
-        return;
-
-    free_struct_field_set(&value->value);
-
-    if (value->raw_data != NULL)
-        free(value->raw_data);
-    value->raw_data = NULL;
 }
 
 static int parse_key_type(psabpf_value_set_context_t *ctx)
@@ -88,113 +73,63 @@ int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set
     return NO_ERROR;
 }
 
-int psabpf_value_set_set_value(psabpf_value_set_t *value, const void *data, size_t data_len) {
-    if (value == NULL)
-        return EINVAL;
-    if (data == NULL || data_len < 1)
-        return ENODATA;
+int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry) {
+    char *key_buffer = NULL;
+    char *value_buffer = NULL;
+    int return_code = NO_ERROR;
 
-    int ret = struct_field_set_append(&value->value, data, data_len);
-    if (ret != NO_ERROR)
-        fprintf(stderr, "couldn't append value to an entry: %s\n", strerror(ret));
-    return ret;
-}
-
-psabpf_struct_field_t * psabpf_value_set_get_next_value_field(psabpf_value_set_context_t *ctx, psabpf_value_set_t *entry) {
     if (ctx == NULL || entry == NULL)
-        return NULL;
+        return EINVAL;
 
-    psabpf_struct_field_descriptor_t *fd;
-    fd = get_struct_field_descriptor(&ctx->fds, entry->current_field_id);
-    if (fd == NULL) {
-        entry->current_field_id = 0;
-        return NULL;
-    }
-
-    entry->current.type = fd->type;
-    entry->current.data_len = fd->data_len;
-    entry->current.name = fd->name;
-    entry->current.data = entry->raw_data + fd->data_offset;
-
-    entry->current_field_id = entry->current_field_id + 1;
-
-    return &entry->current;
-}
-
-static void *allocate_value_buffer(psabpf_value_set_context_t *ctx, psabpf_value_set_t *value)
-{
-    if (value->raw_data != NULL)
-        return value->raw_data;  /* already allocated */
-
-    value->raw_data = malloc(ctx->set_map.key_size);
-    if (value->raw_data == NULL)
+    /* prepare buffers for map key/value */
+    key_buffer = malloc(ctx->set_map.key_size);
+    value_buffer = calloc(1, ctx->set_map.value_size);
+    if (key_buffer == NULL || value_buffer == NULL) {
         fprintf(stderr, "not enough memory\n");
+        return_code = ENOMEM;
+        goto clean_up;
+    }
 
-    return value->raw_data;
+    psabpf_table_entry_ctx_t tec = {
+            .table = ctx->set_map,
+            .btf_metadata = ctx->btf_metadata,
+            .cache.fd = -1,
+    };
+    return_code = construct_buffer(key_buffer, ctx->set_map.key_size, &tec, entry,
+                                   fill_key_btf_info, fill_key_byte_by_byte);
+    if (return_code != NO_ERROR) {
+        fprintf(stderr, "failed to construct key\n");
+        goto clean_up;
+    }
+
+    /* update map */
+    uint64_t bpf_flags = BPF_NOEXIST;
+    if (ctx->set_map.type == BPF_MAP_TYPE_ARRAY)
+        bpf_flags = BPF_ANY;
+    return_code = bpf_map_update_elem(ctx->set_map.fd, key_buffer, value_buffer, bpf_flags);
+    if (return_code != 0) {
+        return_code = errno;
+        fprintf(stderr, "failed to set up entry: %s\n", strerror(errno));
+    }
+
+clean_up:
+    if (key_buffer != NULL)
+        free(key_buffer);
+    if (value_buffer != NULL)
+        free(value_buffer);
+
+    return return_code;
 }
 
-psabpf_value_set_t * psabpf_value_set_get_next(psabpf_value_set_context_t *ctx)
-{
-    if (ctx == NULL)
-        return NULL;
+int psabpf_value_set_delete(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry) {
 
-    if (allocate_value_buffer(ctx, &ctx->current_value) == NULL)
-        return NULL;
+    psabpf_table_entry_ctx_t tec = {
+            .table = ctx->set_map,
+            .btf_metadata = ctx->btf_metadata,
+            .cache.fd = -1,
+    };
 
-    /* on first call ctx->prev_entry_ke must be NULL */
-    if (bpf_map_get_next_key(ctx->set_map.fd, ctx->prev_entry_key, ctx->current_value.raw_data) != 0) {
-        /* no more entries, prepare for next iteration */
-        if (ctx->prev_entry_key != NULL)
-            free(ctx->prev_entry_key);
-        ctx->prev_entry_key = NULL;
+    int ret = psabpf_table_entry_del(&tec, entry);
 
-        return NULL;
-    }
-
-    if (ctx->prev_entry_key == NULL) {
-        ctx->prev_entry_key = malloc(ctx->set_map.key_size);
-        if (ctx->prev_entry_key == NULL) {
-            fprintf(stderr, "not enough memory\n");
-            return NULL;
-        }
-    }
-
-    memcpy(ctx->prev_entry_key, ctx->current_value.raw_data, ctx->set_map.key_size);
-
-    return &ctx->current_value;
-}
-
-int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_value_set_t *value) {
-    if (allocate_value_buffer(ctx, value) == NULL)
-        return ENOMEM;
-
-    int ret = construct_struct_from_fields(&value->value, &ctx->fds, value->raw_data, ctx->set_map.key_size);
-    if (ret != NO_ERROR)
-        return ret;
-
-    void *empty_value = calloc(1, ctx->set_map.value_size);
-    ret = bpf_map_update_elem(ctx->set_map.fd, value->raw_data, empty_value, 0);
-    if (ret != NO_ERROR) {
-        fprintf(stderr, "failed to insert a value to a value_set: %s\n", strerror(ret));
-        return ret;
-    }
-
-    return NO_ERROR;
-}
-
-int psabpf_value_set_delete(psabpf_value_set_context_t *ctx, psabpf_value_set_t *value) {
-    if (allocate_value_buffer(ctx, value) == NULL)
-        return ENOMEM;
-
-    int ret = construct_struct_from_fields(&value->value, &ctx->fds, value->raw_data, ctx->set_map.key_size);
-    if (ret != NO_ERROR)
-        return ret;
-
-    ret = bpf_map_delete_elem(ctx->set_map.fd, value->raw_data);
-    if (ret != NO_ERROR) {
-        fprintf(stderr, "failed to delete an element from a value_set: %s\n", strerror(ret));
-        return ret;
-    }
-
-    return NO_ERROR;
+    return ret;
 }
