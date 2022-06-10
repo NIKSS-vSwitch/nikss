@@ -734,6 +734,14 @@ int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context
 {
     if (ctx == NULL || member == NULL)
         return EINVAL;
+    if (ctx->default_group_action.fd < 0) {
+        fprintf(stderr, "map with default action for empty group not opened\n");
+        return EINVAL;
+    }
+    if (ctx->default_group_action.key_size != 4) {
+        fprintf(stderr, "invalid map with default action form empty group\n");
+        return EINVAL;
+    }
 
     uint32_t key = 0;
     psabpf_table_entry_ctx_t tec = {
@@ -769,6 +777,27 @@ uint32_t psabpf_action_selector_get_action_id_by_name(psabpf_action_selector_con
     };
 
     return psabpf_table_get_action_id_by_name(&table_ctx, name);
+}
+
+int psabpf_action_selector_get_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
+{
+    if (ctx == NULL || group == NULL)
+        return EINVAL;
+    if (ctx->map_of_groups.key_size != 4 || ctx->map_of_groups.value_size != 4) {
+        fprintf(stderr, "invalid map of groups\n");
+        return EINVAL;
+    }
+
+    /* Just validate that group exists */
+    uint32_t inner_map_id = 0;
+    int err = bpf_map_lookup_elem(ctx->map_of_groups.fd, &group->group_ref, &inner_map_id);
+    if (err != 0) {
+        err = errno;
+        fprintf(stderr, "failed to get group: %s\n", strerror(err));
+        return err;
+    }
+
+    return NO_ERROR;
 }
 
 psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(psabpf_action_selector_context_t *ctx)
@@ -845,7 +874,7 @@ psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_m
     if (ctx->group.fd < 0 || ctx->current_group_id != group->group_ref) {
         close_object_fd(&ctx->group.fd);
         ctx->current_group_id = group->group_ref;
-        if (open_group_map(ctx, &ctx->current_group) != NO_ERROR)
+        if (open_group_map(ctx, group) != NO_ERROR)
             goto err_or_no_more_members;
 
         ctx->current_member_id = 0;

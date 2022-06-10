@@ -150,6 +150,41 @@ static int parse_skip_keyword(int *argc, char ***argv, const char *keyword)
     return NO_ERROR;
 }
 
+typedef enum get_mode {
+    GET_MODE_ALL,
+    GET_MODE_MEMBER,
+    GET_MODE_GROUP,
+    GET_MODE_EMPTY_GROUP_ACTION
+} get_mode_t;
+
+static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t *reference)
+{
+    *mode = GET_MODE_ALL;
+
+    if (*argc < 1)
+        return NO_ERROR;
+
+    if (is_keyword(**argv, "member") || is_keyword(**argv, "group")) {
+        *mode = GET_MODE_MEMBER;
+        if (is_keyword(**argv, "group"))
+            *mode = GET_MODE_GROUP;
+        NEXT_ARGP_RET();
+
+        char *ptr;
+        *reference = strtoul(**argv, &ptr, 0);
+        if (*ptr) {
+            fprintf(stderr, "%s: unable to parse as a member reference\n", **argv);
+            return EINVAL;
+        }
+        NEXT_ARGP();
+    } else if (is_keyword(**argv, "default_group_action")) {
+        *mode = GET_MODE_EMPTY_GROUP_ACTION;
+        NEXT_ARGP();
+    }
+
+    return NO_ERROR;
+}
+
 /******************************************************************************
  * JSON functions
  *****************************************************************************/
@@ -231,7 +266,7 @@ json_t *create_json_all_members(psabpf_action_selector_context_t *ctx)
     return members_root;
 }
 
-json_t *create_json_group_entry(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
+json_t *create_json_group_entry(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group, json_t *member_refs)
 {
     json_t *group_root = json_object();
     json_t *members = json_array();
@@ -242,8 +277,13 @@ json_t *create_json_group_entry(psabpf_action_selector_context_t *ctx, psabpf_ac
     }
 
     psabpf_action_selector_member_context_t *current_member;
+    char member_id_str[16];
     while ((current_member = psabpf_action_selector_get_next_group_member(ctx, group)) != NULL) {
         json_array_append_new(members, json_integer(psabpf_action_selector_get_member_reference(current_member)));
+        if (member_refs != NULL) {
+            snprintf(member_id_str, sizeof(member_id_str), "%u", psabpf_action_selector_get_member_reference(current_member));
+            json_object_set_new(member_refs, member_id_str, create_json_member_entry(ctx, current_member));
+        }
         psabpf_action_selector_member_free(current_member);
     }
 
@@ -262,7 +302,7 @@ json_t *create_json_all_groups(psabpf_action_selector_context_t *ctx)
     psabpf_action_selector_group_context_t *group;
     while ((group = psabpf_action_selector_get_next_group(ctx)) != NULL) {
         snprintf(group_id_str, sizeof(group_id_str), "%u", psabpf_action_selector_get_group_reference(group));
-        json_t *group_entry = create_json_group_entry(ctx, group);
+        json_t *group_entry = create_json_group_entry(ctx, group, NULL);
         psabpf_action_selector_group_free(group);
         if (group_entry == NULL) {
             json_decref(groups_root);
@@ -292,16 +332,52 @@ json_t *create_json_empty_group_action(psabpf_action_selector_context_t *ctx)
     return ega_root;
 }
 
-int print_action_selector(psabpf_action_selector_context_t *ctx, const char *instance_name)
+int print_action_selector(psabpf_action_selector_context_t *ctx, const char *instance_name, get_mode_t mode, uint32_t reference)
 {
     int ret = EINVAL;
     json_t *root = json_object();
     json_t *instance = json_object();
-    json_t *members = create_json_all_members(ctx);
-    json_t *groups = create_json_all_groups(ctx);
-    json_t *empty_group_action = create_json_empty_group_action(ctx);
+    json_t *members = NULL;
+    json_t *groups = NULL;
+    json_t *empty_group_action = NULL;
 
-    if (root == NULL || instance == NULL || members == NULL || groups == NULL || empty_group_action == NULL) {
+    bool failed = false;
+    if (mode == GET_MODE_ALL) {
+        members = create_json_all_members(ctx);
+        groups = create_json_all_groups(ctx);
+        empty_group_action = create_json_empty_group_action(ctx);
+
+        if (members == NULL || groups == NULL || empty_group_action == NULL)
+            failed = true;
+    } else if (mode == GET_MODE_MEMBER) {
+        members = json_object();
+    } else if (mode == GET_MODE_GROUP) {
+        members = json_object();
+        psabpf_action_selector_group_context_t group;
+        psabpf_action_selector_group_init(&group);
+        psabpf_action_selector_set_group_reference(&group, reference);
+        ret = psabpf_action_selector_get_group(ctx, &group);
+        groups = json_object();
+        json_t *req_group = create_json_group_entry(ctx, &group, members);
+        psabpf_action_selector_group_free(&group);
+
+        if (members == NULL || ret != NO_ERROR || groups == NULL || req_group == NULL) {
+            json_decref(req_group);
+            failed = true;
+        } else {
+            char group_id_str[16];
+            snprintf(group_id_str, sizeof(group_id_str), "%u", reference);
+            json_object_set_new(groups, group_id_str, req_group);
+        }
+
+    } else if (mode == GET_MODE_EMPTY_GROUP_ACTION) {
+        empty_group_action = create_json_empty_group_action(ctx);
+
+        if (empty_group_action == NULL)
+            failed = true;
+    }
+
+    if (root == NULL || instance == NULL || failed) {
         fprintf(stderr, "failed to create JSON\n");
         ret = ENOMEM;
         goto clean_up;
@@ -311,9 +387,13 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
         fprintf(stderr, "failed to add JSON key %s\n", instance_name);
         goto clean_up;
     }
-    json_object_set(instance, "member_refs", members);
-    json_object_set(instance, "group_refs", groups);
-    json_object_set(instance, "empty_group_action", empty_group_action);
+
+    if (members != NULL)
+        json_object_set(instance, "member_refs", members);
+    if (groups != NULL)
+        json_object_set(instance, "group_refs", groups);
+    if (empty_group_action != NULL)
+        json_object_set(instance, "empty_group_action", empty_group_action);
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
     ret = NO_ERROR;
@@ -711,12 +791,18 @@ int do_action_selector_get(int argc, char **argv)
     if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, true, &instance_name) != NO_ERROR)
         goto clean_up;
 
+    /* 2. Try to get specific mode */
+    get_mode_t mode;
+    uint32_t reference = 0;
+    if (parse_get_options(&argc, &argv, &mode, &reference) != NO_ERROR)
+        goto clean_up;
+
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
         goto clean_up;
     }
 
-    error_code = print_action_selector(&ctx, instance_name);
+    error_code = print_action_selector(&ctx, instance_name, mode, reference);
 
 clean_up:
     psabpf_action_selector_ctx_free(&ctx);

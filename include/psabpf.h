@@ -601,6 +601,7 @@ int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context
 /* See psabpf_table_get_action_id_by_name() */
 uint32_t psabpf_action_selector_get_action_id_by_name(psabpf_action_selector_context_t *ctx, const char *name);
 
+int psabpf_action_selector_get_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group);
 psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(psabpf_action_selector_context_t *ctx);
 psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_member(psabpf_action_selector_context_t *ctx,
                                                                                       psabpf_action_selector_group_context_t *group);
