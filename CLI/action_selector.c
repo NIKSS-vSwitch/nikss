@@ -189,6 +189,16 @@ static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t
  * JSON functions
  *****************************************************************************/
 
+static int set_json_object_at_index(json_t *parent, json_t *object, uint32_t index)
+{
+    char idx_str[16]; /* index is 32 bits, 2^32=4.3e+9, so at least 11 bytes are required to convert idx to string */
+    snprintf(idx_str, sizeof(idx_str), "%u", index);
+    if (json_object_set_new(parent, idx_str, object) != 0)
+        return EINVAL;
+
+    return NO_ERROR;
+}
+
 json_t *create_json_member_entry_parameters(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
     json_t *params_root = json_array();
@@ -251,16 +261,14 @@ json_t *create_json_all_members(psabpf_action_selector_context_t *ctx)
         return NULL;
 
     psabpf_action_selector_member_context_t *member;
-    char member_id_str[16]; /* id is 32 bits, 2^32=4.3e+9, so at least 11 bytes are required to convert id to string */
     while ((member = psabpf_action_selector_get_next_member(ctx)) != NULL) {
-        snprintf(member_id_str, sizeof(member_id_str), "%u", psabpf_action_selector_get_member_reference(member));
         json_t *member_json = create_json_member_entry(ctx, member);
         psabpf_action_selector_member_free(member);
         if (member_json == NULL) {
             json_decref(members_root);
             return NULL;
         }
-        json_object_set_new(members_root, member_id_str, member_json);
+        set_json_object_at_index(members_root, member_json, psabpf_action_selector_get_member_reference(member));
     }
 
     return members_root;
@@ -277,12 +285,12 @@ json_t *create_json_group_entry(psabpf_action_selector_context_t *ctx, psabpf_ac
     }
 
     psabpf_action_selector_member_context_t *current_member;
-    char member_id_str[16];
     while ((current_member = psabpf_action_selector_get_next_group_member(ctx, group)) != NULL) {
         json_array_append_new(members, json_integer(psabpf_action_selector_get_member_reference(current_member)));
         if (member_refs != NULL) {
-            snprintf(member_id_str, sizeof(member_id_str), "%u", psabpf_action_selector_get_member_reference(current_member));
-            json_object_set_new(member_refs, member_id_str, create_json_member_entry(ctx, current_member));
+            set_json_object_at_index(member_refs,
+                                     create_json_member_entry(ctx, current_member),
+                                     psabpf_action_selector_get_member_reference(current_member));
         }
         psabpf_action_selector_member_free(current_member);
     }
@@ -298,17 +306,15 @@ json_t *create_json_all_groups(psabpf_action_selector_context_t *ctx)
     if (groups_root == NULL)
         return NULL;
 
-    char group_id_str[16]; /* id is 32 bits, 2^32=4.3e+9, so at least 11 bytes are required to convert id to string */
     psabpf_action_selector_group_context_t *group;
     while ((group = psabpf_action_selector_get_next_group(ctx)) != NULL) {
-        snprintf(group_id_str, sizeof(group_id_str), "%u", psabpf_action_selector_get_group_reference(group));
         json_t *group_entry = create_json_group_entry(ctx, group, NULL);
         psabpf_action_selector_group_free(group);
         if (group_entry == NULL) {
             json_decref(groups_root);
             return NULL;
         }
-        json_object_set_new(groups_root, group_id_str, group_entry);
+        set_json_object_at_index(groups_root, group_entry, psabpf_action_selector_get_group_reference(group));
     }
 
     return groups_root;
@@ -365,9 +371,7 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
             json_decref(req_group);
             failed = true;
         } else {
-            char group_id_str[16];
-            snprintf(group_id_str, sizeof(group_id_str), "%u", reference);
-            json_object_set_new(groups, group_id_str, req_group);
+            set_json_object_at_index(groups, req_group, reference);
         }
 
     } else if (mode == GET_MODE_EMPTY_GROUP_ACTION) {
