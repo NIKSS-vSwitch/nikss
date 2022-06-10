@@ -606,6 +606,7 @@ psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(ps
 psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_member(psabpf_action_selector_context_t *ctx,
                                                                                       psabpf_action_selector_group_context_t *group);
 psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_member(psabpf_action_selector_context_t *ctx);
+int psabpf_action_selector_get_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member);
 
 uint32_t psabpf_action_selector_get_member_action_id(psabpf_action_selector_context_t *ctx,
                                                      psabpf_action_selector_member_context_t *member);

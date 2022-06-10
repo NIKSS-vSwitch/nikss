@@ -357,6 +357,19 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
             failed = true;
     } else if (mode == GET_MODE_MEMBER) {
         members = json_object();
+        psabpf_action_selector_member_context_t member;
+        psabpf_action_selector_member_init(&member);
+        psabpf_action_selector_set_member_reference(&member, reference);
+        ret = psabpf_action_selector_get_member(ctx, &member);
+        json_t *req_member = create_json_member_entry(ctx, &member);
+        psabpf_action_selector_member_free(&member);
+
+        if (members == NULL || ret != NO_ERROR || req_member == NULL) {
+            json_decref(req_member);
+            failed = true;
+        } else {
+            set_json_object_at_index(members, req_member, reference);
+        }
     } else if (mode == GET_MODE_GROUP) {
         members = json_object();
         psabpf_action_selector_group_context_t group;

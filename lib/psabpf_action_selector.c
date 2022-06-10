@@ -853,7 +853,8 @@ static int get_member_action(psabpf_action_selector_context_t *ctx,
     };
 
     int ret = psabpf_table_entry_get(&tec, &te);
-    memcpy(&member->action, te.action, sizeof(psabpf_action_t));
+    if (te.action != NULL)
+        memcpy(&member->action, te.action, sizeof(psabpf_action_t));
 
     return ret;
 }
@@ -938,6 +939,22 @@ psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_member(
 err_or_no_more_members:
     ctx->current_member_id = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
     return NULL;
+}
+
+int psabpf_action_selector_get_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
+{
+    if (ctx == NULL || member == NULL)
+        return EINVAL;
+    if (ctx->map_of_members.fd < 0) {
+        fprintf(stderr, "Map of members not opened\n");
+        return EINVAL;
+    }
+    if (ctx->map_of_members.key_size != 4) {
+        fprintf(stderr, "Invalid map of members\n");
+        return EINVAL;
+    }
+
+    return get_member_action(ctx, member);
 }
 
 uint32_t psabpf_action_selector_get_member_action_id(psabpf_action_selector_context_t *ctx,
