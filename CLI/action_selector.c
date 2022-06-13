@@ -177,7 +177,7 @@ static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t
             return EINVAL;
         }
         NEXT_ARGP();
-    } else if (is_keyword(**argv, "default_group_action")) {
+    } else if (is_keyword(**argv, "empty-group-action")) {
         *mode = GET_MODE_EMPTY_GROUP_ACTION;
         NEXT_ARGP();
     }
@@ -738,7 +738,7 @@ int do_action_selector_delete_from_group(int argc, char **argv)
     return add_or_remove_member_from_group(argc, argv, false);
 }
 
-int do_action_selector_default_group_action(int argc, char **argv)
+int do_action_selector_empty_group_action(int argc, char **argv)
 {
     int error_code = EPERM;
     psabpf_context_t psabpf_ctx;
@@ -833,20 +833,20 @@ int do_action_selector_help(int argc, char **argv)
     (void) argc; (void) argv;
 
     fprintf(stderr,
-            "Usage: %1$s action-selector add_member pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]\n"
-            "       %1$s action-selector delete_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF\n"
-            "       %1$s action-selector update_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]\n"
+            "Usage: %1$s action-selector add-member pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]\n"
+            "       %1$s action-selector delete-member pipe ID ACTION_SELECTOR_NAME MEMBER_REF\n"
+            "       %1$s action-selector update-member pipe ID ACTION_SELECTOR_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]\n"
             ""
-            "       %1$s action-selector create_group pipe ID ACTION_SELECTOR_NAME\n"
-            "       %1$s action-selector delete_group pipe ID ACTION_SELECTOR_NAME GROUP_REF\n"
+            "       %1$s action-selector create-group pipe ID ACTION_SELECTOR_NAME\n"
+            "       %1$s action-selector delete-group pipe ID ACTION_SELECTOR_NAME GROUP_REF\n"
             ""
-            "       %1$s action-selector add_to_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF\n"
-            "       %1$s action-selector delete_from_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF\n"
+            "       %1$s action-selector add-to-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF\n"
+            "       %1$s action-selector delete-from-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF\n"
             ""
             /* TODO: rename to empty group action, not default */
-            "       %1$s action-selector default_group_action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]\n"
+            "       %1$s action-selector empty-group-action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]\n"
             ""
-            "       %1$s action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | default_group_action]"
+            "       %1$s action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | empty-group-action]\n"
             "\n"
             "       ACTION := { id ACTION_ID | name ACTION_NAME }\n"
             "       ACTION_PARAMS := { DATA }\n"

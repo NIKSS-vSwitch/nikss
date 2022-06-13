@@ -551,7 +551,7 @@ typedef struct psabpf_action_selector_context {
     psabpf_bpf_map_descriptor_t map_of_groups;
     psabpf_bpf_map_descriptor_t group;
     psabpf_bpf_map_descriptor_t map_of_members;
-    psabpf_bpf_map_descriptor_t default_group_action;
+    psabpf_bpf_map_descriptor_t empty_group_action;
     psabpf_bpf_map_descriptor_t cache;
 
     /* For iteration */

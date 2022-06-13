@@ -116,7 +116,7 @@ void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx)
     ctx->group.fd = -1;
     ctx->map_of_groups.fd = -1;
     ctx->map_of_members.fd = -1;
-    ctx->default_group_action.fd = -1;
+    ctx->empty_group_action.fd = -1;
     ctx->cache.fd = -1;
 
     psabpf_action_selector_group_init(&ctx->current_group);
@@ -135,7 +135,7 @@ void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx)
     close_object_fd(&ctx->group.fd);
     close_object_fd(&ctx->map_of_groups.fd);
     close_object_fd(&ctx->map_of_members.fd);
-    close_object_fd(&ctx->default_group_action.fd);
+    close_object_fd(&ctx->empty_group_action.fd);
     close_object_fd(&ctx->cache.fd);
 
     psabpf_action_selector_group_free(&ctx->current_group);
@@ -170,7 +170,7 @@ static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_s
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_defaultActionGroup", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->default_group_action);
+    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->empty_group_action);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
@@ -695,11 +695,11 @@ int psabpf_action_selector_set_empty_group_action(psabpf_action_selector_context
 {
     if (ctx == NULL || action == NULL)
         return EINVAL;
-    if (ctx->default_group_action.fd < 0) {
+    if (ctx->empty_group_action.fd < 0) {
         fprintf(stderr, "map with default action for empty group not opened\n");
         return EINVAL;
     }
-    if (ctx->default_group_action.key_size != 4) {
+    if (ctx->empty_group_action.key_size != 4) {
         fprintf(stderr, "invalid map with default action form empty group\n");
         return EINVAL;
     }
@@ -707,7 +707,7 @@ int psabpf_action_selector_set_empty_group_action(psabpf_action_selector_context
 
     /* Let's again abuse (little) table API. Don't do this at home! */
     psabpf_table_entry_ctx_t tec = {
-            .table = ctx->default_group_action,
+            .table = ctx->empty_group_action,
             .btf_metadata = ctx->btf,
             .cache = ctx->cache,  /* Allow clear cache if applicable */
     };
@@ -734,18 +734,18 @@ int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context
 {
     if (ctx == NULL || member == NULL)
         return EINVAL;
-    if (ctx->default_group_action.fd < 0) {
+    if (ctx->empty_group_action.fd < 0) {
         fprintf(stderr, "map with default action for empty group not opened\n");
         return EINVAL;
     }
-    if (ctx->default_group_action.key_size != 4) {
+    if (ctx->empty_group_action.key_size != 4) {
         fprintf(stderr, "invalid map with default action form empty group\n");
         return EINVAL;
     }
 
     uint32_t key = 0;
     psabpf_table_entry_ctx_t tec = {
-            .table = ctx->default_group_action,
+            .table = ctx->empty_group_action,
             .btf_metadata = ctx->btf,
             .cache = ctx->cache,  /* Allow clear cache if applicable */
     };
@@ -764,6 +764,8 @@ int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context
 
     int ret = psabpf_table_entry_get(&tec, &te);
     move_action(&member->action, te.action);
+    if (te.action)
+        free(te.action);
 
     return ret;
 }
@@ -853,8 +855,10 @@ static int get_member_action(psabpf_action_selector_context_t *ctx,
     };
 
     int ret = psabpf_table_entry_get(&tec, &te);
-    if (te.action != NULL)
+    if (te.action != NULL) {
         memcpy(&member->action, te.action, sizeof(psabpf_action_t));
+        free(te.action);
+    }
 
     return ret;
 }
