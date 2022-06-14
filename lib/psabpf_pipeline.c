@@ -57,6 +57,68 @@ static int open_prog_by_name(psabpf_context_t *ctx, const char *prog)
     return bpf_obj_get(pinned_file);  // error in errno
 }
 
+static int tc_create_hook(int ifindex)
+{
+    DECLARE_LIBBPF_OPTS(bpf_tc_hook, hook,
+                        .ifindex = ifindex,
+                        .attach_point = BPF_TC_INGRESS | BPF_TC_EGRESS);
+
+    int ret = NO_ERROR;
+    if (bpf_tc_hook_create(&hook) != 0) {
+        ret = errno;
+        fprintf(stderr, "failed to create TC hook: %s\n", strerror(ret));
+    }
+
+    return ret;
+}
+
+static int tc_attach_prog(psabpf_context_t *ctx, const char *prog, int ifindex, enum bpf_tc_attach_point hook_point)
+{
+    int ret = NO_ERROR;
+    int fd = open_prog_by_name(ctx, prog);
+    if (fd < 0) {
+        ret = errno;
+        if (ret == ENOENT && hook_point == BPF_TC_EGRESS) {
+            fprintf(stderr, "skipping empty egress program...\n");
+            return NO_ERROR;
+        }
+
+        fprintf(stderr, "failed to open program %s: %s\n", prog, strerror(ret));
+        return ret;
+    }
+
+    DECLARE_LIBBPF_OPTS(bpf_tc_hook, hook,
+                        .ifindex = ifindex,
+                        .attach_point = hook_point);
+    DECLARE_LIBBPF_OPTS(bpf_tc_opts, opts,
+                        .prog_fd = fd);
+
+    if (bpf_tc_attach(&hook, &opts) != 0) {
+        ret = errno;
+        fprintf(stderr, "failed to attach bpf program: %s\n", strerror(ret));
+    }
+    close(fd);
+
+    return ret;
+}
+
+static int tc_create_hook_and_attach_progs(psabpf_context_t *ctx, int ifindex)
+{
+    int ret = tc_create_hook(ifindex);
+    if (ret != NO_ERROR)
+        return ret;
+
+    ret = tc_attach_prog(ctx, TC_INGRESS_PROG, ifindex, BPF_TC_INGRESS);
+    if (ret != NO_ERROR)
+        return ret;
+
+    ret = tc_attach_prog(ctx, TC_EGRESS_PROG, ifindex, BPF_TC_EGRESS);
+    if (ret != NO_ERROR)
+        return ret;
+
+    return NO_ERROR;
+}
+
 static int xdp_attach_prog_to_port(int *fd, psabpf_context_t *ctx, int ifindex, const char *prog)
 {
     __u32 flags;
@@ -172,24 +234,14 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
         }
     }
 
-    /* FIXME: using bash command only for the PoC purpose
-     *   use libbpf for installing TC programs, instead of 'tc filter' */
-    char cmd[256];
-    sprintf(cmd, "tc qdisc add dev %s clsact", intf);
-    system(cmd);
-    memset(cmd, 0, sizeof(cmd));
-    sprintf(cmd, "tc filter add dev %s ingress bpf da fd %s/%s%u/%s",
-            intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_INGRESS_PROG);
-    system(cmd);
-    memset(cmd, 0, sizeof(cmd));
-    sprintf(cmd, "tc filter add dev %s egress bpf da fd %s/%s%u/%s",
-            intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_EGRESS_PROG);
-    system(cmd);
+    ret = tc_create_hook_and_attach_progs(ctx, ifindex);
+    if (ret != NO_ERROR)
+        return ret;
 
     return NO_ERROR;
 }
 
-static int tc_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
+static int tc_port_add(psabpf_context_t *ctx, int ifindex)
 {
     int xdp_helper_fd;
 
@@ -198,19 +250,10 @@ static int tc_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
         return ret;
     close_object_fd(&xdp_helper_fd);
 
-    /* FIXME: using bash command only for the PoC purpose
-     *   use libbpf for installing TC programs, instead of 'tc filter' */
-    char cmd[256];
-    sprintf(cmd, "tc qdisc add dev %s clsact", intf);
-    system(cmd);
-    memset(cmd, 0, sizeof(cmd));
-    sprintf(cmd, "tc filter add dev %s ingress bpf da fd %s/%s%u/%s",
-            intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_INGRESS_PROG);
-    system(cmd);
-    memset(cmd, 0, sizeof(cmd));
-    sprintf(cmd, "tc filter add dev %s egress bpf da fd %s/%s%u/%s",
-            intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_EGRESS_PROG);
-    system(cmd);
+    ret = tc_create_hook_and_attach_progs(ctx, ifindex);
+    if (ret != NO_ERROR)
+        return ret;
+
     return NO_ERROR;
 }
 
@@ -396,7 +439,7 @@ int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *
     if (port_id != NULL)
         *port_id = ifindex;
 
-    return isXDP ? xdp_port_add(ctx, interface, ifindex) : tc_port_add(ctx, interface, ifindex);
+    return isXDP ? xdp_port_add(ctx, interface, ifindex) : tc_port_add(ctx, ifindex);
 }
 
 int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
