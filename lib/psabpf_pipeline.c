@@ -57,7 +57,7 @@ static int open_prog_by_name(psabpf_context_t *ctx, const char *prog)
     return bpf_obj_get(pinned_file);  // error in errno
 }
 
-static int tc_create_hook(int ifindex)
+static int tc_create_hook(int ifindex, const char *interface)
 {
     DECLARE_LIBBPF_OPTS(bpf_tc_hook, hook,
                         .ifindex = ifindex,
@@ -66,13 +66,13 @@ static int tc_create_hook(int ifindex)
     int ret = NO_ERROR;
     if (bpf_tc_hook_create(&hook) != 0) {
         ret = errno;
-        fprintf(stderr, "failed to create TC hook: %s\n", strerror(ret));
+        fprintf(stderr, "failed to create TC hook for interface %s: %s\n", interface, strerror(ret));
     }
 
     return ret;
 }
 
-static int tc_attach_prog(psabpf_context_t *ctx, const char *prog, int ifindex, enum bpf_tc_attach_point hook_point)
+static int tc_attach_prog(psabpf_context_t *ctx, const char *prog, int ifindex, enum bpf_tc_attach_point hook_point, const char *interface)
 {
     int ret = NO_ERROR;
     int fd = open_prog_by_name(ctx, prog);
@@ -95,24 +95,24 @@ static int tc_attach_prog(psabpf_context_t *ctx, const char *prog, int ifindex, 
 
     if (bpf_tc_attach(&hook, &opts) != 0) {
         ret = errno;
-        fprintf(stderr, "failed to attach bpf program: %s\n", strerror(ret));
+        fprintf(stderr, "failed to attach bpf program to interface %s: %s\n", interface, strerror(ret));
     }
     close(fd);
 
     return ret;
 }
 
-static int tc_create_hook_and_attach_progs(psabpf_context_t *ctx, int ifindex)
+static int tc_create_hook_and_attach_progs(psabpf_context_t *ctx, int ifindex, const char *interface)
 {
-    int ret = tc_create_hook(ifindex);
+    int ret = tc_create_hook(ifindex, interface);
     if (ret != NO_ERROR)
         return ret;
 
-    ret = tc_attach_prog(ctx, TC_INGRESS_PROG, ifindex, BPF_TC_INGRESS);
+    ret = tc_attach_prog(ctx, TC_INGRESS_PROG, ifindex, BPF_TC_INGRESS, interface);
     if (ret != NO_ERROR)
         return ret;
 
-    ret = tc_attach_prog(ctx, TC_EGRESS_PROG, ifindex, BPF_TC_EGRESS);
+    ret = tc_attach_prog(ctx, TC_EGRESS_PROG, ifindex, BPF_TC_EGRESS, interface);
     if (ret != NO_ERROR)
         return ret;
 
@@ -234,14 +234,14 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
         }
     }
 
-    ret = tc_create_hook_and_attach_progs(ctx, ifindex);
+    ret = tc_create_hook_and_attach_progs(ctx, ifindex, intf);
     if (ret != NO_ERROR)
         return ret;
 
     return NO_ERROR;
 }
 
-static int tc_port_add(psabpf_context_t *ctx, int ifindex)
+static int tc_port_add(psabpf_context_t *ctx, const char *interface, int ifindex)
 {
     int xdp_helper_fd;
 
@@ -250,7 +250,7 @@ static int tc_port_add(psabpf_context_t *ctx, int ifindex)
         return ret;
     close_object_fd(&xdp_helper_fd);
 
-    ret = tc_create_hook_and_attach_progs(ctx, ifindex);
+    ret = tc_create_hook_and_attach_progs(ctx, ifindex, interface);
     if (ret != NO_ERROR)
         return ret;
 
@@ -413,6 +413,8 @@ err_close_obj:
 
 int psabpf_pipeline_unload(psabpf_context_t *ctx)
 {
+    /* TODO: Should we scan all interfaces to detect if it uses current pipeline programs and detach it? */
+
     // FIXME: temporary solution [PoC-only].
     char cmd[256];
     sprintf(cmd, "rm -rf %s/%s%u",
@@ -439,7 +441,7 @@ int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *
     if (port_id != NULL)
         *port_id = ifindex;
 
-    return isXDP ? xdp_port_add(ctx, interface, ifindex) : tc_port_add(ctx, ifindex);
+    return isXDP ? xdp_port_add(ctx, interface, ifindex) : tc_port_add(ctx, interface, ifindex);
 }
 
 int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
