@@ -278,7 +278,7 @@ json_t *create_json_group_entry(psabpf_action_selector_context_t *ctx, psabpf_ac
 {
     json_t *group_root = json_object();
     json_t *members = json_array();
-    if (group_root ==NULL || members == NULL) {
+    if (group_root == NULL || members == NULL) {
         json_decref(group_root);
         json_decref(members);
         return NULL;
