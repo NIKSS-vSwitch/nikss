@@ -66,12 +66,8 @@ static int get_and_print_value_set_json(psabpf_value_set_context_t *ctx,
 
     json_object_set(root, value_set_name, entries);
 
-    psabpf_table_entry_ctx_t tec = {
-            .table = ctx->set_map,
-            .btf_metadata = ctx->btf_metadata,
-    };
     psabpf_table_entry_t *current_entry = NULL;
-    while ((current_entry = psabpf_table_entry_get_next(&tec)) != NULL) {
+    while ((current_entry = psabpf_value_set_get_next_entry(ctx)) != NULL) {
         json_t *json_entry = json_object();
         json_t *key = create_json_entry_key(current_entry);
         if (key == NULL) {

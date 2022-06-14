@@ -39,6 +39,14 @@ void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx) {
     if (ctx == NULL)
         return;
 
+    if (ctx->current_raw_key != NULL)
+        free(ctx->current_raw_key);
+    ctx->current_raw_key = NULL;
+
+    if (ctx->current_raw_key_mask != NULL)
+        free(ctx->current_raw_key_mask);
+    ctx->current_raw_key_mask = NULL;
+
     free_btf(&ctx->btf_metadata);
     close_object_fd(&(ctx->set_map.fd));
     free_struct_field_descriptor_set(&ctx->fds);
@@ -60,10 +68,24 @@ int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set
     }
 
     int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->set_map);
-    if (ret != NO_ERROR) {
-        fprintf(stderr, "couldn't open a value_set %s\n", name);
-        return ret;
+    /* if map does not exist, try the ternary table */
+    if (ret == ENOENT) {
+        psabpf_table_entry_ctx_t tbl_entry_ctx;
+        psabpf_table_entry_ctx_init(&tbl_entry_ctx);
+        ret = open_ternary_table(psabpf_ctx, &tbl_entry_ctx, name);
+
+        if (ret != NO_ERROR) {
+            fprintf(stderr, "couldn't open a value_set %s\n", name);
+            psabpf_table_entry_ctx_free(&tbl_entry_ctx);
+            return ret;
+        }
+
+        ctx->prefixes = tbl_entry_ctx.prefixes;
+        ctx->tuple_map = tbl_entry_ctx.tuple_map;
+
+        psabpf_table_entry_ctx_free(&tbl_entry_ctx);
     }
+
 
     if (parse_key_type(ctx) != NO_ERROR) {
         fprintf(stderr, "%s: couldn't parse structure of a value_set instance\n", name);
@@ -71,6 +93,54 @@ int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set
     }
 
     return NO_ERROR;
+}
+
+psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t *ctx) {
+    psabpf_table_entry_t * new_entry = NULL;
+    psabpf_table_entry_ctx_t tec = {
+            .table = ctx->set_map,
+            .btf_metadata = ctx->btf_metadata,
+    };
+
+    /* Copy current keys from value_set_ctx to table_entry_ctx */
+    if (ctx->current_raw_key != NULL) {
+        tec.current_raw_key = malloc(ctx->set_map.key_size);
+        tec.current_raw_key_mask = malloc(ctx->prefixes.key_size);
+        memcpy(tec.current_raw_key, ctx->current_raw_key, ctx->set_map.key_size);
+        memcpy(tec.current_raw_key_mask, ctx->current_raw_key_mask, ctx->prefixes.key_size);
+    }
+
+    if (psabpf_table_entry_get_next_key(&tec) != NO_ERROR) {
+        /* psabpf_table_entry_get_next_key free'ed a memory before */
+        ctx->current_raw_key = NULL;
+        ctx->current_raw_key_mask = NULL;
+        goto clean_up;
+    }
+
+    /* Copy current keys from table_entry_ctx to value_set_ctx */
+    if (ctx->current_raw_key != NULL)
+        free(ctx->current_raw_key);
+    ctx->current_raw_key = malloc(ctx->set_map.key_size);
+    memcpy(ctx->current_raw_key, tec.current_raw_key, ctx->set_map.key_size);
+
+    if (ctx->current_raw_key_mask != NULL)
+        free(ctx->current_raw_key_mask);
+    ctx->current_raw_key_mask = malloc(tec.prefixes.key_size);
+    memcpy(ctx->current_raw_key_mask, tec.current_raw_key_mask, tec.prefixes.key_size);
+
+    new_entry = malloc(sizeof(psabpf_table_entry_t));
+    psabpf_table_entry_init(new_entry);
+
+    int return_code = parse_table_key(&tec, new_entry, tec.current_raw_key, tec.current_raw_key_mask);
+    if (return_code != NO_ERROR) {
+        fprintf(stderr, "failed to parse entry: %s\n", strerror(return_code));
+        goto clean_up;
+    }
+
+clean_up:
+    psabpf_table_entry_ctx_free(&tec);
+
+    return new_entry;
 }
 
 int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry) {
