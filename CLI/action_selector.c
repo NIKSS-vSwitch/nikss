@@ -843,7 +843,6 @@ int do_action_selector_help(int argc, char **argv)
             "       %1$s action-selector add-to-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF\n"
             "       %1$s action-selector delete-from-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF\n"
             ""
-            /* TODO: rename to empty group action, not default */
             "       %1$s action-selector empty-group-action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]\n"
             ""
             "       %1$s action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | empty-group-action]\n"
