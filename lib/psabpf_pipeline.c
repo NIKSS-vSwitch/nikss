@@ -445,7 +445,6 @@ int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *
 int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
 {
     (void) ctx;
-    char cmd[256];
     __u32 flags = 0;
     int ifindex;
 
@@ -461,12 +460,16 @@ int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
         return -ret;
     }
 
-    // FIXME: temporary solution [PoC-only].
-    sprintf(cmd, "tc qdisc del dev %s clsact", interface);
-    ret = system(cmd);
-    if (ret) {
-        fprintf(stderr, "failed to detach TC program: %s\n", strerror(ret));
-        return ret;
+    DECLARE_LIBBPF_OPTS(bpf_tc_hook, hook,
+                        .ifindex = ifindex,
+                        .attach_point = BPF_TC_INGRESS | BPF_TC_EGRESS);
+    if (bpf_tc_hook_destroy(&hook) != 0) {
+        ret = errno;
+        /* Ignore error when qdisc does not exist, e.g. for XDP dummy program */
+        if (ret != ENOENT) {
+            fprintf(stderr, "failed to detach TC program from %s: %s\n", interface, strerror(ret));
+            return ret;
+        }
     }
 
     return NO_ERROR;
