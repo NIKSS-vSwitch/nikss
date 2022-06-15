@@ -15,8 +15,10 @@
  * limitations under the License.
  */
 
-/* For ftw.h - use newer function from POSIX 1995 */
+/* For ftw.h - use newer function from POSIX 1995. Other functions might be affected
+ * if behaviour was changed between this release and default one */
 #define _XOPEN_SOURCE 500
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -428,6 +430,12 @@ static int remove_pipeline_directory(psabpf_context_t *ctx)
     char pipeline_path[256];
     build_ebpf_pipeline_path(pipeline_path, sizeof(pipeline_path), ctx);
 
+    /* 16 - Maximum number of file descriptors used by nftw(). In case lack of
+     *      available file descriptors it can be reduced at the cost of performance.
+     * FTW_DEPTH - Call callback for the directory itself after handling the
+     *             contents of the directory and its subdirectories.
+     * FTW_MOUNT - Stay within the same filesystem (i.e., do not cross mount points).
+     * FTW_PHYS  - Do  not  follow  symbolic  links. */
     if (nftw(pipeline_path, remove_file, 16, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) != 0) {
         int err = errno;
         fprintf(stderr, "failed to remove pipeline directory: %s\n", strerror(err));
