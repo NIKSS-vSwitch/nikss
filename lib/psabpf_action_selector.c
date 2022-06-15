@@ -868,6 +868,7 @@ psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_m
 {
     if (ctx == NULL)
         return NULL;
+    /* key is a group reference, value contains member references, so both always are 32 bits */
     if (ctx->group.key_size != 4 || ctx->group.value_size != 4) {
         fprintf(stderr, "invalid group map\n");
         return NULL;
