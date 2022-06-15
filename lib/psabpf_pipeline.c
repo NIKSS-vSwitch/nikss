@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+/* For ftw.h - use newer function from POSIX 1995 */
+#define _XOPEN_SOURCE 500
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -24,8 +26,9 @@
 #include "bpf/bpf.h"
 #include "bpf/libbpf.h"
 #include <string.h>
+#include <ftw.h>
 
-#include "../include/psabpf_pipeline.h"
+#include <psabpf_pipeline.h>
 #include "bpf_defs.h"
 #include "common.h"
 #include "btf.h"
@@ -411,15 +414,34 @@ err_close_obj:
     return -ret;
 }
 
+static int remove_file(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
+{
+    (void) sb; (void) tflag; (void) ftwbuf;
+
+    /* Ignore any error and continue */
+    remove(fpath);
+    return 0;
+}
+
+static int remove_pipeline_directory(psabpf_context_t *ctx)
+{
+    char pipeline_path[256];
+    build_ebpf_pipeline_path(pipeline_path, sizeof(pipeline_path), ctx);
+
+    if (nftw(pipeline_path, remove_file, 16, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) != 0) {
+        int err = errno;
+        fprintf(stderr, "failed to remove pipeline directory: %s\n", strerror(err));
+        return err;
+    }
+
+    return NO_ERROR;
+}
+
 int psabpf_pipeline_unload(psabpf_context_t *ctx)
 {
     /* TODO: Should we scan all interfaces to detect if it uses current pipeline programs and detach it? */
 
-    // FIXME: temporary solution [PoC-only].
-    char cmd[256];
-    sprintf(cmd, "rm -rf %s/%s%u",
-            BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id);
-    return system(cmd);
+    return remove_pipeline_directory(ctx);
 }
 
 int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *port_id)
