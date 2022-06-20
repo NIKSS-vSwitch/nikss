@@ -15,6 +15,10 @@
  * limitations under the License.
  */
 
+/* For ftw.h - use newer function from POSIX 1995. Other functions might be affected
+ * if behaviour was changed between this release and default one */
+#define _XOPEN_SOURCE 500
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -24,8 +28,9 @@
 #include "bpf/bpf.h"
 #include "bpf/libbpf.h"
 #include <string.h>
+#include <ftw.h>
 
-#include "../include/psabpf_pipeline.h"
+#include <psabpf_pipeline.h>
 #include "bpf_defs.h"
 #include "common.h"
 #include "btf.h"
@@ -55,6 +60,71 @@ static int open_prog_by_name(psabpf_context_t *ctx, const char *prog)
     build_ebpf_prog_filename(pinned_file, sizeof(pinned_file), ctx, prog);
 
     return bpf_obj_get(pinned_file);  // error in errno
+}
+
+static int tc_create_hook(int ifindex, const char *interface)
+{
+    DECLARE_LIBBPF_OPTS(bpf_tc_hook, hook,
+                        .ifindex = ifindex,
+                        .attach_point = BPF_TC_INGRESS | BPF_TC_EGRESS);
+
+    int ret = NO_ERROR;
+    if (bpf_tc_hook_create(&hook) != 0) {
+        ret = errno;
+        fprintf(stderr, "failed to create TC hook for interface %s: %s\n", interface, strerror(ret));
+    }
+
+    return ret;
+}
+
+static int tc_attach_prog(psabpf_context_t *ctx, const char *prog, int ifindex, enum bpf_tc_attach_point hook_point, const char *interface)
+{
+    int ret = NO_ERROR;
+    int fd = open_prog_by_name(ctx, prog);
+    if (fd < 0) {
+        ret = errno;
+        if (ret == ENOENT && hook_point == BPF_TC_EGRESS) {
+            fprintf(stderr, "skipping empty egress program...\n");
+            return NO_ERROR;
+        }
+
+        fprintf(stderr, "failed to open program %s: %s\n", prog, strerror(ret));
+        return ret;
+    }
+
+    DECLARE_LIBBPF_OPTS(bpf_tc_hook, hook,
+                        .ifindex = ifindex,
+                        .attach_point = hook_point);
+    DECLARE_LIBBPF_OPTS(bpf_tc_opts, opts,
+                        .prog_fd = fd);
+
+    if (bpf_tc_attach(&hook, &opts) != 0) {
+        ret = errno;
+        fprintf(stderr, "failed to attach bpf program to interface %s: %s\n", interface, strerror(ret));
+        goto clean_up;
+    }
+
+clean_up:
+    close(fd);
+
+    return ret;
+}
+
+static int tc_create_hook_and_attach_progs(psabpf_context_t *ctx, int ifindex, const char *interface)
+{
+    int ret = tc_create_hook(ifindex, interface);
+    if (ret != NO_ERROR)
+        return ret;
+
+    ret = tc_attach_prog(ctx, TC_INGRESS_PROG, ifindex, BPF_TC_INGRESS, interface);
+    if (ret != NO_ERROR)
+        return ret;
+
+    ret = tc_attach_prog(ctx, TC_EGRESS_PROG, ifindex, BPF_TC_EGRESS, interface);
+    if (ret != NO_ERROR)
+        return ret;
+
+    return NO_ERROR;
 }
 
 static int xdp_attach_prog_to_port(int *fd, psabpf_context_t *ctx, int ifindex, const char *prog)
@@ -172,24 +242,14 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
         }
     }
 
-    /* FIXME: using bash command only for the PoC purpose
-     *   use libbpf for installing TC programs, instead of 'tc filter' */
-    char cmd[256];
-    sprintf(cmd, "tc qdisc add dev %s clsact", intf);
-    system(cmd);
-    memset(cmd, 0, sizeof(cmd));
-    sprintf(cmd, "tc filter add dev %s ingress bpf da fd %s/%s%u/%s",
-            intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_INGRESS_PROG);
-    system(cmd);
-    memset(cmd, 0, sizeof(cmd));
-    sprintf(cmd, "tc filter add dev %s egress bpf da fd %s/%s%u/%s",
-            intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_EGRESS_PROG);
-    system(cmd);
+    ret = tc_create_hook_and_attach_progs(ctx, ifindex, intf);
+    if (ret != NO_ERROR)
+        return ret;
 
     return NO_ERROR;
 }
 
-static int tc_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
+static int tc_port_add(psabpf_context_t *ctx, const char *interface, int ifindex)
 {
     int xdp_helper_fd;
 
@@ -198,19 +258,10 @@ static int tc_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
         return ret;
     close_object_fd(&xdp_helper_fd);
 
-    /* FIXME: using bash command only for the PoC purpose
-     *   use libbpf for installing TC programs, instead of 'tc filter' */
-    char cmd[256];
-    sprintf(cmd, "tc qdisc add dev %s clsact", intf);
-    system(cmd);
-    memset(cmd, 0, sizeof(cmd));
-    sprintf(cmd, "tc filter add dev %s ingress bpf da fd %s/%s%u/%s",
-            intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_INGRESS_PROG);
-    system(cmd);
-    memset(cmd, 0, sizeof(cmd));
-    sprintf(cmd, "tc filter add dev %s egress bpf da fd %s/%s%u/%s",
-            intf, BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id, TC_EGRESS_PROG);
-    system(cmd);
+    ret = tc_create_hook_and_attach_progs(ctx, ifindex, interface);
+    if (ret != NO_ERROR)
+        return ret;
+
     return NO_ERROR;
 }
 
@@ -368,13 +419,40 @@ err_close_obj:
     return -ret;
 }
 
+static int remove_file(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
+{
+    (void) sb; (void) tflag; (void) ftwbuf;
+
+    /* Ignore any error and continue */
+    remove(fpath);
+    return 0;
+}
+
+static int remove_pipeline_directory(psabpf_context_t *ctx)
+{
+    char pipeline_path[256];
+    build_ebpf_pipeline_path(pipeline_path, sizeof(pipeline_path), ctx);
+
+    /* 16 - Maximum number of file descriptors used by nftw(). In case lack of
+     *      available file descriptors it can be reduced at the cost of performance.
+     * FTW_DEPTH - Call callback for the directory itself after handling the
+     *             contents of the directory and its subdirectories.
+     * FTW_MOUNT - Stay within the same filesystem (i.e., do not cross mount points).
+     * FTW_PHYS  - Do  not  follow  symbolic  links. */
+    if (nftw(pipeline_path, remove_file, 16, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) != 0) {
+        int err = errno;
+        fprintf(stderr, "failed to remove pipeline directory: %s\n", strerror(err));
+        return err;
+    }
+
+    return NO_ERROR;
+}
+
 int psabpf_pipeline_unload(psabpf_context_t *ctx)
 {
-    // FIXME: temporary solution [PoC-only].
-    char cmd[256];
-    sprintf(cmd, "rm -rf %s/%s%u",
-            BPF_FS, PIPELINE_PREFIX, ctx->pipeline_id);
-    return system(cmd);
+    /* TODO: Should we scan all interfaces to detect if it uses current pipeline programs and detach it? */
+
+    return remove_pipeline_directory(ctx);
 }
 
 int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *port_id)
@@ -402,7 +480,6 @@ int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *
 int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
 {
     (void) ctx;
-    char cmd[256];
     __u32 flags = 0;
     int ifindex;
 
@@ -418,12 +495,16 @@ int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
         return -ret;
     }
 
-    // FIXME: temporary solution [PoC-only].
-    sprintf(cmd, "tc qdisc del dev %s clsact", interface);
-    ret = system(cmd);
-    if (ret) {
-        fprintf(stderr, "failed to detach TC program: %s\n", strerror(ret));
-        return ret;
+    DECLARE_LIBBPF_OPTS(bpf_tc_hook, hook,
+                        .ifindex = ifindex,
+                        .attach_point = BPF_TC_INGRESS | BPF_TC_EGRESS);
+    if (bpf_tc_hook_destroy(&hook) != 0) {
+        ret = errno;
+        /* Ignore error when qdisc does not exist, e.g. for XDP dummy program */
+        if (ret != ENOENT) {
+            fprintf(stderr, "failed to detach TC program from %s: %s\n", interface, strerror(ret));
+            return ret;
+        }
     }
 
     return NO_ERROR;

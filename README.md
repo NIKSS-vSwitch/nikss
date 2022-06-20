@@ -10,7 +10,6 @@ Psabpf depends on following libraries and utilities:
 - [CMake](https://cmake.org/)
 - C compiler, GCC is tested
 - [git](https://git-scm.com/) for version control
-- [iproute2](https://wiki.linuxfoundation.org/networking/iproute2) (dependency might be removed in the future, see issue #1)
 - GNU Multiple Precision Arithmetic Library [GMP](http://gmplib.org/)
 - [libelf](https://sourceware.org/elfutils/)
 - [zlib](http://zlib.net/)
@@ -19,7 +18,7 @@ Psabpf depends on following libraries and utilities:
 All the dependencies can be installed on Ubuntu 20.04 with the following command:
 
 ```shell
-sudo apt install iproute2 make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev
+sudo apt install make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev
 ```
 
 Note that `psabpf-ctl` is statically linked with shipped `libbpf`, so there is no need to install this library
