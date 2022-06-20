@@ -1635,9 +1635,9 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
 
     /* validate size and offset */
     if (md->tuple_id_offset + md->tuple_id_size > ctx->prefixes.value_size ||
-            md->next_mask_offset + md->next_mask_size > ctx->prefixes.value_size ||
-            md->has_next_offset + md->has_next_size > ctx->prefixes.value_size ||
-            md->next_mask_size != ctx->table.key_size) {
+        md->next_mask_offset + md->next_mask_size > ctx->prefixes.value_size ||
+        md->has_next_offset + md->has_next_size > ctx->prefixes.value_size ||
+        md->next_mask_size != ctx->table.key_size) {
         fprintf(stderr, "BUG: invalid size or offset in the mask\n");
         return EPERM;
     }
@@ -1711,7 +1711,7 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
 
     err = NO_ERROR;
 
-    clean_up:
+clean_up:
     if (key != NULL)
         free(key);
     if (value != NULL)
@@ -1831,7 +1831,7 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         err = ternary_table_add_tuple_and_open(ctx, tuple_id);
     }
 
-    clean_up:
+clean_up:
     if (value_mask != NULL)
         free(value_mask);
 
@@ -1878,7 +1878,7 @@ int delete_all_map_entries(psabpf_bpf_map_descriptor_t *map)
             bpf_map_delete_elem(map->fd, key);
     } while (bpf_map_get_next_key(map->fd, key, next_key) == 0);
 
-    clean_up:
+clean_up:
     if (key)
         free(key);
     if (next_key)
@@ -1976,7 +1976,7 @@ static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         }
     }
 
-    clean_up:
+clean_up:
     if (key_buffer != NULL)
         free(key_buffer);
     if (key_mask_buffer != NULL)
@@ -2096,7 +2096,7 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, const char
 
     err = NO_ERROR;
 
-    clean_up:
+clean_up:
     if (prev_key_mask != NULL)
         free(prev_key_mask);
     if (prev_value_mask != NULL)
@@ -2127,7 +2127,7 @@ static int post_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, const char *
         err = ternary_table_remove_prefix(ctx, key_mask);
     }
 
-    clean_up:
+clean_up:
     if (tuple_next_key != NULL)
         free(tuple_next_key);
 
@@ -2207,7 +2207,7 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         }
     }
 
-    clean_up:
+clean_up:
     /* cleanup ternary table */
     if (ctx->is_ternary)
         post_ternary_table_delete(ctx, key_mask_buffer);
@@ -2278,7 +2278,7 @@ int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
         }
     }
 
-    clean_up:
+clean_up:
     if (value_buffer != NULL)
         free(value_buffer);
 
@@ -2594,7 +2594,7 @@ int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     if (return_code != NO_ERROR)
         fprintf(stderr, "failed to parse entry: %s\n", strerror(return_code));
 
-    clean_up:
+clean_up:
     if (key_buffer != NULL)
         free(key_buffer);
     if (key_mask_buffer != NULL)
@@ -2804,7 +2804,7 @@ static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
         ctx->table.fd = bpf_map_get_fd_by_id(inner_map_id);
     }
 
-    clean_up:
+clean_up:
     if (prefix_value != NULL)
         free(prefix_value);
     if (next_key != NULL)
@@ -2916,7 +2916,7 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
 
     ret_instance = &ctx->current_entry;
 
-    clean_up:
+clean_up:
     if (value_buffer)
         free(value_buffer);
 
@@ -2968,7 +2968,7 @@ int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
     if (return_code != NO_ERROR)
         fprintf(stderr, "failed to parse default entry: %s\n", strerror(return_code));
 
-    clean_up:
+clean_up:
     if (value_buffer != NULL)
         free(value_buffer);
 
