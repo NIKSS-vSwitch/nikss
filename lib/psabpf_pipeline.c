@@ -101,7 +101,10 @@ static int tc_attach_prog(psabpf_context_t *ctx, const char *prog, int ifindex, 
     if (bpf_tc_attach(&hook, &opts) != 0) {
         ret = errno;
         fprintf(stderr, "failed to attach bpf program to interface %s: %s\n", interface, strerror(ret));
+        goto clean_up;
     }
+
+clean_up:
     close(fd);
 
     return ret;
