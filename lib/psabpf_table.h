@@ -34,5 +34,6 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
 int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
                     const void *key, const void *key_mask);
 int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name);
+int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx);
 
 #endif  /* P4C_PSABPF_TABLE_H */

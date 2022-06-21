@@ -110,7 +110,7 @@ psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t
         memcpy(tec.current_raw_key_mask, ctx->current_raw_key_mask, ctx->prefixes.key_size);
     }
 
-    if (psabpf_table_entry_get_next_key(&tec) != NO_ERROR) {
+    if (psabpf_table_entry_goto_next_key(&tec) != NO_ERROR) {
         /* psabpf_table_entry_get_next_key free'ed a memory before */
         ctx->current_raw_key = NULL;
         ctx->current_raw_key_mask = NULL;

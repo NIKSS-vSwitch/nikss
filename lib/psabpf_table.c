@@ -2818,7 +2818,7 @@ clean_up:
     return ret_code;
 }
 
-int psabpf_table_entry_get_next_key(psabpf_table_entry_ctx_t *ctx) {
+int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
     psabpf_table_entry_t *ret_instance = NULL;
     void *next_key = NULL; /* do not free */
 
@@ -2879,7 +2879,7 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
     if (ctx == NULL)
         return NULL;
 
-    if (psabpf_table_entry_get_next_key(ctx) != NO_ERROR) {
+    if (psabpf_table_entry_goto_next_key(ctx) != NO_ERROR) {
         /* Error or no next key */
         return NULL;
     }
