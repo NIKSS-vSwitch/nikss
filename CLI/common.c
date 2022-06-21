@@ -340,3 +340,153 @@ char * convert_bin_data_to_hexstr(const void *data, size_t len)
 
     return buff;
 }
+
+static json_t *create_json_match_key(psabpf_match_key_t *mk)
+{
+    json_t *root = json_object();
+    if (root == NULL)
+        return NULL;
+
+    char *value_str = convert_bin_data_to_hexstr(psabpf_matchkey_get_data(mk), psabpf_matchkey_get_data_size(mk));
+    char *mask_str = convert_bin_data_to_hexstr(psabpf_matchkey_get_mask(mk), psabpf_matchkey_get_mask_size(mk));
+    bool failed = false;
+
+    switch (psabpf_matchkey_get_type(mk)) {
+        case PSABPF_EXACT:
+            json_object_set_new(root, "type", json_string("exact"));
+            if (value_str != NULL)
+                json_object_set_new(root, "value", json_string(value_str));
+            else
+                failed = true;
+            break;
+
+        case PSABPF_LPM:
+            json_object_set_new(root, "type", json_string("lpm"));
+            if (value_str != NULL)
+                json_object_set_new(root, "value", json_string(value_str));
+            else
+                failed = true;
+            json_object_set_new(root, "prefix_len", json_integer(psabpf_matchkey_get_prefix_len(mk)));
+            break;
+
+        case PSABPF_TERNARY:
+            json_object_set_new(root, "type", json_string("ternary"));
+            if (value_str != NULL && mask_str != NULL) {
+                json_object_set_new(root, "value", json_string(value_str));
+                json_object_set_new(root, "mask", json_string(mask_str));
+            } else
+                failed = true;
+            break;
+
+        default:
+            json_object_set_new(root, "type", json_string("unknown"));
+    }
+
+    if (failed) {
+        fprintf(stderr, "failed to parse match key\n");
+        json_decref(root);
+        root = NULL;
+    }
+
+    if (value_str != NULL)
+        free(value_str);
+    if (mask_str != NULL)
+        free(mask_str);
+
+    return root;
+}
+
+json_t *create_json_entry_key(psabpf_table_entry_t *entry)
+{
+    json_t *keys = json_array();
+    if (keys == NULL)
+        return NULL;
+
+    psabpf_match_key_t *mk = NULL;
+    while ((mk = psabpf_table_entry_get_next_matchkey(entry)) != NULL) {
+        json_t *key_entry = create_json_match_key(mk);
+        if (key_entry == NULL) {
+            json_decref(keys);
+            return NULL;
+        }
+        json_array_append_new(keys, key_entry);
+        psabpf_matchkey_free(mk);
+    }
+
+    return keys;
+}
+
+int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
+{
+    bool has_any_key = false;
+    int error_code = EPERM;
+
+    do {
+        NEXT_ARGP_RET();
+        if (is_keyword(**argv, "data") || is_keyword(**argv, "priority"))
+            return NO_ERROR;
+
+        if (is_keyword(**argv, "none")) {
+            if (!has_any_key) {
+                NEXT_ARGP();
+                return NO_ERROR;
+            } else {
+                fprintf(stderr, "Unexpected none key\n");
+                return EPERM;
+            }
+        }
+
+        psabpf_match_key_t mk;
+        psabpf_matchkey_init(&mk);
+        char *substr_ptr;
+        if ((substr_ptr = strstr(**argv, "/")) != NULL) {
+            psabpf_matchkey_type(&mk, PSABPF_LPM);
+            *(substr_ptr++) = 0;
+            if (*substr_ptr == 0) {
+                fprintf(stderr, "missing prefix length for LPM key\n");
+                return EINVAL;
+            }
+            error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
+            if (error_code != NO_ERROR)
+                return error_code;
+            char *ptr;
+            psabpf_matchkey_prefix_len(&mk, strtoul(substr_ptr, &ptr, 0));
+            if (*ptr) {
+                fprintf(stderr, "%s: unable to parse prefix length\n", substr_ptr);
+                return EINVAL;
+            }
+        } else if (strstr(**argv, "..") != NULL) {
+            fprintf(stderr, "range match key not supported yet\n");
+            return ENOTSUP;
+        } else if ((substr_ptr = strstr(**argv, "^")) != NULL) {
+            psabpf_matchkey_type(&mk, PSABPF_TERNARY);
+            /* Split data and mask */
+            *substr_ptr = 0;
+            substr_ptr++;
+            if (*substr_ptr == 0) {
+                fprintf(stderr, "missing mask for ternary key\n");
+                return EINVAL;
+            }
+            error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
+            if (error_code != NO_ERROR)
+                return error_code;
+            error_code = translate_data_to_bytes(substr_ptr, &mk, CTX_MATCH_KEY_TERNARY_MASK);
+            if (error_code != NO_ERROR)
+                return error_code;
+        } else {
+            psabpf_matchkey_type(&mk, PSABPF_EXACT);
+            error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
+            if (error_code != NO_ERROR)
+                return error_code;
+        }
+        error_code = psabpf_table_entry_matchkey(entry, &mk);
+        psabpf_matchkey_free(&mk);
+        if (error_code != NO_ERROR)
+            return error_code;
+
+        has_any_key = true;
+    } while ((*argc) > 1);
+    NEXT_ARGP();
+
+    return NO_ERROR;
+}

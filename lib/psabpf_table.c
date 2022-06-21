@@ -80,7 +80,7 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     free_struct_field_descriptor_set(&ctx->table_implementations);
     free_struct_field_descriptor_set(&ctx->table_implementation_group_marks);
 
-    if (ctx->current_raw_key == NULL)
+    if (ctx->current_raw_key != NULL)
         free(ctx->current_raw_key);
     ctx->current_raw_key = NULL;
 
@@ -325,7 +325,7 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
     return init_direct_objects_context(ctx);
 }
 
-static int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
+int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
 {
     int ret;
     char derived_name[256];
@@ -999,7 +999,7 @@ static int write_buffer_btf(char * buffer, size_t buffer_len, size_t offset,
     return NO_ERROR;
 }
 
-static int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     size_t bytes_to_write = ctx->table.key_size;
     uint32_t *lpm_prefix = NULL;
@@ -1062,7 +1062,7 @@ static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_t
     return false;
 }
 
-static int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     uint32_t key_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->table.btf_type_id, "key");
     if (key_type_id == 0)
@@ -1484,10 +1484,10 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
 }
 
 /* Please use this function instead of using directly family of fill_*() functions */
-static int construct_buffer(char * buffer, size_t buffer_len,
-                            psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                            int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
-                            int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *))
+int construct_buffer(char * buffer, size_t buffer_len,
+                     psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                     int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
+                     int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *))
 {
     /* When BTF info mode fails we can fallback to byte by byte mode */
     int return_code = EAGAIN;
@@ -2235,7 +2235,7 @@ int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
         return EBADF;
     }
     if (ctx->default_entry.key_size != sizeof(key) ||
-        ctx->default_entry.value_size == 0 || ctx->default_entry.value_size != ctx->table.value_size) {
+            ctx->default_entry.value_size == 0 || ctx->default_entry.value_size != ctx->table.value_size) {
         fprintf(stderr, "key size or value is not supported\n");
         return ENOTSUP;
     }
@@ -2733,8 +2733,8 @@ static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     return NO_ERROR;
 }
 
-static int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                           const void *key, const void *key_mask)
+int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                    const void *key, const void *key_mask)
 {
     if (ctx->btf_metadata.btf == NULL || ctx->table.btf_type_id == 0)
         return parse_table_key_no_btf(ctx, entry, key, key_mask);
@@ -2818,37 +2818,35 @@ clean_up:
     return ret_code;
 }
 
-psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
-{
+int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
     psabpf_table_entry_t *ret_instance = NULL;
     void *next_key = NULL; /* do not free */
-    void *value_buffer = NULL;
 
     if (ctx == NULL)
-        return NULL;
+        return ENODATA;
 
     if (ctx->is_ternary) {
         if (get_next_ternary_table_key_mask(ctx) != NO_ERROR) {
             if (ctx->table.fd < 0)
-                return NULL;  /* Silently ignore error when table is empty */
+                return NO_ERROR;  /* Silently ignore error when table is empty */
             fprintf(stderr, "failed to iterate over table key masks\n");
-            return NULL;
+            return ENODATA;
         }
     }
 
     if (ctx->table.fd < 0) {
         fprintf(stderr, "can't get entry: table not opened\n");
-        return NULL;
+        return ENODATA;
     }
     if (ctx->table.key_size == 0 || ctx->table.value_size == 0) {
         fprintf(stderr, "zero-size key or value is not supported\n");
-        return NULL;
+        return ENODATA;
     }
 
     next_key = malloc(ctx->table.key_size);
     if (next_key == NULL) {
         fprintf(stderr, "not enough memory\n");
-        goto clean_up;
+        return ENOMEM;
     }
 
     if (bpf_map_get_next_key(ctx->table.fd, ctx->current_raw_key, next_key) != 0) {
@@ -2862,12 +2860,29 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
             free(ctx->current_raw_key_mask);
         ctx->current_raw_key_mask = NULL;
 
-        goto clean_up;
+        return ENODATA;
     }
 
     if (ctx->current_raw_key != NULL)
         free(ctx->current_raw_key);
     ctx->current_raw_key = next_key;
+
+    return NO_ERROR;
+}
+
+psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
+{
+    psabpf_table_entry_t *ret_instance = NULL;
+    void *next_key = NULL; /* do not free */
+    void *value_buffer = NULL;
+
+    if (ctx == NULL)
+        return NULL;
+
+    if (psabpf_table_entry_goto_next_key(ctx) != NO_ERROR) {
+        /* Error or no next key */
+        return NULL;
+    }
 
     value_buffer = malloc(ctx->table.value_size);
     if (value_buffer == NULL || ctx->current_raw_key == NULL) {
