@@ -81,14 +81,15 @@ this situation.
 # Action Selectors
 
 ```shell
-psabpf-ctl action-selector add_member pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
-psabpf-ctl action-selector delete_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF
-psabpf-ctl action-selector update_member pipe ID ACTION_SELECTOR_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]
-psabpf-ctl action-selector create_group pipe ID ACTION_SELECTOR_NAME
-psabpf-ctl action-selector delete_group pipe ID ACTION_SELECTOR_NAME GROUP_REF
-psabpf-ctl action-selector add_to_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF
-psabpf-ctl action-selector delete_from_group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF
-psabpf-ctl action-selector default_group_action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector add-member pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector delete-member pipe ID ACTION_SELECTOR_NAME MEMBER_REF
+psabpf-ctl action-selector update-member pipe ID ACTION_SELECTOR_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector create-group pipe ID ACTION_SELECTOR_NAME
+psabpf-ctl action-selector delete-group pipe ID ACTION_SELECTOR_NAME GROUP_REF
+psabpf-ctl action-selector add-to-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF
+psabpf-ctl action-selector delete-from-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF
+psabpf-ctl action-selector empty-group-action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
+psabpf-ctl action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | empty-group-action]
 
 ACTION := { id ACTION_ID | name ACTION_NAME }
 ACTION_PARAMS := { DATA }

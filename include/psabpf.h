@@ -537,6 +537,8 @@ int psabpf_direct_meter_get_entry(psabpf_direct_meter_context_t *dm_ctx, psabpf_
 typedef struct psabpf_action_selector_member_context {
     uint32_t member_ref;
     psabpf_action_t action;
+    psabpf_action_param_t current_action_param;
+    size_t current_action_param_id;
 } psabpf_action_selector_member_context_t;
 
 typedef struct psabpf_action_selector_group_context {
@@ -549,8 +551,14 @@ typedef struct psabpf_action_selector_context {
     psabpf_bpf_map_descriptor_t map_of_groups;
     psabpf_bpf_map_descriptor_t group;
     psabpf_bpf_map_descriptor_t map_of_members;
-    psabpf_bpf_map_descriptor_t default_group_action;
+    psabpf_bpf_map_descriptor_t empty_group_action;
     psabpf_bpf_map_descriptor_t cache;
+
+    /* For iteration */
+    psabpf_action_selector_group_context_t current_group;
+    uint32_t current_group_id;
+    psabpf_action_selector_member_context_t current_member;
+    uint32_t current_member_id; /* used to iterate over members of group and over all possible members */
 } psabpf_action_selector_context_t;
 
 void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx);
@@ -587,9 +595,27 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
                                                  psabpf_action_selector_member_context_t *member);
 
 /* Reuse table API */
-int psabpf_action_selector_set_default_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action);
+int psabpf_action_selector_set_empty_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action);
+int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context_t *ctx,
+                                                  psabpf_action_selector_member_context_t *member);
 /* See psabpf_table_get_action_id_by_name() */
 uint32_t psabpf_action_selector_get_action_id_by_name(psabpf_action_selector_context_t *ctx, const char *name);
+
+int psabpf_action_selector_get_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group);
+psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(psabpf_action_selector_context_t *ctx);
+psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_member(psabpf_action_selector_context_t *ctx,
+                                                                                      psabpf_action_selector_group_context_t *group);
+psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_member(psabpf_action_selector_context_t *ctx);
+int psabpf_action_selector_get_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member);
+
+uint32_t psabpf_action_selector_get_member_action_id(psabpf_action_selector_context_t *ctx,
+                                                     psabpf_action_selector_member_context_t *member);
+const char *psabpf_action_selector_get_member_action_name(psabpf_action_selector_context_t *ctx,
+                                                          psabpf_action_selector_member_context_t *member);
+psabpf_action_param_t *psabpf_action_selector_action_param_get_next(psabpf_action_selector_member_context_t *member);
+const char *psabpf_action_selector_action_param_get_name(psabpf_action_selector_context_t *ctx,
+                                                         psabpf_action_selector_member_context_t *member,
+                                                         psabpf_action_param_t *param);
 
 /*
  * TODO: Action Profile

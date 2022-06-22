@@ -27,20 +27,22 @@ int do_action_selector_create_group(int argc, char **argv);
 int do_action_selector_delete_group(int argc, char **argv);
 int do_action_selector_add_to_group(int argc, char **argv);
 int do_action_selector_delete_from_group(int argc, char **argv);
-int do_action_selector_default_group_action(int argc, char **argv);
+int do_action_selector_empty_group_action(int argc, char **argv);
+int do_action_selector_get(int argc, char **argv);
 
 int do_action_selector_help(int argc, char **argv);
 
 static const struct cmd action_selector_cmds[] = {
-        {"add_member",           do_action_selector_add_member},
-        {"delete_member",        do_action_selector_delete_member},
-        {"update_member",        do_action_selector_update_member},
-        {"create_group",         do_action_selector_create_group},
-        {"delete_group",         do_action_selector_delete_group},
-        {"add_to_group",         do_action_selector_add_to_group},
-        {"delete_from_group",    do_action_selector_delete_from_group},
-        {"default_group_action", do_action_selector_default_group_action},
         {"help",                 do_action_selector_help},
+        {"add-member",           do_action_selector_add_member},
+        {"delete-member",        do_action_selector_delete_member},
+        {"update-member",        do_action_selector_update_member},
+        {"create-group",         do_action_selector_create_group},
+        {"delete-group",         do_action_selector_delete_group},
+        {"add-to-group",         do_action_selector_add_to_group},
+        {"delete-from-group",    do_action_selector_delete_from_group},
+        {"empty-group-action",   do_action_selector_empty_group_action},
+        {"get",                  do_action_selector_get},
         {0}
 };
 
