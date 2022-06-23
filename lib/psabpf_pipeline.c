@@ -509,3 +509,115 @@ int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
 
     return NO_ERROR;
 }
+
+int psabpf_port_list_init(psabpf_port_list_t *list, psabpf_context_t *ctx)
+{
+    int ret = NO_ERROR;
+    if (list == NULL || ctx == NULL)
+        return EINVAL;
+
+    memset(list, 0, sizeof(psabpf_port_list_t));
+
+    list->port_list = if_nameindex();
+    if (list->port_list == NULL)
+        return errno;
+
+    int fd = open_prog_by_name(ctx, XDP_HELPER_PROG);
+    if (fd < 0) {
+        /* XDP helper not found, try XDP ingress program */
+        fd = open_prog_by_name(ctx, XDP_INGRESS_PROG);
+    }
+
+    if (fd < 0) {
+        ret = errno;
+        fprintf(stderr, "failed to open pipeline program: %s\n", strerror(ret));
+        return ret;
+    }
+
+    struct bpf_prog_info prog_info = {};
+    unsigned len = sizeof(struct bpf_prog_info);
+    if (bpf_obj_get_info_by_fd(fd, &prog_info, &len) != 0) {
+        ret = errno;
+        fprintf(stderr, "failed to get BPF program info: %s\n", strerror(ret));
+        goto free_program;
+    }
+
+    list->xdp_prog_id = prog_info.id;
+
+free_program:
+    close(fd);
+    return ret;
+}
+
+void psabpf_port_list_free(psabpf_port_list_t *list)
+{
+    if (list == NULL)
+        return;
+
+    if (list->port_list != NULL)
+        if_freenameindex(list->port_list);
+
+    list->port_list = NULL;
+    list->current_list_node = NULL;
+}
+
+psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list)
+{
+    if (list == NULL)
+        return NULL;
+    if (list->port_list == NULL)
+        return NULL;
+
+    bool iface_found = false;
+
+    while (!iface_found) {
+        if (list->current_list_node == NULL)
+            list->current_list_node = list->port_list;
+        else
+            list->current_list_node = ((struct if_nameindex *) list->current_list_node) + 1;
+
+        list->current_port.id = ((struct if_nameindex *) list->current_list_node)->if_index;
+        list->current_port.name = ((struct if_nameindex *) list->current_list_node)->if_name;
+
+        if (list->current_port.id == 0 || list->current_port.name == NULL) {
+            /* End of the list */
+            list->current_list_node = NULL;
+            return NULL;
+        }
+
+        uint32_t prog_id = 0;
+        int ret = bpf_get_link_xdp_id((int) list->current_port.id, &prog_id, 0);
+        if (ret != 0 || prog_id == 0)
+            continue;
+
+        if (prog_id == list->xdp_prog_id) {
+            iface_found = true;
+            break;
+        }
+    }
+
+    if (!iface_found)
+        return NULL;
+    return &list->current_port;
+}
+
+const char * psabpf_port_spec_get_name(psabpf_port_spec_t *port)
+{
+    if (port == NULL)
+        return NULL;
+
+    return port->name;
+}
+
+unsigned psabpf_port_sepc_get_id(psabpf_port_spec_t *port)
+{
+    if (port == NULL)
+        return 0;
+
+    return port->id;
+}
+
+void psabpf_port_spec_free(psabpf_port_spec_t *port)
+{
+    (void) port;
+}

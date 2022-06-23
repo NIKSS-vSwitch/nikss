@@ -23,3 +23,23 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file);
 int psabpf_pipeline_unload(psabpf_context_t *ctx);
 int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *port_id);
 int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface);
+
+typedef struct psabpf_port_spec {
+    const char *name;
+    unsigned id;
+} psabpf_port_spec_t;
+
+typedef struct psabpf_port_list {
+    void *port_list;
+    void *current_list_node;
+    psabpf_port_spec_t current_port;
+    unsigned xdp_prog_id; /* XDP program is always present if port is attached */
+} psabpf_port_list_t;
+
+int psabpf_port_list_init(psabpf_port_list_t *list, psabpf_context_t *ctx);
+void psabpf_port_list_free(psabpf_port_list_t *list);
+
+psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list);
+const char * psabpf_port_spec_get_name(psabpf_port_spec_t *port);
+unsigned psabpf_port_sepc_get_id(psabpf_port_spec_t *port);
+void psabpf_port_spec_free(psabpf_port_spec_t *port);

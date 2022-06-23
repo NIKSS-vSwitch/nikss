@@ -25,11 +25,13 @@ int do_pipeline_load(int argc, char **argv);
 int do_pipeline_unload(int argc, char **argv);
 int do_pipeline_port_add(int argc, char **argv);
 int do_pipeline_port_del(int argc, char **argv);
+int do_pipeline_show(int argc, char **argv);
 
 static const struct cmd pipeline_cmds[] = {
         {"help",     do_pipeline_help },
         {"load",     do_pipeline_load },
         {"unload",   do_pipeline_unload },
+        {"show",     do_pipeline_show },
         {0}
 };
 
