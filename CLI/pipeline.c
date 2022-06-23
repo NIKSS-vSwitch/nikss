@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <jansson.h>
 
 #include <psabpf.h>
@@ -43,6 +44,11 @@ static void print_port(const char *intf, int ifindex) {
 
 static int print_pipeline_json(psabpf_context_t *ctx)
 {
+    char date_buf[256];
+    uint64_t load_timestamp = psabpf_pipeline_get_load_timestamp(ctx);
+    /* format timestamp to ISO 8601 date */
+    strftime(date_buf, sizeof(date_buf), "%Y-%m-%dT%H:%M:%S%z", localtime((time_t *) &load_timestamp));
+
     psabpf_port_list_t list;
     psabpf_port_list_init(&list, ctx);
 
@@ -52,6 +58,7 @@ static int print_pipeline_json(psabpf_context_t *ctx)
 
     json_object_set_new(root, "pipeline", pipeline);
     json_object_set_new(pipeline, "id", json_integer(psabpf_context_get_pipeline(ctx)));
+    json_object_set_new(pipeline, "load_time", json_string(date_buf));
     json_object_set_new(pipeline, "ports", ports_root);
 
     psabpf_port_spec_t *port;
@@ -60,7 +67,6 @@ static int print_pipeline_json(psabpf_context_t *ctx)
         json_array_append(ports_root, entry);
         psabpf_port_spec_free(port);
     }
-
     psabpf_port_list_free(&list);
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);

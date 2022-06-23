@@ -29,6 +29,7 @@
 #include "bpf/libbpf.h"
 #include <string.h>
 #include <ftw.h>
+#include <sys/time.h>
 
 #include <psabpf_pipeline.h>
 #include "bpf_defs.h"
@@ -620,4 +621,59 @@ unsigned psabpf_port_sepc_get_id(psabpf_port_spec_t *port)
 void psabpf_port_spec_free(psabpf_port_spec_t *port)
 {
     (void) port;
+}
+
+
+
+uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx)
+{
+    uint64_t load_timestamp = 0;
+    int fd = open_prog_by_name(ctx, XDP_HELPER_PROG);
+    if (fd < 0) {
+        /* XDP helper not found, try XDP ingress program */
+        fd = open_prog_by_name(ctx, XDP_INGRESS_PROG);
+    }
+
+    if (fd < 0) {
+        fprintf(stderr, "failed to open pipeline program: %s\n", strerror(errno));
+        return 0;
+    }
+
+    struct bpf_prog_info prog_info = {};
+    unsigned len = sizeof(struct bpf_prog_info);
+    if (bpf_obj_get_info_by_fd(fd, &prog_info, &len) != 0) {
+        fprintf(stderr, "failed to get BPF program info: %s\n", strerror(errno));
+        goto clean_up;
+    }
+    double load_time = (double) prog_info.load_time / 1e9;
+
+    double uptime = 0;
+    FILE *uptime_file = fopen("/proc/uptime", "r");
+    if (uptime_file != NULL) {
+        char buf[BUFSIZ];
+        char *b = fgets(buf, BUFSIZ, uptime_file);
+        fclose(uptime_file);
+
+        char *end_ptr;
+        if (b == buf)
+            uptime = strtod(buf, &end_ptr);
+        else
+            goto clean_up;
+    } else {
+        fprintf(stderr, "failed to get uptime: %s\n", strerror(errno));
+        goto clean_up;
+    }
+
+    struct timeval tv;
+    if (gettimeofday(&tv, NULL) != 0) {
+        fprintf(stderr, "failed to get current time: %s\n", strerror(errno));
+        goto clean_up;
+    }
+    double now = (double) tv.tv_sec + ((double) tv.tv_usec) / 1e6;
+
+    load_timestamp = (uint64_t) (now - uptime + load_time);
+
+clean_up:
+    close(fd);
+    return load_timestamp;
 }

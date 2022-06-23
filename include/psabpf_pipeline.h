@@ -43,3 +43,6 @@ psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list);
 const char * psabpf_port_spec_get_name(psabpf_port_spec_t *port);
 unsigned psabpf_port_sepc_get_id(psabpf_port_spec_t *port);
 void psabpf_port_spec_free(psabpf_port_spec_t *port);
+
+/* seconds since UNIX timestamp, 0 on error */
+uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx);
