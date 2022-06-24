@@ -46,8 +46,10 @@ static int print_pipeline_json(psabpf_context_t *ctx)
 {
     char date_buf[256];
     uint64_t load_timestamp = psabpf_pipeline_get_load_timestamp(ctx);
-    /* format timestamp to ISO 8601 date */
+    /* format timestamp into ISO 8601 date */
     strftime(date_buf, sizeof(date_buf), "%Y-%m-%dT%H:%M:%S%z", localtime((time_t *) &load_timestamp));
+
+    const char *hook_point_name = psabpf_pipeline_is_TC_based(ctx) ? "TC" : "XDP";
 
     psabpf_port_list_t list;
     psabpf_port_list_init(&list, ctx);
@@ -59,6 +61,9 @@ static int print_pipeline_json(psabpf_context_t *ctx)
     json_object_set_new(root, "pipeline", pipeline);
     json_object_set_new(pipeline, "id", json_integer(psabpf_context_get_pipeline(ctx)));
     json_object_set_new(pipeline, "load_time", json_string(date_buf));
+    json_object_set_new(pipeline, "bpf_hook", json_string(hook_point_name));
+    json_object_set_new(pipeline, "has_egress_program", json_boolean(psabpf_pipeline_has_egress_program(ctx)));
+
     json_object_set_new(pipeline, "ports", ports_root);
 
     psabpf_port_spec_t *port;

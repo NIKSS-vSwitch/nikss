@@ -623,8 +623,6 @@ void psabpf_port_spec_free(psabpf_port_spec_t *port)
     (void) port;
 }
 
-
-
 uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx)
 {
     uint64_t load_timestamp = 0;
@@ -676,4 +674,30 @@ uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx)
 clean_up:
     close(fd);
     return load_timestamp;
+}
+
+static bool check_if_program_exists(psabpf_context_t *ctx, const char *prog)
+{
+    char pinned_file[256];
+    build_ebpf_prog_filename(pinned_file, sizeof(pinned_file), ctx, prog);
+
+    return access(pinned_file, F_OK) == 0;
+}
+
+bool psabpf_pipeline_is_TC_based(psabpf_context_t *ctx)
+{
+    if (ctx == NULL)
+        return false;
+    return check_if_program_exists(ctx, XDP_HELPER_PROG) ||
+           check_if_program_exists(ctx, TC_INGRESS_PROG) ||
+           check_if_program_exists(ctx, TC_EGRESS_PROG);
+}
+
+bool psabpf_pipeline_has_egress_program(psabpf_context_t *ctx)
+{
+    if (ctx == NULL)
+        return false;
+    return check_if_program_exists(ctx, TC_EGRESS_PROG) ||
+           check_if_program_exists(ctx, XDP_EGRESS_PROG) ||
+           check_if_program_exists(ctx, XDP_EGRESS_PROG_OPTIMIZED);
 }

@@ -46,3 +46,6 @@ void psabpf_port_spec_free(psabpf_port_spec_t *port);
 
 /* seconds since UNIX timestamp, 0 on error */
 uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx);
+
+bool psabpf_pipeline_is_TC_based(psabpf_context_t *ctx);
+bool psabpf_pipeline_has_egress_program(psabpf_context_t *ctx);
