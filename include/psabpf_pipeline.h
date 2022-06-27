@@ -57,6 +57,7 @@ typedef struct psabpf_pipeline_object {
 typedef struct psabpf_pipeline_objects_list {
     void *directory;
     psabpf_pipeline_object_t current_object;
+    char base_objects_path[256];
 } psabpf_pipeline_objects_list_t;
 
 int psabpf_pipeline_objects_list_init(psabpf_pipeline_objects_list_t *list, psabpf_context_t *ctx);

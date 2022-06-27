@@ -18,6 +18,7 @@
 /* For ftw.h - use newer function from POSIX 1995. Other functions might be affected
  * if behaviour was changed between this release and default one */
 #define _XOPEN_SOURCE 500
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,10 +37,6 @@
 #include "bpf_defs.h"
 #include "common.h"
 #include "btf.h"
-
-#ifndef DT_REG
-#define DT_REG 8
-#endif
 
 static char *program_pin_name(struct bpf_program *prog)
 {
@@ -714,10 +711,8 @@ int psabpf_pipeline_objects_list_init(psabpf_pipeline_objects_list_t *list, psab
 
     memset(list, 0, sizeof(psabpf_pipeline_objects_list_t));
 
-    char map_path[256];
-    build_ebpf_map_filename(map_path, sizeof(map_path), ctx, "");
-
-    list->directory = opendir(map_path);
+    build_ebpf_map_filename(&list->base_objects_path[0], sizeof(list->base_objects_path), ctx, "");
+    list->directory = opendir(&list->base_objects_path[0]);
     if (list->directory == NULL)
         return errno;
 
@@ -734,34 +729,97 @@ void psabpf_pipeline_objects_list_free(psabpf_pipeline_objects_list_t *list)
     list->directory = NULL;
 }
 
+bool is_valid_object_name(psabpf_pipeline_objects_list_t *list, const char *name,
+                          const char *allowed_suffixes[], const unsigned no_allowed_suffixes)
+{
+    const char *reserved_names[] = {
+            "clone_session_tbl",
+            "clone_session_tbl_inner",
+            "multicast_grp_tbl",
+            "multicast_grp_tbl_inner",
+            "hdr_md_cpumap",
+    };
+    const char *suffixes[] = {
+            "_defaultAction",
+            "_prefixes",
+            "_tuple",
+            "_tuples_map",
+            "_groups_inner",
+            "_groups",
+            "_defaultActionGroup",
+            "_actions",
+    };
+    const char *ternary_tuple_infix = "_tuple_";
+    const unsigned no_reserved_names = sizeof(reserved_names) / sizeof(reserved_names[0]);
+    const unsigned no_suffixes = sizeof(suffixes) / sizeof(suffixes[0]);
+
+    /* Reserved names are not allowed (exact match) */
+    for (unsigned i = 0; i < no_reserved_names; ++i) {
+        if (strcmp(name, reserved_names[i]) == 0)
+            return false;
+    }
+
+    /* Check for known suffix */
+    bool has_suffix = false;
+    for (unsigned i = 0; i < no_suffixes; ++i) {
+        if (str_ends_with(name, suffixes[i])) {
+            has_suffix = true;
+            break;
+        }
+    }
+
+    /* No suffix no problem. Unless we have a ternary tuple */
+    if (!has_suffix) {
+        if (strstr(name, ternary_tuple_infix) != NULL)
+            return false;
+        return true;
+    }
+
+    /* Allow occurrence of some prefixes */
+    for (unsigned i = 0; i < no_allowed_suffixes; ++i) {
+        if (str_ends_with(name, allowed_suffixes[i]))
+            return true;
+    }
+
+    /* Let's check whether there is object which has additional suffix, e.g. ends with "_groups_groups" */
+    char path[512];
+    for (unsigned i = 0; i < no_suffixes; ++i) {
+        snprintf(path, sizeof(path), "%s%s%s", list->base_objects_path, name, suffixes[i]);
+        if (access(path, F_OK) == 0)
+            return true;
+    }
+
+    return false;
+}
+
 psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_pipeline_objects_list_t *list)
 {
     if (list == NULL)
         return NULL;
+    if (list->directory == NULL)
+        return NULL;
+
+    /* Some object has no direct names in the file system, they occur only with suffix(es) */
+    const char *allowed_suffixes[] = {
+            "_prefixes",
+            "_actions",
+    };
+    const unsigned no_allowed_suffixes = sizeof(allowed_suffixes) / sizeof(allowed_suffixes[0]);
 
     struct dirent *file;
     while ((file = readdir(list->directory)) != NULL) {
         if (file->d_type != DT_REG)
             continue;
 
-        if (strcmp(file->d_name, "clone_session_tbl") == 0 ||
-            strcmp(file->d_name, "multicast_grp_tbl") == 0 ||
-            strcmp(file->d_name, "hdr_md_cpumap") == 0)
-            continue;
-
-        if (str_ends_with(file->d_name, "_defaultAction") ||
-            str_ends_with(file->d_name, "_inner") ||
-            str_ends_with(file->d_name, "_groups") ||
-            str_ends_with(file->d_name, "_defaultActionGroup") ||
-            str_ends_with(file->d_name, "_tuples_map") ||
-            str_ends_with(file->d_name, "_tuple"))
+        if (!is_valid_object_name(list, file->d_name, allowed_suffixes, no_allowed_suffixes))
             continue;
 
         snprintf(&list->current_object.name[0], sizeof(list->current_object.name), "%s", file->d_name);
-
-        /* Some object has no direct names in the file system, they occur only with suffix(es) */
-        remove_suffix_from_str(&list->current_object.name[0], "_prefixes");
-        remove_suffix_from_str(&list->current_object.name[0], "_actions");
+        for (unsigned i = 0; i < no_allowed_suffixes; ++i) {
+            /* Remove only one suffix */
+            if (remove_suffix_from_str(&list->current_object.name[0], allowed_suffixes[i]))
+                break;
+        }
 
         return &list->current_object;
     }
