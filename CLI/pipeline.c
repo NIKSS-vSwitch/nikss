@@ -278,6 +278,12 @@ int do_pipeline_show(int argc, char **argv)
     psabpf_context_init(&ctx);
     psabpf_context_set_pipeline(&ctx, id);
 
+    if (!psabpf_pipeline_exists(&ctx)) {
+        fprintf(stderr, "pipeline with given id %u does not exist or is inaccessible\n", id);
+        psabpf_context_free(&ctx);
+        return ENOENT;
+    }
+
     ret_code = print_pipeline_json(&ctx);
 
     psabpf_context_free(&ctx);
