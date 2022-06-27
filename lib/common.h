@@ -22,6 +22,7 @@
 #include <psabpf.h>
 
 int str_ends_with(const char *str, const char *suffix);
+void remove_suffix_from_str(char *str, const char *suffix);
 
 /* Data len must be aligned to 4B */
 void mem_bitwise_and(uint32_t *dst, uint32_t *mask, size_t len);

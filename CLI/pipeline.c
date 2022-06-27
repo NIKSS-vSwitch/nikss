@@ -51,20 +51,22 @@ static int print_pipeline_json(psabpf_context_t *ctx)
 
     const char *hook_point_name = psabpf_pipeline_is_TC_based(ctx) ? "TC" : "XDP";
 
-    psabpf_port_list_t list;
-    psabpf_port_list_init(&list, ctx);
-
     json_t *root = json_object();
     json_t *pipeline = json_object();
     json_t *ports_root = json_array();
+    json_t *objects_root = json_array();
 
     json_object_set_new(root, "pipeline", pipeline);
     json_object_set_new(pipeline, "id", json_integer(psabpf_context_get_pipeline(ctx)));
     json_object_set_new(pipeline, "load_time", json_string(date_buf));
     json_object_set_new(pipeline, "bpf_hook", json_string(hook_point_name));
     json_object_set_new(pipeline, "has_egress_program", json_boolean(psabpf_pipeline_has_egress_program(ctx)));
-
     json_object_set_new(pipeline, "ports", ports_root);
+    json_object_set_new(pipeline, "objects", objects_root);
+
+    /* List ports */
+    psabpf_port_list_t list;
+    psabpf_port_list_init(&list, ctx);
 
     psabpf_port_spec_t *port;
     while ((port = psabpf_port_list_get_next_port(&list)) != NULL) {
@@ -73,6 +75,17 @@ static int print_pipeline_json(psabpf_context_t *ctx)
         psabpf_port_spec_free(port);
     }
     psabpf_port_list_free(&list);
+
+    /* List objects */
+    psabpf_pipeline_objects_list_t objs;
+    psabpf_pipeline_objects_list_init(&objs, ctx);
+
+    psabpf_pipeline_object_t *obj;
+    while ((obj = psabpf_pipeline_objects_list_get_next_object(&objs)) != NULL) {
+        json_array_append(objects_root, json_string(psabpf_pipeline_object_get_name(obj)));
+        psabpf_pipeline_object_free(obj);
+    }
+    psabpf_pipeline_objects_list_free(&objs);
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
     json_decref(root);

@@ -30,11 +30,16 @@
 #include <string.h>
 #include <ftw.h>
 #include <sys/time.h>
+#include <dirent.h>
 
 #include <psabpf_pipeline.h>
 #include "bpf_defs.h"
 #include "common.h"
 #include "btf.h"
+
+#ifndef DT_REG
+#define DT_REG 8
+#endif
 
 static char *program_pin_name(struct bpf_program *prog)
 {
@@ -700,4 +705,78 @@ bool psabpf_pipeline_has_egress_program(psabpf_context_t *ctx)
     return check_if_program_exists(ctx, TC_EGRESS_PROG) ||
            check_if_program_exists(ctx, XDP_EGRESS_PROG) ||
            check_if_program_exists(ctx, XDP_EGRESS_PROG_OPTIMIZED);
+}
+
+int psabpf_pipeline_objects_list_init(psabpf_pipeline_objects_list_t *list, psabpf_context_t *ctx)
+{
+    if (list == NULL || ctx == NULL)
+        return EINVAL;
+
+    memset(list, 0, sizeof(psabpf_pipeline_objects_list_t));
+
+    char map_path[256];
+    build_ebpf_map_filename(map_path, sizeof(map_path), ctx, "");
+
+    list->directory = opendir(map_path);
+    if (list->directory == NULL)
+        return errno;
+
+    return NO_ERROR;
+}
+
+void psabpf_pipeline_objects_list_free(psabpf_pipeline_objects_list_t *list)
+{
+    if (list == NULL)
+        return;
+
+    if (list->directory != NULL)
+        closedir(list->directory);
+    list->directory = NULL;
+}
+
+psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_pipeline_objects_list_t *list)
+{
+    if (list == NULL)
+        return NULL;
+
+    struct dirent *file;
+    while ((file = readdir(list->directory)) != NULL) {
+        if (file->d_type != DT_REG)
+            continue;
+
+        if (strcmp(file->d_name, "clone_session_tbl") == 0 ||
+            strcmp(file->d_name, "multicast_grp_tbl") == 0 ||
+            strcmp(file->d_name, "hdr_md_cpumap") == 0)
+            continue;
+
+        if (str_ends_with(file->d_name, "_defaultAction") ||
+            str_ends_with(file->d_name, "_inner") ||
+            str_ends_with(file->d_name, "_groups") ||
+            str_ends_with(file->d_name, "_defaultActionGroup") ||
+            str_ends_with(file->d_name, "_tuples_map") ||
+            str_ends_with(file->d_name, "_tuple"))
+            continue;
+
+        snprintf(&list->current_object.name[0], sizeof(list->current_object.name), "%s", file->d_name);
+
+        /* Some object has no direct names in the file system, they occur only with suffix(es) */
+        remove_suffix_from_str(&list->current_object.name[0], "_prefixes");
+        remove_suffix_from_str(&list->current_object.name[0], "_actions");
+
+        return &list->current_object;
+    }
+
+    return NULL;
+}
+
+const char * psabpf_pipeline_object_get_name(psabpf_pipeline_object_t *obj)
+{
+    if (obj == NULL)
+        return NULL;
+    return &obj->name[0];
+}
+
+void psabpf_pipeline_object_free(psabpf_pipeline_object_t *obj)
+{
+    (void) obj;
 }

@@ -49,3 +49,19 @@ uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx);
 
 bool psabpf_pipeline_is_TC_based(psabpf_context_t *ctx);
 bool psabpf_pipeline_has_egress_program(psabpf_context_t *ctx);
+
+typedef struct psabpf_pipeline_object {
+    char name[256];
+} psabpf_pipeline_object_t;
+
+typedef struct psabpf_pipeline_objects_list {
+    void *directory;
+    psabpf_pipeline_object_t current_object;
+} psabpf_pipeline_objects_list_t;
+
+int psabpf_pipeline_objects_list_init(psabpf_pipeline_objects_list_t *list, psabpf_context_t *ctx);
+void psabpf_pipeline_objects_list_free(psabpf_pipeline_objects_list_t *list);
+
+psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_pipeline_objects_list_t *list);
+const char * psabpf_pipeline_object_get_name(psabpf_pipeline_object_t *obj);
+void psabpf_pipeline_object_free(psabpf_pipeline_object_t *obj);

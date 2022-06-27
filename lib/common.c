@@ -34,6 +34,17 @@ int str_ends_with(const char *str, const char *suffix)
     return strncmp(str + len_str - len_suffix, suffix, len_suffix) == 0;
 }
 
+void remove_suffix_from_str(char *str, const char *suffix)
+{
+    if (!str_ends_with(str, suffix))
+        return;
+
+    unsigned len = strlen(str);
+    unsigned suffix_len = strlen(suffix);
+
+    str[len - suffix_len] = '\0';
+}
+
 void mem_bitwise_and(uint32_t *dst, uint32_t *mask, size_t len)
 {
     for (size_t i = 0; i < len / 4; i++) {
