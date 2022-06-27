@@ -133,6 +133,14 @@ psabpf-ctl del-port pipe <ID> dev <INTERFACE>
 
 ---
 
+Show pipeline information:
+```shell
+psabpf-ctl pipeline show id <ID>
+```
+- ID - ID of the pipeline, natural number.
+
+---
+
 Create clone session and add member to it:
 ```shell
 psabpf-ctl clone-session create pipe <ID> id <SESSION_ID>
