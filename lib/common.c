@@ -204,9 +204,6 @@ static int setup_struct_field_descriptor_set_btf(psabpf_btf_t *btf_md, psabpf_st
 
     unsigned entries = btf_vlen(type);
     for (unsigned i = 0; i < entries; i++) {
-        if (*field_idx >= fds->n_fields)
-            goto too_many_fields;
-
         psabtf_struct_member_md_t md;
         if (psabtf_get_member_md_by_index(btf_md->btf, type_id, i, &md) != NO_ERROR) {
             fprintf(stderr, "invalid field or type\n");
@@ -227,6 +224,9 @@ static int setup_struct_field_descriptor_set_btf(psabpf_btf_t *btf_md, psabpf_st
         }
         if (strcmp(type_name, "bpf_spin_lock") == 0)
             continue;
+
+        if (*field_idx >= fds->n_fields)
+            goto too_many_fields;
 
         fds->fields[*field_idx].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
         fds->fields[*field_idx].data_offset = base_offset + md.bit_offset / 8;
