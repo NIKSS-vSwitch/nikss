@@ -215,23 +215,18 @@ static int setup_struct_field_descriptor_set_btf(psabpf_btf_t *btf_md, psabpf_st
 
         /* Let's skip a bpf_spin_lock field.
          * This is an internal field not relevant to a user. */
-        bool cos = false;
         const struct btf_type *member_type = psabtf_get_type_by_id(btf_md->btf, md.member->type);
         if (member_type == NULL) {
             fprintf(stderr, "invalid type\n");
-            return false;
+            return EINVAL;
         }
         const char *type_name = btf__name_by_offset(btf_md->btf, member_type->name_off);
         if (type_name == NULL) {
             fprintf(stderr, "invalid type\n");
-            return false;
+            return EINVAL;
         }
         if (strcmp(type_name, "bpf_spin_lock") == 0)
-            cos = true;
-
-        if (cos) {
             continue;
-        }
 
         fds->fields[*field_idx].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
         fds->fields[*field_idx].data_offset = base_offset + md.bit_offset / 8;
