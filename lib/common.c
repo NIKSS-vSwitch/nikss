@@ -212,7 +212,7 @@ static int setup_struct_field_descriptor_set_btf(psabpf_btf_t *btf_md, psabpf_st
 
         /* Let's skip a bpf_spin_lock field.
          * This is an internal field not relevant to a user. */
-        const struct btf_type *member_type = psabtf_get_type_by_id(btf_md->btf, md.member->type);
+        const struct btf_type *member_type = psabtf_get_type_by_id(btf_md->btf, md.effective_type_id);
         if (member_type == NULL) {
             fprintf(stderr, "invalid type\n");
             return EINVAL;
@@ -240,7 +240,6 @@ static int setup_struct_field_descriptor_set_btf(psabpf_btf_t *btf_md, psabpf_st
             }
         }
 
-        member_type = psabtf_get_type_by_id(btf_md->btf, md.effective_type_id);
         if (btf_is_struct(member_type)) {
             fds->fields[*field_idx].type = PSABPF_STRUCT_FIELD_TYPE_STRUCT_START;
             (*field_idx)++;
