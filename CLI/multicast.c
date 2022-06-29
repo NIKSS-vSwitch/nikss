@@ -201,6 +201,28 @@ err:
     return ret;
 }
 
+int do_multicast_get(int argc, char **argv)
+{
+    psabpf_context_t ctx;
+    psabpf_mcast_grp_ctx_t group;
+    psabpf_mcast_grp_member_t *member;
+
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, 1);
+    psabpf_mcast_grp_context_init(&group);
+    psabpf_mcast_grp_id(&group, 8);
+
+    while ((member = psabpf_mcast_grp_get_next_member(&ctx, &group)) != NULL) {
+        printf("%u: port %u instance %u\n", group.id, member->egress_port, member->instance);
+        psabpf_mcast_grp_member_free(member);
+    }
+
+    psabpf_mcast_grp_context_free(&group);
+    psabpf_context_free(&ctx);
+
+    return NO_ERROR;
+}
+
 int do_multicast_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
@@ -209,6 +231,7 @@ int do_multicast_help(int argc, char **argv)
         "       %1$s multicast-group delete pipe ID MULTICAST_GROUP\n"
         "       %1$s multicast-group add-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID\n"
         "       %1$s multicast-group del-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID\n"
+        "       %1$s multicast-group get pipe ID [MULTICAST_GROUP]\n"
         "\n"
         "       MULTICAST_GROUP := id MULTICAST_GROUP_ID\n"
         "",

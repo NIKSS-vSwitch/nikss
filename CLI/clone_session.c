@@ -303,7 +303,7 @@ int do_clone_session_get(int argc, char **argv)
     psabpf_clone_session_id(&session, 8);
 
     while ((entry = psabpf_clone_session_get_next_entry(&ctx, &session)) != NULL) {
-        printf("%u: port %u instance %u\n", session.id, session.current_entry.egress_port, session.current_entry.instance);
+        printf("%u: port %u instance %u\n", session.id, entry->egress_port, entry->instance);
         psabpf_clone_session_entry_free(entry);
     }
 

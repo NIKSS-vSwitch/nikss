@@ -41,8 +41,8 @@ typedef struct psabpf_clone_session_ctx {
     /* For iteration over entries in clone session */
     psabpf_bpf_map_descriptor_t session_map;
     psabpf_clone_session_entry_t current_entry;
-    uint32_t  current_egress_port;
-    uint16_t  current_instance;
+    uint32_t current_egress_port;
+    uint16_t current_instance;
 } psabpf_clone_session_ctx_t;
 
 
@@ -78,14 +78,20 @@ psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context
  */
 typedef uint32_t psabpf_mcast_grp_id_t;
 
-typedef struct psabpf_mcast_grp_context {
-    psabpf_mcast_grp_id_t id;
-} psabpf_mcast_grp_ctx_t;
-
 typedef struct psabpf_mcast_grp_member {
     uint32_t egress_port;
     uint16_t instance;
 } psabpf_mcast_grp_member_t;
+
+typedef struct psabpf_mcast_grp_context {
+    psabpf_mcast_grp_id_t id;
+
+    /* For iteration over members */
+    psabpf_bpf_map_descriptor_t group_map;
+    psabpf_mcast_grp_member_t current_member;
+    uint32_t current_egress_port;
+    uint16_t current_instance;
+} psabpf_mcast_grp_ctx_t;
 
 void psabpf_mcast_grp_context_init(psabpf_mcast_grp_ctx_t *group);
 void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group);
@@ -105,5 +111,7 @@ void psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_
 int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member);
+
+psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group);
 
 #endif  /* __PSABPF_PRE_H */

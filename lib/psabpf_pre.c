@@ -421,6 +421,67 @@ err:
     return ret;
 }
 
+static int pre_get_next_entry(psabpf_context_t *ctx,
+                              psabpf_bpf_map_descriptor_t *session_map, const char *pr_map_name,
+                              uint32_t session, uint32_t *current_egress_port, uint16_t *current_instance,
+                              psabpf_clone_session_entry_t *current_entry)
+{
+    if (ctx == NULL || session == 0) {
+        fprintf(stderr, "invalid session/group or context\n");
+        return EINVAL;
+    }
+
+    if (session_map->fd < 0) {
+        psabpf_bpf_map_descriptor_t pr_map;
+
+        int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
+        if (ret != NO_ERROR)
+            return ret;
+
+        ret = open_session_map(&pr_map, session_map, session);
+        close_object_fd(&pr_map.fd);
+        if (ret != NO_ERROR)
+            return ret;
+
+        /* Start iteration from head */
+        *current_egress_port = 0;
+        *current_instance = 0;
+    }
+
+    /* Build key for current entry and read next key */
+    elem_t key = {
+            .port = *current_egress_port,
+            .instance = *current_instance,
+    };
+    struct element value;
+    if (bpf_map_lookup_elem(session_map->fd, &key, &value) != 0) {
+        fprintf(stderr, "failed to read next entry key: %s", strerror(errno));
+        goto no_more_entries;
+    }
+    memcpy(&key, &value.next_id, sizeof(elem_t));
+
+    /* Next entry exists? */
+    if (key.port == 0 && key.instance == 0)
+        goto no_more_entries;
+
+    /* Read next entry */
+    if (bpf_map_lookup_elem(session_map->fd, &key, &value) != 0) {
+        fprintf(stderr, "failed to read next entry: %s", strerror(errno));
+        goto no_more_entries;
+    }
+    memcpy(current_entry, &value.entry, sizeof(psabpf_clone_session_entry_t));
+
+    *current_egress_port = value.entry.egress_port;
+    *current_instance = value.entry.instance;
+
+    return NO_ERROR;
+
+no_more_entries:
+    *current_egress_port = 0;
+    *current_instance = 0;
+    return ENODATA;
+}
+
 /******************************************************************************
  * Clone session
  ******************************************************************************/
@@ -536,59 +597,19 @@ int psabpf_clone_session_entry_exists(psabpf_context_t *ctx, psabpf_clone_sessio
 
 psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
-    if (ctx == NULL || session->id == 0) {
-        fprintf(stderr, "invalid session/group or context\n");
+    if (ctx == NULL || session == NULL) {
+        fprintf(stderr, "invalid session or context\n");
         return NULL;
     }
 
-    if (session->session_map.fd < 0) {
-        psabpf_bpf_map_descriptor_t pr_map;
-
-        if (open_pr_maps(ctx, CLONE_SESSION_TABLE, NULL, &pr_map, NULL) != NO_ERROR)
-            return NULL;
-
-        int ret = open_session_map(&pr_map, &session->session_map, session->id);
-        close_object_fd(&pr_map.fd);
-        if (ret != NO_ERROR)
-            return NULL;
-
-        /* Start iteration from head */
-        session->current_egress_port = 0;
-        session->current_instance = 0;
-    }
-
-    /* Build key for current entry and read next key */
-    elem_t key = {
-            .port = session->current_egress_port,
-            .instance = session->current_instance,
-    };
-    struct element value;
-    if (bpf_map_lookup_elem(session->session_map.fd, &key, &value) != 0) {
-        fprintf(stderr, "failed to read next entry key: %s", strerror(errno));
-        goto no_more_entries;
-    }
-    memcpy(&key, &value.next_id, sizeof(elem_t));
-
-    /* Next entry exists? */
-    if (key.port == 0 && key.instance == 0)
-        goto no_more_entries;
-
-    /* Read next entry */
-    if (bpf_map_lookup_elem(session->session_map.fd, &key, &value) != 0) {
-        fprintf(stderr, "failed to read next entry: %s", strerror(errno));
-        goto no_more_entries;
-    }
-    memcpy(&session->current_entry, &value.entry, sizeof(psabpf_clone_session_entry_t));
-
-    session->current_egress_port = value.entry.egress_port;
-    session->current_instance = value.entry.instance;
+    int ret = pre_get_next_entry(ctx, &session->session_map, CLONE_SESSION_TABLE,
+                                 session->id,
+                                 &session->current_egress_port, &session->current_instance,
+                                 &session->current_entry);
+    if (ret != NO_ERROR)
+        return NULL;
 
     return &session->current_entry;
-
-no_more_entries:
-    session->current_egress_port = 0;
-    session->current_instance = 0;
-    return NULL;
 }
 
 /******************************************************************************
@@ -600,19 +621,28 @@ void psabpf_mcast_grp_context_init(psabpf_mcast_grp_ctx_t *group)
     if (group == NULL)
         return;
     memset(group, 0, sizeof(psabpf_mcast_grp_ctx_t));
+
+    group->group_map.fd = -1;
 }
 
 void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group)
 {
     if (group == NULL)
         return;
+
+    close_object_fd(&group->group_map.fd);
+
     memset(group, 0, sizeof(psabpf_mcast_grp_ctx_t));
+    group->group_map.fd = -1;
 }
 
 void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mcast_grp_id)
 {
     if (group != NULL)
         group->id = mcast_grp_id;
+
+    /* Also reset group map */
+    close_object_fd(&group->group_map.fd);
 }
 
 int psabpf_mcast_grp_create(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
@@ -691,4 +721,25 @@ int psabpf_mcast_grp_member_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t
     };
 
     return pre_session_del_entry(ctx, MULTICAST_GROUP_TABLE, group->id, &entry);
+}
+
+psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+{
+    if (ctx == NULL || group == NULL) {
+        fprintf(stderr, "invalid group or context\n");
+        return NULL;
+    }
+
+    psabpf_clone_session_entry_t entry= {};
+    int ret = pre_get_next_entry(ctx, &group->group_map, MULTICAST_GROUP_TABLE,
+                                 group->id,
+                                 &group->current_egress_port, &group->current_instance,
+                                 &entry);
+    if (ret != NO_ERROR)
+        return NULL;
+
+    group->current_member.egress_port = entry.egress_port;
+    group->current_member.instance = entry.instance;
+
+    return &group->current_member;
 }
