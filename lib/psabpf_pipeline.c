@@ -521,8 +521,8 @@ int psabpf_port_list_init(psabpf_port_list_t *list, psabpf_context_t *ctx)
 
     memset(list, 0, sizeof(psabpf_port_list_t));
 
-    list->port_list = if_nameindex();
-    if (list->port_list == NULL)
+    list->iface_list = if_nameindex();
+    if (list->iface_list == NULL)
         return errno;
 
     int fd = open_prog_by_name(ctx, XDP_HELPER_PROG);
@@ -557,34 +557,34 @@ void psabpf_port_list_free(psabpf_port_list_t *list)
     if (list == NULL)
         return;
 
-    if (list->port_list != NULL)
-        if_freenameindex(list->port_list);
+    if (list->iface_list != NULL)
+        if_freenameindex(list->iface_list);
 
-    list->port_list = NULL;
-    list->current_list_node = NULL;
+    list->iface_list = NULL;
+    list->current_iface = NULL;
 }
 
 psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list)
 {
     if (list == NULL)
         return NULL;
-    if (list->port_list == NULL)
+    if (list->iface_list == NULL)
         return NULL;
 
     bool iface_found = false;
 
     while (!iface_found) {
-        if (list->current_list_node == NULL)
-            list->current_list_node = list->port_list;
+        if (list->current_iface == NULL)
+            list->current_iface = list->iface_list;
         else
-            list->current_list_node = ((struct if_nameindex *) list->current_list_node) + 1;
+            list->current_iface = ((struct if_nameindex *) list->current_iface) + 1;
 
-        list->current_port.id = ((struct if_nameindex *) list->current_list_node)->if_index;
-        list->current_port.name = ((struct if_nameindex *) list->current_list_node)->if_name;
+        list->current_port.id = ((struct if_nameindex *) list->current_iface)->if_index;
+        list->current_port.name = ((struct if_nameindex *) list->current_iface)->if_name;
 
         if (list->current_port.id == 0 || list->current_port.name == NULL) {
             /* End of the list */
-            list->current_list_node = NULL;
+            list->current_iface = NULL;
             return NULL;
         }
 

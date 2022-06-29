@@ -30,8 +30,8 @@ typedef struct psabpf_port_spec {
 } psabpf_port_spec_t;
 
 typedef struct psabpf_port_list {
-    void *port_list;
-    void *current_list_node;
+    void *iface_list;
+    void *current_iface;
     psabpf_port_spec_t current_port;
     unsigned xdp_prog_id; /* XDP program is always present if port is attached */
 } psabpf_port_list_t;
