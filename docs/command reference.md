@@ -48,6 +48,7 @@ MULTICAST_GROUP := id MULTICAST_GROUP_ID
 ```shell
 psabpf-ctl pipeline load id ID PATH
 psabpf-ctl pipeline unload id ID
+psabpf-ctl pipeline show id ID
 psabpf-ctl add-port pipe id ID dev DEV
 psabpf-ctl del-port pipe id ID dev DEV
 ```
