@@ -430,13 +430,16 @@ void psabpf_clone_session_context_init(psabpf_clone_session_ctx_t *ctx)
     if (ctx == NULL)
         return;
     memset( ctx, 0, sizeof(psabpf_clone_session_ctx_t));
+
+    ctx->session_map.fd = -1;
 }
 
 void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx)
 {
     if (ctx == NULL)
         return;
-    memset( ctx, 0, sizeof(psabpf_clone_session_ctx_t));
+
+    close_object_fd(&ctx->session_map.fd);
 }
 
 void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_id_t id)
@@ -444,6 +447,9 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
     if (ctx == NULL)
         return;
     ctx->id = id;
+
+    /* Also reset session map if opened */
+    close_object_fd(&ctx->session_map.fd);
 }
 
 bool psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
@@ -528,11 +534,61 @@ int psabpf_clone_session_entry_exists(psabpf_context_t *ctx, psabpf_clone_sessio
     return NO_ERROR;
 }
 
-// TODO: implement
-int psabpf_clone_session_entry_get(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
+psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
-    (void) ctx; (void) session; (void) entry;
-    return EOPNOTSUPP;
+    if (ctx == NULL || session->id == 0) {
+        fprintf(stderr, "invalid session/group or context\n");
+        return NULL;
+    }
+
+    if (session->session_map.fd < 0) {
+        psabpf_bpf_map_descriptor_t pr_map;
+
+        if (open_pr_maps(ctx, CLONE_SESSION_TABLE, NULL, &pr_map, NULL) != NO_ERROR)
+            return NULL;
+
+        int ret = open_session_map(&pr_map, &session->session_map, session->id);
+        close_object_fd(&pr_map.fd);
+        if (ret != NO_ERROR)
+            return NULL;
+
+        /* Start iteration from head */
+        session->current_egress_port = 0;
+        session->current_instance = 0;
+    }
+
+    /* Build key for current entry and read next key */
+    elem_t key = {
+            .port = session->current_egress_port,
+            .instance = session->current_instance,
+    };
+    struct element value;
+    if (bpf_map_lookup_elem(session->session_map.fd, &key, &value) != 0) {
+        fprintf(stderr, "failed to read next entry key: %s", strerror(errno));
+        goto no_more_entries;
+    }
+    memcpy(&key, &value.next_id, sizeof(elem_t));
+
+    /* Next entry exists? */
+    if (key.port == 0 && key.instance == 0)
+        goto no_more_entries;
+
+    /* Read next entry */
+    if (bpf_map_lookup_elem(session->session_map.fd, &key, &value) != 0) {
+        fprintf(stderr, "failed to read next entry: %s", strerror(errno));
+        goto no_more_entries;
+    }
+    memcpy(&session->current_entry, &value.entry, sizeof(psabpf_clone_session_entry_t));
+
+    session->current_egress_port = value.entry.egress_port;
+    session->current_instance = value.entry.instance;
+
+    return &session->current_entry;
+
+no_more_entries:
+    session->current_egress_port = 0;
+    session->current_instance = 0;
+    return NULL;
 }
 
 /******************************************************************************

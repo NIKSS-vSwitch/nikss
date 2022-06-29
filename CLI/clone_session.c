@@ -291,6 +291,28 @@ err:
     return ret;
 }
 
+int do_clone_session_get(int argc, char **argv)
+{
+    psabpf_context_t ctx;
+    psabpf_clone_session_ctx_t session;
+    psabpf_clone_session_entry_t *entry;
+
+    psabpf_context_init(&ctx);
+    psabpf_context_set_pipeline(&ctx, 1);
+    psabpf_clone_session_context_init(&session);
+    psabpf_clone_session_id(&session, 8);
+
+    while ((entry = psabpf_clone_session_get_next_entry(&ctx, &session)) != NULL) {
+        printf("%u: port %u instance %u\n", session.id, session.current_entry.egress_port, session.current_entry.instance);
+        psabpf_clone_session_entry_free(entry);
+    }
+
+    psabpf_clone_session_context_free(&session);
+    psabpf_context_free(&ctx);
+
+    return NO_ERROR;
+}
+
 int do_clone_session_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
@@ -299,6 +321,7 @@ int do_clone_session_help(int argc, char **argv)
     "       %1$s clone-session delete pipe ID SESSION\n"
     "       %1$s clone-session add-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID [cos CLASS_OF_SERVICE] [truncate plen_bytes BYTES]\n"
     "       %1$s clone-session del-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID\n"
+    "       %1$s clone-session get pipe ID [SESSION]\n"
     "\n"
     "       SESSION := id SESSION_ID\n"
     "",

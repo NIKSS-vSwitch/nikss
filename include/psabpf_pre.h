@@ -38,9 +38,11 @@ typedef struct psabpf_clone_session_entry psabpf_clone_session_entry_t;
 typedef struct psabpf_clone_session_ctx {
     psabpf_clone_session_id_t id;
 
-    // TODO: to consider if this is the best way to iterate
-    size_t curr_idx;
-    psabpf_clone_session_entry_t *next_id;
+    /* For iteration over entries in clone session */
+    psabpf_bpf_map_descriptor_t session_map;
+    psabpf_clone_session_entry_t current_entry;
+    uint32_t  current_egress_port;
+    uint16_t  current_instance;
 } psabpf_clone_session_ctx_t;
 
 
@@ -69,23 +71,7 @@ int psabpf_clone_session_entry_delete(psabpf_context_t *ctx, psabpf_clone_sessio
 int psabpf_clone_session_entry_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry);
 int psabpf_clone_session_entry_get(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry);
 
-/*
- * Example:
- * psabpf_clone_session_ctx_t ctx;
- * psabpf_clone_session_context_init(&ctx);
- *
- * psabpf_clone_session_entry_t entry;
- * psabpf_clone_session_entry_init(&entry);
- *
- * while(psabpf_clone_session_entry_getnext(&ctx, &entry)) {
- *     // print entry fields
- * }
- *
- * psabpf_clone_session_entry_free(&entry);
- * psabpf_clone_session_context_free(&ctx);
- *
- */
-int psabpf_clone_session_entry_getnext(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_entry_t **entry);
+psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
 
 /*
  * PRE - Multicast Groups
