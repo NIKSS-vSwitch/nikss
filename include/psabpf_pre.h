@@ -97,6 +97,7 @@ void psabpf_mcast_grp_context_init(psabpf_mcast_grp_ctx_t *group);
 void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group);
 
 void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mcast_grp_id);
+psabpf_mcast_grp_id_t psabpf_mcast_grp_get_id(psabpf_mcast_grp_ctx_t *group);
 
 int psabpf_mcast_grp_create(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group);
 bool psabpf_mcast_grp_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group);
@@ -107,6 +108,9 @@ void psabpf_mcast_grp_member_free(psabpf_mcast_grp_member_t *member);
 
 void psabpf_mcast_grp_member_port(psabpf_mcast_grp_member_t *member, uint32_t egress_port);
 void psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_t instance);
+
+uint32_t psabpf_mcast_grp_member_get_port(psabpf_mcast_grp_member_t *member);
+uint16_t psabpf_mcast_grp_member_get_instance(psabpf_mcast_grp_member_t *member);
 
 int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member);
 int psabpf_mcast_grp_member_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member);

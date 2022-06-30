@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <jansson.h>
 
 #include "multicast.h"
 #include <psabpf_pre.h>
@@ -201,6 +202,52 @@ err:
     return ret;
 }
 
+static json_t *create_json_single_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+{
+    json_t *root = json_array();
+    if (root == NULL)
+        return NULL;
+
+    psabpf_mcast_grp_member_t *member;
+    while ((member = psabpf_mcast_grp_get_next_member(ctx, group)) != NULL) {
+        json_t *member_root = json_object();
+        if (member_root == NULL) {
+            json_decref(root);
+            return NULL;
+        }
+
+        json_object_set_new(member_root, "port", json_integer(psabpf_mcast_grp_member_get_port(member)));
+        json_object_set_new(member_root, "instance", json_integer(psabpf_mcast_grp_member_get_instance(member)));
+        json_array_append_new(root, member_root);
+
+        psabpf_mcast_grp_member_free(member);
+    }
+
+    return root;
+}
+
+static int print_single_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+{
+    json_t *root = json_object();
+    json_t *groups = json_object();
+    json_t *group_json = create_json_single_group(ctx, group);
+
+    if (root == NULL || groups == NULL || group_json == NULL)
+        goto clean_up;
+
+    json_object_set(root, "multicast-groups", groups);
+    set_json_object_at_index(groups, group_json, psabpf_mcast_grp_get_id(group));
+
+    json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+
+clean_up:
+    json_decref(root);
+    json_decref(groups);
+    json_decref(group_json);
+
+    return NO_ERROR;
+}
+
 int do_multicast_get(int argc, char **argv)
 {
     psabpf_context_t ctx;
@@ -212,10 +259,7 @@ int do_multicast_get(int argc, char **argv)
     psabpf_mcast_grp_context_init(&group);
     psabpf_mcast_grp_id(&group, 8);
 
-    while ((member = psabpf_mcast_grp_get_next_member(&ctx, &group)) != NULL) {
-        printf("%u: port %u instance %u\n", group.id, member->egress_port, member->instance);
-        psabpf_mcast_grp_member_free(member);
-    }
+    print_single_mcast_group(&ctx, &group);
 
     psabpf_mcast_grp_context_free(&group);
     psabpf_context_free(&ctx);

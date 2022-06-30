@@ -189,16 +189,6 @@ static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t
  * JSON functions
  *****************************************************************************/
 
-static int set_json_object_at_index(json_t *parent, json_t *object, uint32_t index)
-{
-    char idx_str[16]; /* index is 32 bits, 2^32=4.3e+9, so at least 11 bytes are required to convert idx to string */
-    snprintf(idx_str, sizeof(idx_str), "%u", index);
-    if (json_object_set_new(parent, idx_str, object) != 0)
-        return EINVAL;
-
-    return NO_ERROR;
-}
-
 json_t *create_json_member_entry_parameters(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
     json_t *params_root = json_array();

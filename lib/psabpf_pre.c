@@ -645,6 +645,14 @@ void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mc
     close_object_fd(&group->group_map.fd);
 }
 
+psabpf_mcast_grp_id_t psabpf_mcast_grp_get_id(psabpf_mcast_grp_ctx_t *group)
+{
+    if (group == NULL)
+        return 0;
+
+    return group->id;
+}
+
 int psabpf_mcast_grp_create(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
 {
     return create_pre_session(ctx, MULTICAST_GROUP_TABLE, MULTICAST_GROUP_TABLE_INNER, group->id);
@@ -689,6 +697,20 @@ void psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_
 {
     if (member != NULL)
         member->instance = instance;
+}
+
+uint32_t psabpf_mcast_grp_member_get_port(psabpf_mcast_grp_member_t *member)
+{
+    if (member == NULL)
+        return 0;
+    return member->egress_port;
+}
+
+uint16_t psabpf_mcast_grp_member_get_instance(psabpf_mcast_grp_member_t *member)
+{
+    if (member == NULL)
+        return 0;
+    return member->instance;
 }
 
 int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
