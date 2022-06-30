@@ -226,42 +226,67 @@ static json_t *create_json_single_group(psabpf_context_t *ctx, psabpf_mcast_grp_
     return root;
 }
 
-static int print_single_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
 {
+    int ret = ENOMEM;
     json_t *root = json_object();
     json_t *groups = json_object();
-    json_t *group_json = create_json_single_group(ctx, group);
+    json_t *group_json;
 
-    if (root == NULL || groups == NULL || group_json == NULL)
+    if (root == NULL || groups == NULL)
         goto clean_up;
 
     json_object_set(root, "multicast-groups", groups);
-    set_json_object_at_index(groups, group_json, psabpf_mcast_grp_get_id(group));
 
+    if (group != NULL) {
+        group_json = create_json_single_group(ctx, group);
+        if (group_json == NULL)
+            goto clean_up;
+        set_json_object_at_index(groups, group_json, psabpf_mcast_grp_get_id(group));
+    } else {
+        psabpf_mcast_grp_list_t list;
+        psabpf_mcast_grp_list_init(ctx, &list);
+
+        while ((group = psabpf_mcast_grp_list_get_next_group(&list)) != NULL) {
+            group_json = create_json_single_group(ctx, group);
+            if (group_json == NULL) {
+                psabpf_mcast_grp_context_free(group);
+                goto clean_up;
+            }
+            set_json_object_at_index(groups, group_json, psabpf_mcast_grp_get_id(group));
+
+            psabpf_mcast_grp_context_free(group);
+        }
+        psabpf_mcast_grp_list_free(&list);
+    }
+    
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+    ret = NO_ERROR;
 
 clean_up:
     json_decref(root);
     json_decref(groups);
-    json_decref(group_json);
 
-    return NO_ERROR;
+    return ret;
 }
 
 int do_multicast_get(int argc, char **argv)
 {
     psabpf_context_t ctx;
-    psabpf_mcast_grp_ctx_t group;
-    psabpf_mcast_grp_member_t *member;
+    psabpf_mcast_grp_ctx_t *group;
 
     psabpf_context_init(&ctx);
     psabpf_context_set_pipeline(&ctx, 1);
-    psabpf_mcast_grp_context_init(&group);
-    psabpf_mcast_grp_id(&group, 8);
 
-    print_single_mcast_group(&ctx, &group);
+//    psabpf_mcast_grp_context_init(&group);
+//    psabpf_mcast_grp_id(&group, 8);
+//
+//    print_single_mcast_group(&ctx, &group);
+//
+//    psabpf_mcast_grp_context_free(&group);
 
-    psabpf_mcast_grp_context_free(&group);
+    print_mcast_group(&ctx, NULL);
+
     psabpf_context_free(&ctx);
 
     return NO_ERROR;

@@ -118,4 +118,14 @@ int psabpf_mcast_grp_member_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t
 
 psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group);
 
+typedef struct psabpf_mcast_grp_list {
+    psabpf_bpf_map_descriptor_t group_map;
+    psabpf_mcast_grp_id_t current_id;
+    psabpf_mcast_grp_ctx_t current_group;
+} psabpf_mcast_grp_list_t;
+
+int psabpf_mcast_grp_list_init(psabpf_context_t *ctx, psabpf_mcast_grp_list_t *list);
+void psabpf_mcast_grp_list_free(psabpf_mcast_grp_list_t *list);
+psabpf_mcast_grp_ctx_t *psabpf_mcast_grp_list_get_next_group(psabpf_mcast_grp_list_t *list);
+
 #endif  /* __PSABPF_PRE_H */

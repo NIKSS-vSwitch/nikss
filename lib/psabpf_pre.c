@@ -449,13 +449,12 @@ static int pre_get_next_entry(psabpf_context_t *ctx,
     }
 
     /* Build key for current entry and read next key */
-    elem_t key = {
-            .port = *current_egress_port,
-            .instance = *current_instance,
-    };
+    elem_t key = {0};
+    key.port = *current_egress_port;
+    key.instance = *current_instance;
     struct element value;
     if (bpf_map_lookup_elem(session_map->fd, &key, &value) != 0) {
-        fprintf(stderr, "failed to read next entry key: %s", strerror(errno));
+        fprintf(stderr, "failed to read next entry key: %s\n", strerror(errno));
         goto no_more_entries;
     }
     memcpy(&key, &value.next_id, sizeof(elem_t));
@@ -764,4 +763,56 @@ psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ct
     group->current_member.instance = entry.instance;
 
     return &group->current_member;
+}
+
+int psabpf_mcast_grp_list_init(psabpf_context_t *ctx, psabpf_mcast_grp_list_t *list)
+{
+    if (ctx == NULL || list == NULL)
+        return EINVAL;
+
+    memset(list, 0, sizeof(psabpf_mcast_grp_list_t));
+    list->group_map.fd = -1;
+    psabpf_mcast_grp_context_init(&list->current_group);
+
+    return open_pr_maps(ctx, MULTICAST_GROUP_TABLE, NULL, &list->group_map, NULL);
+}
+
+void psabpf_mcast_grp_list_free(psabpf_mcast_grp_list_t *list)
+{
+    if (list == NULL)
+        return;
+
+    close_object_fd(&list->group_map.fd);
+    psabpf_mcast_grp_context_free(&list->current_group);
+}
+
+psabpf_mcast_grp_ctx_t *psabpf_mcast_grp_list_get_next_group(psabpf_mcast_grp_list_t *list)
+{
+    if (list == NULL)
+        return NULL;
+
+    psabpf_mcast_grp_id_t next_id;
+    psabpf_mcast_grp_id_t current_id = list->current_id;
+    uint32_t value;
+
+    if (list->current_id == 0)
+        bpf_map_get_next_key(list->group_map.fd, NULL, &current_id);
+
+    while (true) {
+        if (bpf_map_get_next_key(list->group_map.fd, &current_id, &next_id) != 0) {
+            list->current_id = 0;
+            return NULL;
+        }
+        current_id = next_id;
+
+        /* Validate that entry exists because in other way we will iterate over all possible keys, even non-existing */
+        if (bpf_map_lookup_elem(list->group_map.fd, &next_id, &value) == 0)
+            break;
+    }
+
+    psabpf_mcast_grp_context_init(&list->current_group);
+    psabpf_mcast_grp_id(&list->current_group, next_id);
+    list->current_id = next_id;
+
+    return &list->current_group;
 }
