@@ -2820,7 +2820,6 @@ clean_up:
 }
 
 int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
-    psabpf_table_entry_t *ret_instance = NULL;
     void *next_key = NULL; /* do not free */
 
     if (ctx == NULL)
@@ -2874,7 +2873,6 @@ int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
 psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
 {
     psabpf_table_entry_t *ret_instance = NULL;
-    void *next_key = NULL; /* do not free */
     void *value_buffer = NULL;
 
     if (ctx == NULL)

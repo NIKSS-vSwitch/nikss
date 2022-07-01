@@ -274,23 +274,48 @@ clean_up:
 int do_multicast_get(int argc, char **argv)
 {
     psabpf_context_t ctx;
-    psabpf_mcast_grp_ctx_t *group;
+    psabpf_mcast_grp_ctx_t group;
+    bool group_id_specified = false;
+    int ret;
 
     psabpf_context_init(&ctx);
-    psabpf_context_set_pipeline(&ctx, 1);
+    psabpf_mcast_grp_context_init(&group);
 
-//    psabpf_mcast_grp_context_init(&group);
-//    psabpf_mcast_grp_id(&group, 8);
-//
-//    print_single_mcast_group(&ctx, &group);
-//
-//    psabpf_mcast_grp_context_free(&group);
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+        goto clean_up;
 
-    print_mcast_group(&ctx, NULL);
+    if (argc > 0) {
+        group_id_specified = true;
 
+        psabpf_mcast_grp_id_t group_id;
+        parser_keyword_value_pair_t kv[] = {
+                {"id", &group_id, sizeof(group_id), true, "multicast group id"},
+                { 0 },
+        };
+
+        if ((ret = parse_keyword_value_pairs(&argc, &argv, &kv[0])) != NO_ERROR)
+            goto clean_up;
+
+        psabpf_mcast_grp_id(&group, group_id);
+        if (!psabpf_mcast_grp_exists(&ctx, &group)) {
+            fprintf(stderr, "multicast group does not exist\n");
+            ret = ENOENT;
+            goto clean_up;
+        }
+    }
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    print_mcast_group(&ctx, group_id_specified ? &group : NULL);
+
+clean_up:
+    psabpf_mcast_grp_context_free(&group);
     psabpf_context_free(&ctx);
 
-    return NO_ERROR;
+    return ret;
 }
 
 int do_multicast_help(int argc, char **argv)
