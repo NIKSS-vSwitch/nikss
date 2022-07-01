@@ -251,6 +251,7 @@ static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *grou
             group_json = create_json_single_group(ctx, group);
             if (group_json == NULL) {
                 psabpf_mcast_grp_context_free(group);
+                psabpf_mcast_grp_list_free(&list);
                 goto clean_up;
             }
             set_json_object_at_index(groups, group_json, psabpf_mcast_grp_get_id(group));

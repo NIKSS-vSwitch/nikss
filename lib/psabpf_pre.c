@@ -791,28 +791,33 @@ psabpf_mcast_grp_ctx_t *psabpf_mcast_grp_list_get_next_group(psabpf_mcast_grp_li
     if (list == NULL)
         return NULL;
 
-    psabpf_mcast_grp_id_t next_id;
-    psabpf_mcast_grp_id_t current_id = list->current_id;
+    if (list->group_map.fd < 0 ||
+        list->group_map.type != BPF_MAP_TYPE_ARRAY_OF_MAPS ||
+        list->group_map.key_size != 4 || list->group_map.value_size != 4) {
+        fprintf(stderr, "invalid sessions/groups map or not opened properly\n");
+        return NULL;
+    }
+
+    /* This way is a little bit faster than using bpf_map_get_next_key
+     * to scan all possible keys if we assume array map of maps type.
+     * TODO: When kernel 5.19 or later will be in production, bpf_map_lookup_batch
+     *       could be used to get list of groups and gain performance.
+     *       See this commit: https://github.com/torvalds/linux/commit/9263dddc7b6f816fdd327eee435cc54ba51dd095
+     *       To check kernel version at runtime see: https://stackoverflow.com/a/46282013 */
     uint32_t value;
-
-    if (list->current_id == 0)
-        bpf_map_get_next_key(list->group_map.fd, NULL, &current_id);
-
     while (true) {
-        if (bpf_map_get_next_key(list->group_map.fd, &current_id, &next_id) != 0) {
+        list->current_id += 1;
+        if (list->current_id >= list->group_map.max_entries) {
             list->current_id = 0;
             return NULL;
         }
-        current_id = next_id;
 
-        /* Validate that entry exists because in other way we will iterate over all possible keys, even non-existing */
-        if (bpf_map_lookup_elem(list->group_map.fd, &next_id, &value) == 0)
+        if (bpf_map_lookup_elem(list->group_map.fd, &list->current_id, &value) == 0)
             break;
     }
 
     psabpf_mcast_grp_context_init(&list->current_group);
-    psabpf_mcast_grp_id(&list->current_group, next_id);
-    list->current_id = next_id;
+    psabpf_mcast_grp_id(&list->current_group, list->current_id);
 
     return &list->current_group;
 }
