@@ -481,6 +481,36 @@ no_more_entries:
     return ENODATA;
 }
 
+static int pre_get_next_session(psabpf_bpf_map_descriptor_t *pr_map, uint32_t *current_session_id)
+{
+    if (pr_map->fd < 0 ||
+        pr_map->type != BPF_MAP_TYPE_ARRAY_OF_MAPS ||
+        pr_map->key_size != 4 || pr_map->value_size != 4) {
+        fprintf(stderr, "invalid sessions/groups map or not opened properly\n");
+        return EINVAL;
+    }
+
+    /* This way is a little bit faster than using bpf_map_get_next_key
+     * to scan all possible keys if we assume array map of maps type.
+     * TODO: When kernel 5.19 or later will be in production, bpf_map_lookup_batch
+     *       could be used to get list of groups and gain performance.
+     *       See this commit: https://github.com/torvalds/linux/commit/9263dddc7b6f816fdd327eee435cc54ba51dd095
+     *       To check kernel version at runtime see: https://stackoverflow.com/a/46282013 */
+    uint32_t value;
+    while (true) {
+        *current_session_id += 1;
+        if (*current_session_id >= pr_map->max_entries) {
+            *current_session_id = 0;
+            return ENOENT;
+        }
+
+        if (bpf_map_lookup_elem(pr_map->fd, current_session_id, &value) == 0)
+            break;
+    }
+
+    return NO_ERROR;
+}
+
 /******************************************************************************
  * Clone session
  ******************************************************************************/
@@ -609,6 +639,41 @@ psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context
         return NULL;
 
     return &session->current_entry;
+}
+
+int psabpf_clone_session_list_init(psabpf_context_t *ctx, psabpf_clone_session_list_t *list)
+{
+    if (ctx == NULL || list == NULL)
+        return EINVAL;
+
+    memset(list, 0, sizeof(psabpf_clone_session_list_t));
+    list->session_map.fd = -1;
+    psabpf_clone_session_context_init(&list->current_session);
+
+    return open_pr_maps(ctx, CLONE_SESSION_TABLE, NULL, &list->session_map, NULL);
+}
+
+void psabpf_clone_session_list_free(psabpf_clone_session_list_t *list)
+{
+    if (list == NULL)
+        return;
+
+    close_object_fd(&list->session_map.fd);
+    psabpf_clone_session_context_free(&list->current_session);
+}
+
+psabpf_clone_session_ctx_t *psabpf_clone_session_list_get_next_group(psabpf_clone_session_list_t *list)
+{
+    if (list == NULL)
+        return NULL;
+
+    if (pre_get_next_session(&list->session_map, &list->current_id) != NO_ERROR)
+        return NULL;
+
+    psabpf_clone_session_context_init(&list->current_session);
+    psabpf_clone_session_id(&list->current_session, list->current_id);
+
+    return &list->current_session;
 }
 
 /******************************************************************************
@@ -791,30 +856,8 @@ psabpf_mcast_grp_ctx_t *psabpf_mcast_grp_list_get_next_group(psabpf_mcast_grp_li
     if (list == NULL)
         return NULL;
 
-    if (list->group_map.fd < 0 ||
-        list->group_map.type != BPF_MAP_TYPE_ARRAY_OF_MAPS ||
-        list->group_map.key_size != 4 || list->group_map.value_size != 4) {
-        fprintf(stderr, "invalid sessions/groups map or not opened properly\n");
+    if (pre_get_next_session(&list->group_map, &list->current_id) != NO_ERROR)
         return NULL;
-    }
-
-    /* This way is a little bit faster than using bpf_map_get_next_key
-     * to scan all possible keys if we assume array map of maps type.
-     * TODO: When kernel 5.19 or later will be in production, bpf_map_lookup_batch
-     *       could be used to get list of groups and gain performance.
-     *       See this commit: https://github.com/torvalds/linux/commit/9263dddc7b6f816fdd327eee435cc54ba51dd095
-     *       To check kernel version at runtime see: https://stackoverflow.com/a/46282013 */
-    uint32_t value;
-    while (true) {
-        list->current_id += 1;
-        if (list->current_id >= list->group_map.max_entries) {
-            list->current_id = 0;
-            return NULL;
-        }
-
-        if (bpf_map_lookup_elem(list->group_map.fd, &list->current_id, &value) == 0)
-            break;
-    }
 
     psabpf_mcast_grp_context_init(&list->current_group);
     psabpf_mcast_grp_id(&list->current_group, list->current_id);

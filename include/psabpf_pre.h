@@ -73,6 +73,16 @@ int psabpf_clone_session_entry_get(psabpf_context_t *ctx, psabpf_clone_session_c
 
 psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session);
 
+typedef struct psabpf_clone_session_list {
+    psabpf_bpf_map_descriptor_t session_map;
+    psabpf_clone_session_id_t current_id;
+    psabpf_clone_session_ctx_t current_session;
+} psabpf_clone_session_list_t;
+
+int psabpf_clone_session_list_init(psabpf_context_t *ctx, psabpf_clone_session_list_t *list);
+void psabpf_clone_session_list_free(psabpf_clone_session_list_t *list);
+psabpf_clone_session_ctx_t *psabpf_clone_session_list_get_next_group(psabpf_clone_session_list_t *list);
+
 /*
  * PRE - Multicast Groups
  */
