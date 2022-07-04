@@ -28,6 +28,7 @@ psabpf-ctl clone-session create pipe ID SESSION
 psabpf-ctl clone-session delete pipe ID SESSION
 psabpf-ctl clone-session add-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID [cos CLASS_OF_SERVICE] [truncate plen_bytes BYTES]
 psabpf-ctl clone-session del-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID
+psabpf-ctl clone-session get pipe ID [SESSION]
 
 SESSION := id SESSION_ID
 ```
@@ -39,6 +40,7 @@ psabpf-ctl multicast-group create pipe ID MULTICAST_GROUP
 psabpf-ctl multicast-group delete pipe ID MULTICAST_GROUP
 psabpf-ctl multicast-group add-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID
 psabpf-ctl multicast-group del-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID
+psabpf-ctl multicast-group get pipe ID [MULTICAST_GROUP]
 
 MULTICAST_GROUP := id MULTICAST_GROUP_ID
 ```
