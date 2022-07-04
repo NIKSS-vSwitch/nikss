@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <jansson.h>
 
 #include "clone_session.h"
 #include <psabpf_pre.h>
