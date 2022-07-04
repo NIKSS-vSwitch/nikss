@@ -291,26 +291,127 @@ err:
     return ret;
 }
 
+static json_t *create_json_single_session(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
+{
+    json_t *root = json_array();
+    if (root == NULL)
+        return NULL;
+
+    psabpf_clone_session_entry_t *entry;
+    while ((entry = psabpf_clone_session_get_next_entry(ctx, session)) != NULL) {
+        json_t *session_root = json_object();
+        if (session_root == NULL) {
+            json_decref(root);
+            psabpf_clone_session_entry_free(entry);
+            return NULL;
+        }
+
+        json_object_set_new(session_root, "port", json_integer(psabpf_clone_session_entry_get_port(entry)));
+        json_object_set_new(session_root, "instance", json_integer(psabpf_clone_session_entry_get_instance(entry)));
+        json_object_set_new(session_root, "class_of_service", json_integer(psabpf_clone_session_entry_get_cos(entry)));
+        bool truncate = psabpf_clone_session_entry_get_truncate_state(entry);
+        json_object_set_new(session_root, "truncate", json_boolean(truncate));
+        if (truncate)
+            json_object_set_new(session_root, "truncate_length", json_integer(psabpf_clone_session_entry_get_truncate_length(entry)));
+
+        json_array_append_new(root, session_root);
+
+        psabpf_clone_session_entry_free(entry);
+    }
+
+    return root;
+}
+
+static int print_clone_session(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
+{
+    int ret = ENOMEM;
+    json_t *root = json_object();
+    json_t *groups = json_object();
+    json_t *session_json;
+
+    if (root == NULL || groups == NULL)
+        goto clean_up;
+
+    json_object_set(root, "clone_sessions", groups);
+
+    if (session != NULL) {
+        session_json = create_json_single_session(ctx, session);
+        if (session_json == NULL)
+            goto clean_up;
+        set_json_object_at_index(groups, session_json, psabpf_clone_session_get_id(session));
+    } else {
+        psabpf_clone_session_list_t list;
+        psabpf_clone_session_list_init(ctx, &list);
+
+        while ((session = psabpf_clone_session_list_get_next_group(&list)) != NULL) {
+            session_json = create_json_single_session(ctx, session);
+            if (session_json == NULL) {
+                psabpf_clone_session_context_free(session);
+                psabpf_clone_session_list_free(&list);
+                goto clean_up;
+            }
+            set_json_object_at_index(groups, session_json, psabpf_clone_session_get_id(session));
+
+            psabpf_clone_session_context_free(session);
+        }
+        psabpf_clone_session_list_free(&list);
+    }
+
+    json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+    ret = NO_ERROR;
+
+clean_up:
+    json_decref(root);
+    json_decref(groups);
+
+    return ret;
+}
+
 int do_clone_session_get(int argc, char **argv)
 {
     psabpf_context_t ctx;
     psabpf_clone_session_ctx_t session;
-    psabpf_clone_session_entry_t *entry;
+    bool session_id_specified = false;
+    int ret;
 
     psabpf_context_init(&ctx);
-    psabpf_context_set_pipeline(&ctx, 1);
     psabpf_clone_session_context_init(&session);
-    psabpf_clone_session_id(&session, 8);
 
-    while ((entry = psabpf_clone_session_get_next_entry(&ctx, &session)) != NULL) {
-        printf("%u: port %u instance %u\n", session.id, entry->egress_port, entry->instance);
-        psabpf_clone_session_entry_free(entry);
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        session_id_specified = true;
+
+        psabpf_clone_session_id_t session_id;
+        parser_keyword_value_pair_t kv[] = {
+                {"id", &session_id, sizeof(session_id), true, "clone session id"},
+                { 0 },
+        };
+
+        if ((ret = parse_keyword_value_pairs(&argc, &argv, &kv[0])) != NO_ERROR)
+            goto clean_up;
+
+        psabpf_clone_session_id(&session, session_id);
+        if (!psabpf_clone_session_exists(&ctx, &session)) {
+            fprintf(stderr, "clone session does not exist\n");
+            ret = ENOENT;
+            goto clean_up;
+        }
     }
 
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    print_clone_session(&ctx, session_id_specified ? &session : NULL);
+
+clean_up:
     psabpf_clone_session_context_free(&session);
     psabpf_context_free(&ctx);
 
-    return NO_ERROR;
+    return ret;
 }
 
 int do_clone_session_help(int argc, char **argv)

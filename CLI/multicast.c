@@ -213,6 +213,7 @@ static json_t *create_json_single_group(psabpf_context_t *ctx, psabpf_mcast_grp_
         json_t *member_root = json_object();
         if (member_root == NULL) {
             json_decref(root);
+            psabpf_mcast_grp_member_free(member);
             return NULL;
         }
 
@@ -236,7 +237,7 @@ static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *grou
     if (root == NULL || groups == NULL)
         goto clean_up;
 
-    json_object_set(root, "multicast-groups", groups);
+    json_object_set(root, "multicast_groups", groups);
 
     if (group != NULL) {
         group_json = create_json_single_group(ctx, group);

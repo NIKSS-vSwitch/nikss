@@ -542,6 +542,13 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
     close_object_fd(&ctx->session_map.fd);
 }
 
+psabpf_clone_session_id_t psabpf_clone_session_get_id(psabpf_clone_session_ctx_t *ctx)
+{
+    if (ctx == NULL)
+        return 0;
+    return ctx->id;
+}
+
 bool psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
     if (session == NULL)
@@ -573,14 +580,35 @@ void psabpf_clone_session_entry_port(psabpf_clone_session_entry_t *entry, uint32
     entry->egress_port = egress_port;
 }
 
+uint32_t psabpf_clone_session_entry_get_port(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+    return entry->egress_port;
+}
+
 void psabpf_clone_session_entry_instance(psabpf_clone_session_entry_t *entry, uint16_t instance)
 {
     entry->instance = instance;
 }
 
+uint16_t psabpf_clone_session_entry_get_instance(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+    return entry->instance;
+}
+
 void psabpf_clone_session_entry_cos(psabpf_clone_session_entry_t *entry, uint8_t class_of_service)
 {
     entry->class_of_service = class_of_service;
+}
+
+uint8_t psabpf_clone_session_entry_get_cos(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+    return entry->class_of_service;
 }
 
 void psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes)
@@ -593,6 +621,20 @@ void psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *e
 {
     entry->truncate = false;
     entry->packet_length_bytes = 0;
+}
+
+bool psabpf_clone_session_entry_get_truncate_state(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+    return entry->truncate != 0;
+}
+
+uint16_t psabpf_clone_session_entry_get_truncate_length(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL || entry->truncate == 0)
+        return 0;
+    return entry->packet_length_bytes;
 }
 
 int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
