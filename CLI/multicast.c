@@ -204,9 +204,16 @@ err:
 
 static json_t *create_json_single_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
 {
-    json_t *root = json_array();
-    if (root == NULL)
+    json_t *root = json_object();
+    json_t *all_members = json_array();
+    if (root == NULL || all_members == NULL) {
+        json_decref(root);
+        json_decref(all_members);
         return NULL;
+    }
+
+    json_object_set_new(root, "id", json_integer(psabpf_mcast_grp_get_id(group)));
+    json_object_set_new(root, "members", all_members);
 
     psabpf_mcast_grp_member_t *member;
     while ((member = psabpf_mcast_grp_get_next_member(ctx, group)) != NULL) {
@@ -219,7 +226,7 @@ static json_t *create_json_single_group(psabpf_context_t *ctx, psabpf_mcast_grp_
 
         json_object_set_new(member_root, "port", json_integer(psabpf_mcast_grp_member_get_port(member)));
         json_object_set_new(member_root, "instance", json_integer(psabpf_mcast_grp_member_get_instance(member)));
-        json_array_append_new(root, member_root);
+        json_array_append_new(all_members, member_root);
 
         psabpf_mcast_grp_member_free(member);
     }
@@ -231,7 +238,7 @@ static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *grou
 {
     int ret = ENOMEM;
     json_t *root = json_object();
-    json_t *groups = json_object();
+    json_t *groups = json_array();
     json_t *group_json;
 
     if (root == NULL || groups == NULL)
@@ -243,7 +250,7 @@ static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *grou
         group_json = create_json_single_group(ctx, group);
         if (group_json == NULL)
             goto clean_up;
-        set_json_object_at_index(groups, group_json, psabpf_mcast_grp_get_id(group));
+        json_array_append_new(groups, group_json);
     } else {
         psabpf_mcast_grp_list_t list;
         psabpf_mcast_grp_list_init(ctx, &list);
@@ -255,7 +262,7 @@ static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *grou
                 psabpf_mcast_grp_list_free(&list);
                 goto clean_up;
             }
-            set_json_object_at_index(groups, group_json, psabpf_mcast_grp_get_id(group));
+            json_array_append_new(groups, group_json);
 
             psabpf_mcast_grp_context_free(group);
         }

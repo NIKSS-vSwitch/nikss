@@ -74,7 +74,4 @@ char * convert_bin_data_to_hexstr(const void *data, size_t len);
 json_t *create_json_entry_key(psabpf_table_entry_t *entry);
 int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry);
 
-/* parent - JSON object, object - any JSON type, index - converted to string */
-int set_json_object_at_index(json_t *parent, json_t *object, uint32_t index);
-
 #endif //P4C_COMMON_H

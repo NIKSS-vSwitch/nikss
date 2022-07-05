@@ -490,13 +490,3 @@ int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
 
     return NO_ERROR;
 }
-
-int set_json_object_at_index(json_t *parent, json_t *object, uint32_t index)
-{
-    char idx_str[16]; /* index is 32 bits, 2^32=4.3e+9, so at least 11 bytes are required to convert idx to string */
-    snprintf(idx_str, sizeof(idx_str), "%u", index);
-    if (json_object_set_new(parent, idx_str, object) != 0)
-        return EINVAL;
-
-    return NO_ERROR;
-}

@@ -294,9 +294,16 @@ err:
 
 static json_t *create_json_single_session(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
-    json_t *root = json_array();
-    if (root == NULL)
+    json_t *root = json_object();
+    json_t *all_sessions = json_array();
+    if (root == NULL || all_sessions == NULL) {
+        json_decref(root);
+        json_decref(all_sessions);
         return NULL;
+    }
+
+    json_object_set_new(root, "id", json_integer(psabpf_clone_session_get_id(session)));
+    json_object_set_new(root, "entries", all_sessions);
 
     psabpf_clone_session_entry_t *entry;
     while ((entry = psabpf_clone_session_get_next_entry(ctx, session)) != NULL) {
@@ -315,7 +322,7 @@ static json_t *create_json_single_session(psabpf_context_t *ctx, psabpf_clone_se
         if (truncate)
             json_object_set_new(session_root, "truncate_length", json_integer(psabpf_clone_session_entry_get_truncate_length(entry)));
 
-        json_array_append_new(root, session_root);
+        json_array_append_new(all_sessions, session_root);
 
         psabpf_clone_session_entry_free(entry);
     }
@@ -327,7 +334,7 @@ static int print_clone_session(psabpf_context_t *ctx, psabpf_clone_session_ctx_t
 {
     int ret = ENOMEM;
     json_t *root = json_object();
-    json_t *groups = json_object();
+    json_t *groups = json_array();
     json_t *session_json;
 
     if (root == NULL || groups == NULL)
@@ -339,7 +346,7 @@ static int print_clone_session(psabpf_context_t *ctx, psabpf_clone_session_ctx_t
         session_json = create_json_single_session(ctx, session);
         if (session_json == NULL)
             goto clean_up;
-        set_json_object_at_index(groups, session_json, psabpf_clone_session_get_id(session));
+        json_array_append_new(groups, session_json);
     } else {
         psabpf_clone_session_list_t list;
         psabpf_clone_session_list_init(ctx, &list);
@@ -351,7 +358,7 @@ static int print_clone_session(psabpf_context_t *ctx, psabpf_clone_session_ctx_t
                 psabpf_clone_session_list_free(&list);
                 goto clean_up;
             }
-            set_json_object_at_index(groups, session_json, psabpf_clone_session_get_id(session));
+            json_array_append_new(groups, session_json);
 
             psabpf_clone_session_context_free(session);
         }
