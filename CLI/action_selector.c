@@ -189,7 +189,7 @@ static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t
  * JSON functions
  *****************************************************************************/
 
-int set_json_object_at_index(json_t *parent, json_t *object, uint32_t index)
+static int set_json_object_at_index(json_t *parent, json_t *object, uint32_t index)
 {
     char idx_str[16]; /* index is 32 bits, 2^32=4.3e+9, so at least 11 bytes are required to convert idx to string */
     snprintf(idx_str, sizeof(idx_str), "%u", index);
