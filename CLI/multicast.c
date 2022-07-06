@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <jansson.h>
 
 #include "multicast.h"
 #include <psabpf_pre.h>
@@ -201,6 +202,130 @@ err:
     return ret;
 }
 
+static json_t *create_json_single_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+{
+    json_t *root = json_object();
+    json_t *all_members = json_array();
+    if (root == NULL || all_members == NULL) {
+        json_decref(root);
+        json_decref(all_members);
+        return NULL;
+    }
+
+    json_object_set_new(root, "id", json_integer(psabpf_mcast_grp_get_id(group)));
+    json_object_set_new(root, "members", all_members);
+
+    psabpf_mcast_grp_member_t *member;
+    while ((member = psabpf_mcast_grp_get_next_member(ctx, group)) != NULL) {
+        json_t *member_root = json_object();
+        if (member_root == NULL) {
+            json_decref(root);
+            psabpf_mcast_grp_member_free(member);
+            return NULL;
+        }
+
+        json_object_set_new(member_root, "port", json_integer(psabpf_mcast_grp_member_get_port(member)));
+        json_object_set_new(member_root, "instance", json_integer(psabpf_mcast_grp_member_get_instance(member)));
+        json_array_append_new(all_members, member_root);
+
+        psabpf_mcast_grp_member_free(member);
+    }
+
+    return root;
+}
+
+static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+{
+    int ret = ENOMEM;
+    json_t *root = json_object();
+    json_t *groups = json_array();
+    json_t *group_json;
+
+    if (root == NULL || groups == NULL)
+        goto clean_up;
+
+    json_object_set(root, "multicast_groups", groups);
+
+    if (group != NULL) {
+        group_json = create_json_single_group(ctx, group);
+        if (group_json == NULL)
+            goto clean_up;
+        json_array_append_new(groups, group_json);
+    } else {
+        psabpf_mcast_grp_list_t list;
+        psabpf_mcast_grp_list_init(ctx, &list);
+
+        while ((group = psabpf_mcast_grp_list_get_next_group(&list)) != NULL) {
+            group_json = create_json_single_group(ctx, group);
+            if (group_json == NULL) {
+                psabpf_mcast_grp_context_free(group);
+                psabpf_mcast_grp_list_free(&list);
+                goto clean_up;
+            }
+            json_array_append_new(groups, group_json);
+
+            psabpf_mcast_grp_context_free(group);
+        }
+        psabpf_mcast_grp_list_free(&list);
+    }
+    
+    json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
+    ret = NO_ERROR;
+
+clean_up:
+    json_decref(root);
+    json_decref(groups);
+
+    return ret;
+}
+
+int do_multicast_get(int argc, char **argv)
+{
+    psabpf_context_t ctx;
+    psabpf_mcast_grp_ctx_t group;
+    bool group_id_specified = false;
+    int ret;
+
+    psabpf_context_init(&ctx);
+    psabpf_mcast_grp_context_init(&group);
+
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+        goto clean_up;
+
+    if (argc > 0) {
+        group_id_specified = true;
+
+        psabpf_mcast_grp_id_t group_id;
+        parser_keyword_value_pair_t kv[] = {
+                {"id", &group_id, sizeof(group_id), true, "multicast group id"},
+                { 0 },
+        };
+
+        if ((ret = parse_keyword_value_pairs(&argc, &argv, &kv[0])) != NO_ERROR)
+            goto clean_up;
+
+        psabpf_mcast_grp_id(&group, group_id);
+        if (!psabpf_mcast_grp_exists(&ctx, &group)) {
+            fprintf(stderr, "multicast group does not exist\n");
+            ret = ENOENT;
+            goto clean_up;
+        }
+    }
+
+    if (argc > 0) {
+        fprintf(stderr, "%s: unused argument\n", *argv);
+        goto clean_up;
+    }
+
+    print_mcast_group(&ctx, group_id_specified ? &group : NULL);
+
+clean_up:
+    psabpf_mcast_grp_context_free(&group);
+    psabpf_context_free(&ctx);
+
+    return ret;
+}
+
 int do_multicast_help(int argc, char **argv)
 {
     (void) argc; (void) argv;
@@ -209,6 +334,7 @@ int do_multicast_help(int argc, char **argv)
         "       %1$s multicast-group delete pipe ID MULTICAST_GROUP\n"
         "       %1$s multicast-group add-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID\n"
         "       %1$s multicast-group del-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID\n"
+        "       %1$s multicast-group get pipe ID [MULTICAST_GROUP]\n"
         "\n"
         "       MULTICAST_GROUP := id MULTICAST_GROUP_ID\n"
         "",

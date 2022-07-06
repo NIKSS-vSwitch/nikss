@@ -421,6 +421,96 @@ err:
     return ret;
 }
 
+static int pre_get_next_entry(psabpf_context_t *ctx,
+                              psabpf_bpf_map_descriptor_t *session_map, const char *pr_map_name,
+                              uint32_t session, uint32_t *current_egress_port, uint16_t *current_instance,
+                              psabpf_clone_session_entry_t *current_entry)
+{
+    if (ctx == NULL || session == 0) {
+        fprintf(stderr, "invalid session/group or context\n");
+        return EINVAL;
+    }
+
+    if (session_map->fd < 0) {
+        psabpf_bpf_map_descriptor_t pr_map;
+
+        int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
+        if (ret != NO_ERROR)
+            return ret;
+
+        ret = open_session_map(&pr_map, session_map, session);
+        close_object_fd(&pr_map.fd);
+        if (ret != NO_ERROR)
+            return ret;
+
+        /* Start iteration from head */
+        *current_egress_port = 0;
+        *current_instance = 0;
+    }
+
+    /* Build key for current entry and read next key */
+    elem_t key = {0};
+    key.port = *current_egress_port;
+    key.instance = *current_instance;
+    struct element value;
+    if (bpf_map_lookup_elem(session_map->fd, &key, &value) != 0) {
+        fprintf(stderr, "failed to read next entry key: %s\n", strerror(errno));
+        goto no_more_entries;
+    }
+    memcpy(&key, &value.next_id, sizeof(elem_t));
+
+    /* Next entry exists? */
+    if (key.port == 0 && key.instance == 0)
+        goto no_more_entries;
+
+    /* Read next entry */
+    if (bpf_map_lookup_elem(session_map->fd, &key, &value) != 0) {
+        fprintf(stderr, "failed to read next entry: %s", strerror(errno));
+        goto no_more_entries;
+    }
+    memcpy(current_entry, &value.entry, sizeof(psabpf_clone_session_entry_t));
+
+    *current_egress_port = value.entry.egress_port;
+    *current_instance = value.entry.instance;
+
+    return NO_ERROR;
+
+no_more_entries:
+    *current_egress_port = 0;
+    *current_instance = 0;
+    return ENODATA;
+}
+
+static int pre_get_next_session(psabpf_bpf_map_descriptor_t *pr_map, uint32_t *current_session_id)
+{
+    if (pr_map->fd < 0 ||
+        pr_map->type != BPF_MAP_TYPE_ARRAY_OF_MAPS ||
+        pr_map->key_size != 4 || pr_map->value_size != 4) {
+        fprintf(stderr, "invalid sessions/groups map or not opened properly\n");
+        return EINVAL;
+    }
+
+    /* This way is a little bit faster than using bpf_map_get_next_key
+     * to scan all possible keys if we assume array map of maps type.
+     * TODO: When kernel 5.19 or later will be in production, bpf_map_lookup_batch
+     *       could be used to get list of groups and gain performance.
+     *       See this commit: https://github.com/torvalds/linux/commit/9263dddc7b6f816fdd327eee435cc54ba51dd095
+     *       To check kernel version at runtime see: https://stackoverflow.com/a/46282013 */
+    uint32_t value;
+    while (true) {
+        *current_session_id += 1;
+        if (*current_session_id >= pr_map->max_entries) {
+            *current_session_id = 0;
+            return ENOENT;
+        }
+
+        if (bpf_map_lookup_elem(pr_map->fd, current_session_id, &value) == 0)
+            break;
+    }
+
+    return NO_ERROR;
+}
+
 /******************************************************************************
  * Clone session
  ******************************************************************************/
@@ -430,13 +520,16 @@ void psabpf_clone_session_context_init(psabpf_clone_session_ctx_t *ctx)
     if (ctx == NULL)
         return;
     memset( ctx, 0, sizeof(psabpf_clone_session_ctx_t));
+
+    ctx->session_map.fd = -1;
 }
 
 void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx)
 {
     if (ctx == NULL)
         return;
-    memset( ctx, 0, sizeof(psabpf_clone_session_ctx_t));
+
+    close_object_fd(&ctx->session_map.fd);
 }
 
 void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_id_t id)
@@ -444,6 +537,16 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
     if (ctx == NULL)
         return;
     ctx->id = id;
+
+    /* Also reset session map if opened */
+    close_object_fd(&ctx->session_map.fd);
+}
+
+psabpf_clone_session_id_t psabpf_clone_session_get_id(psabpf_clone_session_ctx_t *ctx)
+{
+    if (ctx == NULL)
+        return 0;
+    return ctx->id;
 }
 
 bool psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
@@ -477,14 +580,35 @@ void psabpf_clone_session_entry_port(psabpf_clone_session_entry_t *entry, uint32
     entry->egress_port = egress_port;
 }
 
+uint32_t psabpf_clone_session_entry_get_port(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+    return entry->egress_port;
+}
+
 void psabpf_clone_session_entry_instance(psabpf_clone_session_entry_t *entry, uint16_t instance)
 {
     entry->instance = instance;
 }
 
+uint16_t psabpf_clone_session_entry_get_instance(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+    return entry->instance;
+}
+
 void psabpf_clone_session_entry_cos(psabpf_clone_session_entry_t *entry, uint8_t class_of_service)
 {
     entry->class_of_service = class_of_service;
+}
+
+uint8_t psabpf_clone_session_entry_get_cos(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+    return entry->class_of_service;
 }
 
 void psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes)
@@ -497,6 +621,20 @@ void psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *e
 {
     entry->truncate = false;
     entry->packet_length_bytes = 0;
+}
+
+bool psabpf_clone_session_entry_get_truncate_state(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL)
+        return 0;
+    return entry->truncate != 0;
+}
+
+uint16_t psabpf_clone_session_entry_get_truncate_length(psabpf_clone_session_entry_t *entry)
+{
+    if (entry == NULL || entry->truncate == 0)
+        return 0;
+    return entry->packet_length_bytes;
 }
 
 int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
@@ -528,11 +666,56 @@ int psabpf_clone_session_entry_exists(psabpf_context_t *ctx, psabpf_clone_sessio
     return NO_ERROR;
 }
 
-// TODO: implement
-int psabpf_clone_session_entry_get(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
+psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
-    (void) ctx; (void) session; (void) entry;
-    return EOPNOTSUPP;
+    if (ctx == NULL || session == NULL) {
+        fprintf(stderr, "invalid session or context\n");
+        return NULL;
+    }
+
+    int ret = pre_get_next_entry(ctx, &session->session_map, CLONE_SESSION_TABLE,
+                                 session->id,
+                                 &session->current_egress_port, &session->current_instance,
+                                 &session->current_entry);
+    if (ret != NO_ERROR)
+        return NULL;
+
+    return &session->current_entry;
+}
+
+int psabpf_clone_session_list_init(psabpf_context_t *ctx, psabpf_clone_session_list_t *list)
+{
+    if (ctx == NULL || list == NULL)
+        return EINVAL;
+
+    memset(list, 0, sizeof(psabpf_clone_session_list_t));
+    list->session_map.fd = -1;
+    psabpf_clone_session_context_init(&list->current_session);
+
+    return open_pr_maps(ctx, CLONE_SESSION_TABLE, NULL, &list->session_map, NULL);
+}
+
+void psabpf_clone_session_list_free(psabpf_clone_session_list_t *list)
+{
+    if (list == NULL)
+        return;
+
+    close_object_fd(&list->session_map.fd);
+    psabpf_clone_session_context_free(&list->current_session);
+}
+
+psabpf_clone_session_ctx_t *psabpf_clone_session_list_get_next_group(psabpf_clone_session_list_t *list)
+{
+    if (list == NULL)
+        return NULL;
+
+    if (pre_get_next_session(&list->session_map, &list->current_id) != NO_ERROR)
+        return NULL;
+
+    psabpf_clone_session_context_init(&list->current_session);
+    psabpf_clone_session_id(&list->current_session, list->current_id);
+
+    return &list->current_session;
 }
 
 /******************************************************************************
@@ -544,19 +727,36 @@ void psabpf_mcast_grp_context_init(psabpf_mcast_grp_ctx_t *group)
     if (group == NULL)
         return;
     memset(group, 0, sizeof(psabpf_mcast_grp_ctx_t));
+
+    group->group_map.fd = -1;
 }
 
 void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group)
 {
     if (group == NULL)
         return;
+
+    close_object_fd(&group->group_map.fd);
+
     memset(group, 0, sizeof(psabpf_mcast_grp_ctx_t));
+    group->group_map.fd = -1;
 }
 
 void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mcast_grp_id)
 {
     if (group != NULL)
         group->id = mcast_grp_id;
+
+    /* Also reset group map */
+    close_object_fd(&group->group_map.fd);
+}
+
+psabpf_mcast_grp_id_t psabpf_mcast_grp_get_id(psabpf_mcast_grp_ctx_t *group)
+{
+    if (group == NULL)
+        return 0;
+
+    return group->id;
 }
 
 int psabpf_mcast_grp_create(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
@@ -605,6 +805,20 @@ void psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_
         member->instance = instance;
 }
 
+uint32_t psabpf_mcast_grp_member_get_port(psabpf_mcast_grp_member_t *member)
+{
+    if (member == NULL)
+        return 0;
+    return member->egress_port;
+}
+
+uint16_t psabpf_mcast_grp_member_get_instance(psabpf_mcast_grp_member_t *member)
+{
+    if (member == NULL)
+        return 0;
+    return member->instance;
+}
+
 int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
 {
     if (group == NULL || member == NULL)
@@ -635,4 +849,60 @@ int psabpf_mcast_grp_member_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t
     };
 
     return pre_session_del_entry(ctx, MULTICAST_GROUP_TABLE, group->id, &entry);
+}
+
+psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+{
+    if (ctx == NULL || group == NULL) {
+        fprintf(stderr, "invalid group or context\n");
+        return NULL;
+    }
+
+    psabpf_clone_session_entry_t entry= {};
+    int ret = pre_get_next_entry(ctx, &group->group_map, MULTICAST_GROUP_TABLE,
+                                 group->id,
+                                 &group->current_egress_port, &group->current_instance,
+                                 &entry);
+    if (ret != NO_ERROR)
+        return NULL;
+
+    group->current_member.egress_port = entry.egress_port;
+    group->current_member.instance = entry.instance;
+
+    return &group->current_member;
+}
+
+int psabpf_mcast_grp_list_init(psabpf_context_t *ctx, psabpf_mcast_grp_list_t *list)
+{
+    if (ctx == NULL || list == NULL)
+        return EINVAL;
+
+    memset(list, 0, sizeof(psabpf_mcast_grp_list_t));
+    list->group_map.fd = -1;
+    psabpf_mcast_grp_context_init(&list->current_group);
+
+    return open_pr_maps(ctx, MULTICAST_GROUP_TABLE, NULL, &list->group_map, NULL);
+}
+
+void psabpf_mcast_grp_list_free(psabpf_mcast_grp_list_t *list)
+{
+    if (list == NULL)
+        return;
+
+    close_object_fd(&list->group_map.fd);
+    psabpf_mcast_grp_context_free(&list->current_group);
+}
+
+psabpf_mcast_grp_ctx_t *psabpf_mcast_grp_list_get_next_group(psabpf_mcast_grp_list_t *list)
+{
+    if (list == NULL)
+        return NULL;
+
+    if (pre_get_next_session(&list->group_map, &list->current_id) != NO_ERROR)
+        return NULL;
+
+    psabpf_mcast_grp_context_init(&list->current_group);
+    psabpf_mcast_grp_id(&list->current_group, list->current_id);
+
+    return &list->current_group;
 }

@@ -25,6 +25,7 @@ int do_clone_session_delete(int argc, char **argv);
 int do_clone_session_add_member(int argc, char **argv);
 int do_clone_session_del_member(int argc, char **argv);
 int do_clone_session_help(int argc, char **argv);
+int do_clone_session_get(int argc, char **argv);
 
 static const struct cmd clone_session_cmds[] = {
         {"help",       do_clone_session_help},
@@ -32,6 +33,7 @@ static const struct cmd clone_session_cmds[] = {
         {"delete",     do_clone_session_delete},
         {"add-member", do_clone_session_add_member},
         {"del-member", do_clone_session_del_member},
+        {"get",        do_clone_session_get},
         {0}
 };
 

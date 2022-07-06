@@ -24,6 +24,7 @@ int do_multicast_create_group(int argc, char **argv);
 int do_multicast_delete_group(int argc, char **argv);
 int do_multicast_add_group_member(int argc, char **argv);
 int do_multicast_del_group_member(int argc, char **argv);
+int do_multicast_get(int argc, char **argv);
 int do_multicast_help(int argc, char **argv);
 
 
@@ -33,6 +34,7 @@ static const struct cmd multicast_cmds[] = {
         {"delete",     do_multicast_delete_group},
         {"add-member", do_multicast_add_group_member},
         {"del-member", do_multicast_del_group_member},
+        {"get",        do_multicast_get},
         {0}
 };
 
