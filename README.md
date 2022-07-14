@@ -5,6 +5,8 @@ existing functions in the API or CLI.**
 
 **psabpf** is an in-kernel implementation of a P4 software switch. It works in conjunction with the P4-eBPF compiler. The **psabpf** switch uses Portable Switch Architecture (PSA) as a forwarding model and extended Berkeley Packet Filter (eBPF) as a packet processing engine. **psabpf** works seamlessly with both TC-based and XDP-based design of the PSA model for the P4-eBPF compiler. 
 
+This repository implements C API & command line tool (`psabpf-ctl`) to manage P4/PSA programs for eBPF.
+
 # Installation
 
 ## Dependencies
