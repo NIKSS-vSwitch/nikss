@@ -207,6 +207,13 @@ size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
     return 0;
 }
 
+void init_btf(psabpf_btf_t *btf)
+{
+    btf->btf = NULL;
+    btf->associated_prog = -1;
+    btf->btf_fd = -1;
+}
+
 static int try_load_btf(psabpf_btf_t *btf, const char *program_name)
 {
     btf->associated_prog = bpf_obj_get(program_name);
@@ -220,7 +227,8 @@ static int try_load_btf(psabpf_btf_t *btf, const char *program_name)
         goto free_program;
 
     error = btf__get_from_id(prog_info.btf_id, (struct btf **) &(btf->btf));
-    if (btf->btf == NULL || error != 0)
+    btf->btf_fd = bpf_btf_get_fd_by_id(prog_info.btf_id);
+    if (btf->btf == NULL || btf->btf_fd < 0 || error != 0)
         goto free_btf;
 
     return NO_ERROR;
@@ -229,11 +237,10 @@ free_btf:
     if (btf->btf != NULL)
         btf__free(btf->btf);
     btf->btf = NULL;
+    close_object_fd(&btf->btf_fd);
 
 free_program:
-    if (btf->associated_prog >= 0)
-        close(btf->associated_prog);
-    btf->associated_prog = -1;
+    close_object_fd(&btf->associated_prog);
 
     return ENOENT;
 }
@@ -268,6 +275,7 @@ void free_btf(psabpf_btf_t *btf)
         btf__free(btf->btf);
     btf->btf = NULL;
     close_object_fd(&btf->associated_prog);
+    close_object_fd(&btf->btf_fd);
 }
 
 int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *btf, psabpf_bpf_map_descriptor_t *md)
@@ -318,6 +326,8 @@ int update_map_info(psabpf_bpf_map_descriptor_t *md)
     md->key_size = info.key_size;
     md->value_size = info.value_size;
     md->max_entries = info.max_entries;
+    md->key_type_id = info.btf_key_type_id;
+    md->value_type_id = info.btf_value_type_id;
 
     return NO_ERROR;
 }

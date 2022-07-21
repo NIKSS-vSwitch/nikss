@@ -32,6 +32,8 @@ typedef struct psabpf_btf {
     /* BTF metadata are associated with eBPF program, eBPF map may do not own BTF */
     int associated_prog;
     void * btf;
+    /* To create bpf maps with BTF info */
+    int btf_fd;
 } psabpf_btf_t;
 
 typedef struct psabpf_bpf_map_descriptor {
@@ -39,8 +41,10 @@ typedef struct psabpf_bpf_map_descriptor {
     uint32_t type;
     uint32_t key_size;
     uint32_t value_size;
-    uint32_t btf_type_id;  // TODO: key type ID and value type ID
     uint32_t max_entries;
+    uint32_t btf_type_id;  // TODO: remove, use instead key_type_id and value_type_id
+    uint32_t key_type_id;
+    uint32_t value_type_id;
 } psabpf_bpf_map_descriptor_t;
 
 /*

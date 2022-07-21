@@ -30,6 +30,7 @@ void psabpf_register_ctx_init(psabpf_register_context_t *ctx) {
         return;
 
     memset(ctx, 0, sizeof(psabpf_register_context_t));
+    init_btf(&ctx->btf_metadata);
 }
 
 void psabpf_register_ctx_free(psabpf_register_context_t *ctx) {

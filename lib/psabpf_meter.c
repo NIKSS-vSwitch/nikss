@@ -188,7 +188,7 @@ void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx) {
 
     psabpf_meter_entry_init(&ctx->current_entry);
     ctx->meter.fd = -1;
-    ctx->btf_metadata.associated_prog = -1;
+    init_btf(&ctx->btf_metadata);
 }
 
 void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx) {

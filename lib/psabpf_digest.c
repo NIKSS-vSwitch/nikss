@@ -33,7 +33,7 @@ void psabpf_digest_ctx_init(psabpf_digest_context_t *ctx)
     memset(ctx, 0, sizeof(psabpf_digest_context_t));
 
     ctx->queue.fd = -1;
-    ctx->btf_metadata.associated_prog = -1;
+    init_btf(&ctx->btf_metadata);
 }
 
 void psabpf_digest_ctx_free(psabpf_digest_context_t *ctx)

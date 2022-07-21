@@ -33,6 +33,7 @@ void psabpf_value_set_context_init(psabpf_value_set_context_t *ctx) {
         return;
 
     memset(ctx, 0, sizeof(psabpf_value_set_context_t));
+    init_btf(&ctx->btf_metadata);
 }
 
 void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx) {

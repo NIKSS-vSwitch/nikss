@@ -38,7 +38,7 @@ void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx)
 
     memset(ctx, 0, sizeof(psabpf_counter_context_t));
     ctx->counter.fd = -1;
-    ctx->btf_metadata.associated_prog = -1;
+    init_btf(&ctx->btf_metadata);
 }
 
 void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx)
