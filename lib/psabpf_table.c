@@ -37,10 +37,11 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
         return;
     memset(ctx, 0, sizeof(psabpf_table_entry_ctx_t));
 
+    init_btf(&ctx->btf_metadata);
+
     /* 0 is a valid file descriptor */
     ctx->table.fd = -1;
     ctx->default_entry.fd = -1;
-    ctx->btf_metadata.associated_prog = -1;
     ctx->prefixes.fd = -1;
     ctx->tuple_map.fd = -1;
     ctx->cache.fd = -1;
@@ -1730,6 +1731,9 @@ static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const
             .value_size = ctx->table.value_size,
             .max_entries = ctx->table.max_entries,
             .map_type = ctx->table.type,
+            .btf_fd = ctx->btf_metadata.btf_fd,
+            .btf_key_type_id = ctx->table.key_type_id,
+            .btf_value_type_id = ctx->table.value_type_id,
     };
     ctx->table.fd = bpf_create_map_xattr(&attr);
     if (ctx->table.fd < 0) {

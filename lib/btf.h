@@ -41,6 +41,7 @@ uint32_t psabtf_get_member_type_id_by_name(struct btf *btf, uint32_t type_id,
 
 size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id);
 
+void init_btf(psabpf_btf_t *btf);
 int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf);
 void free_btf(psabpf_btf_t *btf);
 

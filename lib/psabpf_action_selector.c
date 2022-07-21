@@ -111,8 +111,9 @@ void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx)
         return;
     memset(ctx, 0, sizeof(*ctx));
 
+    init_btf(&ctx->btf);
+
     /* 0 is a valid file descriptor */
-    ctx->btf.associated_prog = -1;
     ctx->group.fd = -1;
     ctx->map_of_groups.fd = -1;
     ctx->map_of_members.fd = -1;
@@ -463,6 +464,9 @@ int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psab
             .value_size = ctx->group.value_size,
             .max_entries = ctx->group.max_entries,
             .map_type = ctx->group.type,
+            .btf_fd = ctx->btf.btf_fd,
+            .btf_key_type_id = ctx->group.key_type_id,
+            .btf_value_type_id = ctx->group.value_type_id,
     };
     ctx->group.fd = bpf_create_map_xattr(&attr);
     if (ctx->group.fd < 0) {
