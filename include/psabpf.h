@@ -32,7 +32,7 @@ typedef struct psabpf_btf {
     /* BTF metadata are associated with eBPF program, eBPF map may do not own BTF */
     int associated_prog;
     void * btf;
-    /* To create map (tuples) with BTF info */
+    /* To create bpf maps with BTF info */
     int btf_fd;
 } psabpf_btf_t;
 
