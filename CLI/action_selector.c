@@ -154,7 +154,11 @@ typedef enum get_mode {
     GET_MODE_ALL,
     GET_MODE_MEMBER,
     GET_MODE_GROUP,
-    GET_MODE_EMPTY_GROUP_ACTION
+    GET_MODE_EMPTY_GROUP_ACTION,
+
+    /* Used when adding member or group */
+    ADD_MEMBER,
+    ADD_GROUP
 } get_mode_t;
 
 static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t *reference)
@@ -346,6 +350,7 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
     json_t *members = NULL;
     json_t *groups = NULL;
     json_t *empty_group_action = NULL;
+    json_t *new_entry = NULL;
 
     bool failed = false;
     if (mode == GET_MODE_ALL) {
@@ -392,6 +397,10 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
 
         if (empty_group_action == NULL)
             failed = true;
+    } else if (mode == ADD_MEMBER || mode == ADD_GROUP) {
+        new_entry = json_integer(reference);
+        if (new_entry == NULL)
+            failed = true;
     }
 
     if (root == NULL || instance == NULL || failed) {
@@ -411,6 +420,10 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
         json_object_set(instance, "group_refs", groups);
     if (empty_group_action != NULL)
         json_object_set(instance, "empty_group_action", empty_group_action);
+    if (new_entry != NULL && mode == ADD_MEMBER)
+        json_object_set(instance, "added_member_ref", new_entry);
+    if (new_entry != NULL && mode == ADD_GROUP)
+        json_object_set(instance, "added_group_ref", new_entry);
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
     ret = NO_ERROR;
@@ -421,6 +434,7 @@ clean_up:
     json_decref(members);
     json_decref(groups);
     json_decref(empty_group_action);
+    json_decref(new_entry);
 
     return ret;
 }
@@ -432,6 +446,7 @@ clean_up:
 int do_action_selector_add_member(int argc, char **argv)
 {
     int error_code = EPERM;
+    const char *instance_name;
     psabpf_context_t psabpf_ctx;
     psabpf_action_selector_context_t ctx;
     psabpf_action_t action;
@@ -452,7 +467,7 @@ int do_action_selector_add_member(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, &instance_name) != NO_ERROR)
         goto clean_up;
 
     /* 2. Get action */
@@ -472,7 +487,7 @@ int do_action_selector_add_member(int argc, char **argv)
 
     error_code = psabpf_action_selector_add_member(&ctx, &member);
     if (error_code == NO_ERROR)
-        fprintf(stdout, "%u\n", psabpf_action_selector_get_member_reference(&member));
+        print_action_selector(&ctx, instance_name, ADD_MEMBER, psabpf_action_selector_get_member_reference(&member));
 
 clean_up:
     psabpf_action_selector_member_free(&member);
@@ -585,6 +600,7 @@ clean_up:
 int do_action_selector_create_group(int argc, char **argv)
 {
     int error_code = EPERM;
+    const char *instance_name;
     psabpf_context_t psabpf_ctx;
     psabpf_action_selector_context_t ctx;
     psabpf_action_selector_group_context_t group;
@@ -603,7 +619,7 @@ int do_action_selector_create_group(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, true, NULL) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, true, &instance_name) != NO_ERROR)
         goto clean_up;
 
     if (argc > 0) {
@@ -613,7 +629,7 @@ int do_action_selector_create_group(int argc, char **argv)
 
     error_code = psabpf_action_selector_add_group(&ctx, &group);
     if (error_code == NO_ERROR)
-        fprintf(stdout, "%u\n", psabpf_action_selector_get_group_reference(&group));
+        print_action_selector(&ctx, instance_name, ADD_GROUP, psabpf_action_selector_get_group_reference(&group));
 
 clean_up:
     psabpf_action_selector_group_free(&group);
