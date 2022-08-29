@@ -1032,9 +1032,13 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
             memcpy(buffer, mk->data, mk->key_size);
         }
 
-        /* write prefix length */
-        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
-            *lpm_prefix = (buffer - ((char *) lpm_prefix) - 4) * 8 + mk->u.lpm.prefix_len;
+        /* Write prefix length for every field, so overwrite previous value */
+        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
+            uint32_t prefix_len = mk->key_size * 8;
+            if (mk->type == PSABPF_LPM)
+                prefix_len = mk->u.lpm.prefix_len;
+            // TODO: error for ternary type match key
+            *lpm_prefix = (buffer - ((char *) lpm_prefix) - 4) * 8 + prefix_len;
         }
 
         buffer += mk->key_size;
@@ -1087,9 +1091,15 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
         const struct btf_member *member = btf_members(key_type);
         unsigned entries = btf_vlen(key_type);
         unsigned expected_entries = entries;
+        psabtf_struct_member_md_t prefix_md; /* For LPM trie map only */
 
-        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE)
-            --expected_entries;  /* omit prefix length */
+        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
+            /* Omit prefix length */
+            --expected_entries;
+            /* Get prefix metadata */
+            if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, key_type_id, 0, &prefix_md) != NO_ERROR)
+                return EAGAIN;
+        }
         if (is_table_dummy_key(ctx, key_type, key_type_id)) {
             /* Preserve zeroed bytes if table do not define key */
             expected_entries = 0;
@@ -1117,11 +1127,12 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
                 return ret;
 
             /* write prefix value for LPM field */
-            if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
-                uint32_t prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
-                psabtf_struct_member_md_t prefix_md;
-                if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, key_type_id, 0, &prefix_md) != NO_ERROR)
-                    return EAGAIN;
+            if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
+                /* LPM field have to be last field in the key structure, so we can assume that whole key must match for other keys */
+                uint32_t prefix_value = ctx->table.key_size * 8 - 32;
+                if (mk->type == PSABPF_LPM)
+                    prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
+                // TODO: error for ternary key match type
                 ret = write_buffer_btf(buffer, ctx->table.key_size, prefix_md.bit_offset / 8,
                                        &prefix_value, sizeof(prefix_value), ctx,
                                        prefix_md.effective_type_id, "prefix", WRITE_HOST_ORDER);
