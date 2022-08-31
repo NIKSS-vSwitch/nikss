@@ -1037,7 +1037,10 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
             uint32_t prefix_len = mk->key_size * 8;
             if (mk->type == PSABPF_LPM)
                 prefix_len = mk->u.lpm.prefix_len;
-            // TODO: error for ternary type match key
+            else if (mk->type == PSABPF_TERNARY) {
+                fprintf(stderr, "ternary key is not allowed for this table\n");
+                return EINVAL;
+            }
             *lpm_prefix = (buffer - ((char *) lpm_prefix) - 4) * 8 + prefix_len;
         }
 
@@ -1132,7 +1135,10 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
                 uint32_t prefix_value = ctx->table.key_size * 8 - 32;
                 if (mk->type == PSABPF_LPM)
                     prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
-                // TODO: error for ternary key match type
+                else if (mk->type == PSABPF_TERNARY) {
+                    fprintf(stderr, "ternary key is not allowed for this table\n");
+                    return EINVAL;
+                }
                 ret = write_buffer_btf(buffer, ctx->table.key_size, prefix_md.bit_offset / 8,
                                        &prefix_value, sizeof(prefix_value), ctx,
                                        prefix_md.effective_type_id, "prefix", WRITE_HOST_ORDER);
