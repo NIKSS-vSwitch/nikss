@@ -161,7 +161,7 @@ typedef enum get_mode {
     ADD_GROUP
 } get_mode_t;
 
-static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t *reference)
+static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t *reference, psabpf_action_selector_context_t *ctx)
 {
     *mode = GET_MODE_ALL;
 
@@ -170,8 +170,13 @@ static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t
 
     if (is_keyword(**argv, "member") || is_keyword(**argv, "group")) {
         *mode = GET_MODE_MEMBER;
-        if (is_keyword(**argv, "group"))
+        if (is_keyword(**argv, "group")) {
             *mode = GET_MODE_GROUP;
+            if (!psabpf_action_selector_has_group_capability(ctx)) {
+                fprintf(stderr, "%s: not supported\n", **argv);
+                return ENOTSUP;
+            }
+        }
         NEXT_ARGP_RET();
 
         char *ptr;
@@ -183,6 +188,10 @@ static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t
         NEXT_ARGP();
     } else if (is_keyword(**argv, "empty-group-action")) {
         *mode = GET_MODE_EMPTY_GROUP_ACTION;
+        if (!psabpf_action_selector_has_group_capability(ctx)) {
+            fprintf(stderr, "%s: not supported\n", **argv);
+            return ENOTSUP;
+        }
         NEXT_ARGP();
     }
 
@@ -355,11 +364,15 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
     bool failed = false;
     if (mode == GET_MODE_ALL) {
         members = create_json_all_members(ctx);
-        groups = create_json_all_groups(ctx);
-        empty_group_action = create_json_empty_group_action(ctx);
-
-        if (members == NULL || groups == NULL || empty_group_action == NULL)
+        if (members == NULL)
             failed = true;
+
+        if (psabpf_action_selector_has_group_capability(ctx)) {
+            groups = create_json_all_groups(ctx);
+            empty_group_action = create_json_empty_group_action(ctx);
+            if (groups == NULL || empty_group_action == NULL)
+                failed = true;
+        }
     } else if (mode == GET_MODE_MEMBER) {
         members = json_object();
         psabpf_action_selector_member_context_t member;
@@ -827,7 +840,7 @@ int do_action_selector_get(int argc, char **argv)
     /* 2. Try to get specific mode */
     get_mode_t mode;
     uint32_t reference = 0;
-    if (parse_get_options(&argc, &argv, &mode, &reference) != NO_ERROR)
+    if (parse_get_options(&argc, &argv, &mode, &reference, &ctx) != NO_ERROR)
         goto clean_up;
 
     if (argc > 0) {
@@ -862,6 +875,24 @@ int do_action_selector_help(int argc, char **argv)
             "       %1$s action-selector empty-group-action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]\n"
             ""
             "       %1$s action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | empty-group-action]\n"
+            "\n"
+            "       ACTION := { id ACTION_ID | name ACTION_NAME }\n"
+            "       ACTION_PARAMS := { DATA }\n"
+            "",
+            program_name);
+    return 0;
+}
+
+int do_action_profile_help(int argc, char **argv)
+{
+    (void) argc; (void) argv;
+
+    fprintf(stderr,
+            "Usage: %1$s action-profile add-member pipe ID ACTION_PROFILE_NAME action ACTION [data ACTION_PARAMS]\n"
+            "       %1$s action-profile delete-member pipe ID ACTION_PROFILE_NAME MEMBER_REF\n"
+            "       %1$s action-profile update-member pipe ID ACTION_PROFILE_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]\n"
+            ""
+            "       %1$s action-profile get pipe ID ACTION_PROFILE_NAME [member MEMBER_REF]\n"
             "\n"
             "       ACTION := { id ACTION_ID | name ACTION_NAME }\n"
             "       ACTION_PARAMS := { DATA }\n"
