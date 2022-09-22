@@ -98,10 +98,7 @@ psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id)
 
 static int parse_counter_value(psabpf_counter_context_t *ctx)
 {
-    uint32_t value_type_id;
-    value_type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->counter.btf_type_id, "value");
-
-    ctx->counter_type = get_counter_type(&ctx->btf_metadata, value_type_id);
+    ctx->counter_type = get_counter_type(&ctx->btf_metadata, ctx->counter.value_type_id);
     if (ctx->counter_type == PSABPF_COUNTER_TYPE_UNKNOWN)
         return EINVAL;
 
@@ -117,8 +114,7 @@ static int parse_counter_value(psabpf_counter_context_t *ctx)
 
 static int parse_counter_key(psabpf_counter_context_t *ctx)
 {
-    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->counter.btf_type_id, "key");
-    return parse_struct_type(&ctx->btf_metadata, type_id, ctx->counter.key_size, &ctx->key_fds);
+    return parse_struct_type(&ctx->btf_metadata, ctx->counter.key_type_id, ctx->counter.key_size, &ctx->key_fds);
 }
 
 int psabpf_counter_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name)

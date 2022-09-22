@@ -36,8 +36,6 @@ int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
         const char *member_name, psabtf_struct_member_md_t *md);
 int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
         psabtf_struct_member_md_t *md);
-uint32_t psabtf_get_member_type_id_by_name(struct btf *btf, uint32_t type_id,
-        const char *member_name);
 
 size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id);
 

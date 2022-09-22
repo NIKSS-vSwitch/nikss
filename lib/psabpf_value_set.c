@@ -55,9 +55,7 @@ void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx) {
 
 static int parse_key_type(psabpf_value_set_context_t *ctx)
 {
-    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->set_map.btf_type_id, "key");
-
-    return parse_struct_type(&ctx->btf_metadata, type_id, ctx->set_map.key_size, &ctx->fds);
+    return parse_struct_type(&ctx->btf_metadata, ctx->set_map.key_type_id, ctx->set_map.key_size, &ctx->fds);
 }
 
 int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set_context_t *ctx, const char *name) {

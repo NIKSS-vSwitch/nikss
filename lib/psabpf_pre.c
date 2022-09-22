@@ -135,8 +135,8 @@ static int do_create_pre_session(psabpf_bpf_map_descriptor_t *pr_map,
             .max_entries = session_template->max_entries,
             .map_type = session_template->type,
             .btf_fd = btf->btf_fd,
-            .btf_key_type_id = session_template->key_type_id,
-            .btf_value_type_id = session_template->value_type_id,
+            .btf_key_type_id = session_template->map_key_type_id,
+            .btf_value_type_id = session_template->map_value_type_id,
     };
     int inner_map_fd = bpf_create_map_xattr(&attr);
     if (inner_map_fd < 0) {

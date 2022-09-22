@@ -465,8 +465,8 @@ int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psab
             .max_entries = ctx->group.max_entries,
             .map_type = ctx->group.type,
             .btf_fd = ctx->btf.btf_fd,
-            .btf_key_type_id = ctx->group.key_type_id,
-            .btf_value_type_id = ctx->group.value_type_id,
+            .btf_key_type_id = ctx->group.map_key_type_id,
+            .btf_value_type_id = ctx->group.map_value_type_id,
     };
     ctx->group.fd = bpf_create_map_xattr(&attr);
     if (ctx->group.fd < 0) {
