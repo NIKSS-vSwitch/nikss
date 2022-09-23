@@ -69,6 +69,7 @@ static int do_help(int argc, char **argv)
             "                   del-port |\n"
             "                   table |\n"
             "                   action-selector |\n"
+            "                   action-profile |\n"
             "                   meter |\n"
             "                   digest |\n"
             "                   counter |\n"
