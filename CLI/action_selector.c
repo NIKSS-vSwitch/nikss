@@ -364,14 +364,16 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
     bool failed = false;
     if (mode == GET_MODE_ALL) {
         members = create_json_all_members(ctx);
-        if (members == NULL)
+        if (members == NULL) {
             failed = true;
+        }
 
         if (psabpf_action_selector_has_group_capability(ctx)) {
             groups = create_json_all_groups(ctx);
             empty_group_action = create_json_empty_group_action(ctx);
-            if (groups == NULL || empty_group_action == NULL)
+            if (groups == NULL || empty_group_action == NULL) {
                 failed = true;
+            }
         }
     } else if (mode == GET_MODE_MEMBER) {
         members = json_object();

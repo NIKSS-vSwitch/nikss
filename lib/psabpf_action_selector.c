@@ -152,8 +152,9 @@ static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_s
     ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->group);
     if (ret != NO_ERROR) {
         /* Maybe ActionSelector is an ActionProfile so do not bother user in this case */
-        if (ret != ENOENT)
+        if (ret != ENOENT) {
             fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
+        }
         return ret;
     }
     close_object_fd(&ctx->group.fd);
@@ -209,8 +210,9 @@ int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_
         fprintf(stderr, "warning: couldn't find BTF info\n");
 
     int ret = do_open_action_selector(psabpf_ctx, ctx, name);
-    if (ret == ENOENT)
+    if (ret == ENOENT) {
         ret = do_open_action_profile(psabpf_ctx, ctx, name);
+    }
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open ActionSelector/ActionProfile %s: %s\n", name, strerror(ret));
         return ret;
@@ -255,8 +257,9 @@ void psabpf_action_selector_group_free(psabpf_action_selector_group_context_t *g
 
 bool psabpf_action_selector_has_group_capability(psabpf_action_selector_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return false;
+    }
     return ctx->map_of_groups.fd >= 0;
 }
 
@@ -397,8 +400,9 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
     bool found = false;
     uint32_t key = 0, next_key;
 
-    if (ctx->map_of_groups.fd < 0)
+    if (ctx->map_of_groups.fd < 0) {
         return false; /* No groups available */
+    }
 
     /* Iterate over every group and check if member reference exists */
     if (bpf_map_get_next_key(ctx->map_of_groups.fd, NULL, &next_key) != 0)
