@@ -31,6 +31,7 @@ int do_action_selector_empty_group_action(int argc, char **argv);
 int do_action_selector_get(int argc, char **argv);
 
 int do_action_selector_help(int argc, char **argv);
+int do_action_profile_help(int argc, char **argv);
 
 static const struct cmd action_selector_cmds[] = {
         {"help",                 do_action_selector_help},
@@ -42,6 +43,15 @@ static const struct cmd action_selector_cmds[] = {
         {"add-to-group",         do_action_selector_add_to_group},
         {"delete-from-group",    do_action_selector_delete_from_group},
         {"empty-group-action",   do_action_selector_empty_group_action},
+        {"get",                  do_action_selector_get},
+        {0}
+};
+
+static const struct cmd action_profile_cmds[] = {
+        {"help",                 do_action_profile_help},
+        {"add-member",           do_action_selector_add_member},
+        {"delete-member",        do_action_selector_delete_member},
+        {"update-member",        do_action_selector_update_member},
         {"get",                  do_action_selector_get},
         {0}
 };

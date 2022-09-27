@@ -151,7 +151,10 @@ static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_s
     snprintf(derived_name, sizeof(derived_name), "%s_groups_inner", name);
     ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->group);
     if (ret != NO_ERROR) {
-        fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
+        /* Maybe ActionSelector is an ActionProfile so do not bother user in this case */
+        if (ret != ENOENT) {
+            fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
+        }
         return ret;
     }
     close_object_fd(&ctx->group.fd);
@@ -186,6 +189,17 @@ static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_s
     return NO_ERROR;
 }
 
+static int do_open_action_profile(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
+{
+    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf, &ctx->map_of_members);
+    if (ret != NO_ERROR) {
+        fprintf(stderr, "couldn't open map %s: %s\n", name, strerror(ret));
+        return ret;
+    }
+
+    return NO_ERROR;
+}
+
 int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
 {
     if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
@@ -196,8 +210,11 @@ int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_
         fprintf(stderr, "warning: couldn't find BTF info\n");
 
     int ret = do_open_action_selector(psabpf_ctx, ctx, name);
+    if (ret == ENOENT) {
+        ret = do_open_action_profile(psabpf_ctx, ctx, name);
+    }
     if (ret != NO_ERROR) {
-        fprintf(stderr, "couldn't open ActionSelector %s: %s\n", name, strerror(ret));
+        fprintf(stderr, "couldn't open ActionSelector/ActionProfile %s: %s\n", name, strerror(ret));
         return ret;
     }
 
@@ -236,6 +253,14 @@ void psabpf_action_selector_group_init(psabpf_action_selector_group_context_t *g
 void psabpf_action_selector_group_free(psabpf_action_selector_group_context_t *group)
 {
     (void) group;
+}
+
+bool psabpf_action_selector_has_group_capability(psabpf_action_selector_context_t *ctx)
+{
+    if (ctx == NULL) {
+        return false;
+    }
+    return ctx->map_of_groups.fd >= 0;
 }
 
 int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t *member, psabpf_action_t *action)
@@ -323,7 +348,7 @@ int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psa
 
     member->member_ref = find_and_reserve_reference(&ctx->map_of_members, NULL);
     if (member->member_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
-        fprintf(stderr, "failed to find available reference for member");
+        fprintf(stderr, "failed to find available reference for member\n");
         return EFBIG;  /* Probably, here we know we have access to eBPF, so most probably version is that map is full */
     }
 
@@ -375,6 +400,10 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
     bool found = false;
     uint32_t key = 0, next_key;
 
+    if (ctx->map_of_groups.fd < 0) {
+        return false; /* No groups available */
+    }
+
     /* Iterate over every group and check if member reference exists */
     if (bpf_map_get_next_key(ctx->map_of_groups.fd, NULL, &next_key) != 0)
         return false;  /* no groups */
@@ -416,7 +445,7 @@ int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psa
         fprintf(stderr, "expected that map have 32 bit key\n");
         return EINVAL;
     }
-    if (ctx->group.key_size != 4 || ctx->group.value_size != 4) {
+    if (ctx->map_of_groups.fd >= 0 && (ctx->group.key_size != 4 || ctx->group.value_size != 4)) {
         fprintf(stderr, "invalid group map\n");
         return EINVAL;
     }
@@ -465,8 +494,8 @@ int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psab
             .max_entries = ctx->group.max_entries,
             .map_type = ctx->group.type,
             .btf_fd = ctx->btf.btf_fd,
-            .btf_key_type_id = ctx->group.key_type_id,
-            .btf_value_type_id = ctx->group.value_type_id,
+            .btf_key_type_id = ctx->group.map_key_type_id,
+            .btf_value_type_id = ctx->group.map_value_type_id,
     };
     ctx->group.fd = bpf_create_map_xattr(&attr);
     if (ctx->group.fd < 0) {
@@ -789,6 +818,10 @@ int psabpf_action_selector_get_group(psabpf_action_selector_context_t *ctx, psab
 {
     if (ctx == NULL || group == NULL)
         return EINVAL;
+    if (ctx->map_of_groups.fd < 0) {
+        fprintf(stderr, "map of groups not opened\n");
+        return EINVAL;
+    }
     if (ctx->map_of_groups.key_size != 4 || ctx->map_of_groups.value_size != 4) {
         fprintf(stderr, "invalid map of groups\n");
         return EINVAL;
@@ -810,6 +843,10 @@ psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(ps
 {
     if (ctx == NULL)
         return NULL;
+    if (ctx->map_of_groups.fd < 0) {
+        fprintf(stderr, "map of groups not opened\n");
+        return NULL;
+    }
     if (ctx->map_of_groups.key_size != 4) {
         fprintf(stderr, "invalid map of groups\n");
         return NULL;

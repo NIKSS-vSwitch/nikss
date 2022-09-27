@@ -227,8 +227,7 @@ int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx,
     }
 
     /* Parses index type */
-    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->meter.btf_type_id, "key");
-    ret = parse_struct_type(&ctx->btf_metadata, type_id, ctx->meter.key_size, &ctx->index_fds);
+    ret = parse_struct_type(&ctx->btf_metadata, ctx->meter.key_type_id, ctx->meter.key_size, &ctx->index_fds);
     if (ret != NO_ERROR) {
         fprintf(stderr, "failed to parse meter type: %s\n", strerror(ret));
         return ret;

@@ -29,8 +29,6 @@
  */
 
 typedef struct psabpf_btf {
-    /* BTF metadata are associated with eBPF program, eBPF map may do not own BTF */
-    int associated_prog;
     void * btf;
     /* To create bpf maps with BTF info */
     int btf_fd;
@@ -42,9 +40,12 @@ typedef struct psabpf_bpf_map_descriptor {
     uint32_t key_size;
     uint32_t value_size;
     uint32_t max_entries;
-    uint32_t btf_type_id;  // TODO: remove, use instead key_type_id and value_type_id
+    /* Effective type IDs for key/value */
     uint32_t key_type_id;
     uint32_t value_type_id;
+    /* Type IDs used by map definition for key/value */
+    uint32_t map_key_type_id;
+    uint32_t map_value_type_id;
 } psabpf_bpf_map_descriptor_t;
 
 /*
@@ -535,7 +536,7 @@ const char *psabpf_direct_meter_get_name(psabpf_direct_meter_context_t *dm_ctx);
 int psabpf_direct_meter_get_entry(psabpf_direct_meter_context_t *dm_ctx, psabpf_table_entry_t *entry, psabpf_meter_entry_t *dm);
 
 /*
- * Action Selector
+ * Action Selector and Action Profile
  */
 
 typedef struct psabpf_action_selector_member_context {
@@ -574,6 +575,8 @@ void psabpf_action_selector_member_free(psabpf_action_selector_member_context_t 
 
 void psabpf_action_selector_group_init(psabpf_action_selector_group_context_t *group);
 void psabpf_action_selector_group_free(psabpf_action_selector_group_context_t *group);
+
+bool psabpf_action_selector_has_group_capability(psabpf_action_selector_context_t *ctx);
 
 /* Reuse table API */
 int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t *member, psabpf_action_t *action);
@@ -620,10 +623,6 @@ psabpf_action_param_t *psabpf_action_selector_action_param_get_next(psabpf_actio
 const char *psabpf_action_selector_action_param_get_name(psabpf_action_selector_context_t *ctx,
                                                          psabpf_action_selector_member_context_t *member,
                                                          psabpf_action_param_t *param);
-
-/*
- * TODO: Action Profile
- */
 
 ////// PacketIn / PacketOut
 // TODO: to be implemented

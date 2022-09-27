@@ -169,7 +169,7 @@ int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t in
     return NO_ERROR;
 }
 
-uint32_t psabtf_get_member_type_id_by_name(struct btf *btf, uint32_t type_id, const char *member_name)
+static uint32_t get_member_type_id_by_name(struct btf *btf, uint32_t type_id, const char *member_name)
 {
     psabtf_struct_member_md_t md = {};
     if (psabtf_get_member_md_by_name(btf, type_id, member_name, &md) != 0)
@@ -210,21 +210,24 @@ size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
 void init_btf(psabpf_btf_t *btf)
 {
     btf->btf = NULL;
-    btf->associated_prog = -1;
     btf->btf_fd = -1;
 }
 
 static int try_load_btf(psabpf_btf_t *btf, const char *program_name)
 {
-    btf->associated_prog = bpf_obj_get(program_name);
-    if (btf->associated_prog < 0)
+    /* BTF metadata are associated with eBPF program, eBPF map may do not own BTF */
+    int associated_prog = bpf_obj_get(program_name);
+    if (associated_prog < 0) {
         return ENOENT;
+    }
 
     struct bpf_prog_info prog_info = {};
     unsigned len = sizeof(struct bpf_prog_info);
-    int error = bpf_obj_get_info_by_fd(btf->associated_prog, &prog_info, &len);
-    if (error)
-        goto free_program;
+    int error = bpf_obj_get_info_by_fd(associated_prog, &prog_info, &len);
+    close(associated_prog);
+    if (error) {
+        return ENOENT;
+    }
 
     error = btf__get_from_id(prog_info.btf_id, (struct btf **) &(btf->btf));
     btf->btf_fd = bpf_btf_get_fd_by_id(prog_info.btf_id);
@@ -238,9 +241,6 @@ free_btf:
         btf__free(btf->btf);
     btf->btf = NULL;
     close_object_fd(&btf->btf_fd);
-
-free_program:
-    close_object_fd(&btf->associated_prog);
 
     return ENOENT;
 }
@@ -274,7 +274,6 @@ void free_btf(psabpf_btf_t *btf)
     if (btf->btf)
         btf__free(btf->btf);
     btf->btf = NULL;
-    close_object_fd(&btf->associated_prog);
     close_object_fd(&btf->btf_fd);
 }
 
@@ -296,11 +295,25 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
     if (errno_val != NO_ERROR)
         return errno_val;
 
-    /* Find entry in BTF for our map */
+    /* Find BTF type IDs for our map */
+    md->key_type_id = 0;
+    md->value_type_id = 0;
     if (btf != NULL && btf->btf != NULL) {
-        md->btf_type_id = psabtf_get_map_type_id_by_name(btf->btf, name);
-        if (md->btf_type_id == 0)
+        uint32_t btf_type_id = psabtf_get_map_type_id_by_name(btf->btf, name);
+        if (btf_type_id == 0)
             fprintf(stderr, "can't get BTF info for %s\n", name);
+
+        if (md->map_key_type_id == 0) {
+            md->key_type_id = get_member_type_id_by_name(btf->btf, btf_type_id, "key");
+        } else {
+            md->key_type_id = follow_types(btf->btf, md->map_key_type_id);
+        }
+
+        if (md->map_value_type_id == 0) {
+            md->value_type_id = get_member_type_id_by_name(btf->btf, btf_type_id, "value");
+        } else {
+            md->value_type_id = follow_types(btf->btf, md->map_value_type_id);
+        }
     }
 
     return NO_ERROR;
@@ -326,8 +339,8 @@ int update_map_info(psabpf_bpf_map_descriptor_t *md)
     md->key_size = info.key_size;
     md->value_size = info.value_size;
     md->max_entries = info.max_entries;
-    md->key_type_id = info.btf_key_type_id;
-    md->value_type_id = info.btf_value_type_id;
+    md->map_key_type_id = info.btf_key_type_id;
+    md->map_value_type_id = info.btf_value_type_id;
 
     return NO_ERROR;
 }

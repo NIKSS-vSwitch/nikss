@@ -48,8 +48,7 @@ void psabpf_digest_ctx_free(psabpf_digest_context_t *ctx)
 
 static int parse_digest_btf(psabpf_digest_context_t *ctx)
 {
-    uint32_t type_id = psabtf_get_member_type_id_by_name(ctx->btf_metadata.btf, ctx->queue.btf_type_id, "value");
-    return parse_struct_type(&ctx->btf_metadata, type_id, ctx->queue.value_size, &ctx->fds);
+    return parse_struct_type(&ctx->btf_metadata, ctx->queue.value_type_id, ctx->queue.value_size, &ctx->fds);
 }
 
 int psabpf_digest_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name)

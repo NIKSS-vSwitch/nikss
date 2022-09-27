@@ -69,6 +69,7 @@ static int do_help(int argc, char **argv)
             "                   del-port |\n"
             "                   table |\n"
             "                   action-selector |\n"
+            "                   action-profile |\n"
             "                   meter |\n"
             "                   digest |\n"
             "                   counter |\n"
@@ -132,6 +133,11 @@ static int do_action_selector(int argc, char **argv)
     return cmd_select(action_selector_cmds, argc, argv, do_action_selector_help);
 }
 
+static int do_action_profile(int argc, char **argv)
+{
+    return cmd_select(action_profile_cmds, argc, argv, do_action_profile_help);
+}
+
 static int do_digest(int argc, char **argv)
 {
     return cmd_select(digest_cmds, argc, argv, do_digest_help);
@@ -161,6 +167,7 @@ static const struct cmd cmds[] = {
         { "multicast-group", do_multicast },
         { "table",           do_table },
         { "action-selector", do_action_selector },
+        { "action-profile",  do_action_profile },
         { "meter",           do_meter },
         { "digest",          do_digest },
         { "counter",         do_counter },
