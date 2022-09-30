@@ -180,7 +180,7 @@ static int update_prog_devmap(psabpf_bpf_map_descriptor_t *devmap, int ifindex, 
     }
     if (ifindex > (int) devmap->max_entries) {
         fprintf(stderr,
-                "Warning: the index(=%d) of the interface %s is higher than the DEVMAP size (=%d)\n"
+                "Warning: the index(=%d) of the interface %s is higher than the DEVMAP size (=%u)\n"
                 "Applying modulo ... \n", ifindex, intf, devmap->max_entries);
     }
     int index = ifindex % ((int) devmap->max_entries);
@@ -749,6 +749,7 @@ bool is_valid_object_name(psabpf_pipeline_objects_list_t *list, const char *name
             "_defaultActionGroup",
             "_actions",
     };
+    /* cppcheck-suppress variableScope ; for readability all related variables are defined together */
     const char *ternary_tuple_infix = "_tuple_";
     const unsigned no_reserved_names = sizeof(reserved_names) / sizeof(reserved_names[0]);
     const unsigned no_suffixes = sizeof(suffixes) / sizeof(suffixes[0]);

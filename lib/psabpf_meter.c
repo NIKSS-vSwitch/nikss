@@ -220,6 +220,7 @@ int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx,
     }
 
     if (sizeof(psabpf_meter_data_t) > ctx->meter.value_size) {
+        /* cppcheck-suppress invalidPrintfArgType_uint ; cppcheck failed to recognize a real type of size_t */
         fprintf(stderr, "Meter data has bigger size "
                         "(%lu) than meter definition value size (%u)!\n",
                 sizeof(psabpf_meter_data_t), ctx->meter.value_size);

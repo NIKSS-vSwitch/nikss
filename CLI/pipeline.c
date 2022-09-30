@@ -46,8 +46,9 @@ static int print_pipeline_json(psabpf_context_t *ctx)
 {
     char date_buf[256];
     uint64_t load_timestamp = psabpf_pipeline_get_load_timestamp(ctx);
+    struct tm date;
     /* format timestamp into ISO 8601 date */
-    strftime(date_buf, sizeof(date_buf), "%Y-%m-%dT%H:%M:%S%z", localtime((time_t *) &load_timestamp));
+    strftime(date_buf, sizeof(date_buf), "%Y-%m-%dT%H:%M:%S%z", localtime_r((time_t *) &load_timestamp, &date));
 
     const char *hook_point_name = psabpf_pipeline_is_TC_based(ctx) ? "TC" : "XDP";
 

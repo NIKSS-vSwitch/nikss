@@ -120,6 +120,7 @@ static int do_create_pre_session(psabpf_bpf_map_descriptor_t *pr_map,
         return EBADF;
     }
     if (pr_map->key_size != sizeof(session)) {
+        /* cppcheck-suppress invalidPrintfArgType_uint ; cppcheck failed to recognize a real type of size_t */
         fprintf(stderr, "key map size must be equal to %lu\n", sizeof(session));
         return EINVAL;
     }
@@ -215,6 +216,7 @@ static int remove_pre_session(psabpf_context_t *ctx, const char *pr_map_name, ui
         goto err;
 
     if (pr_map.key_size != sizeof(session)) {
+        /* cppcheck-suppress invalidPrintfArgType_uint ; cppcheck failed to recognize a real type of size_t */
         fprintf(stderr, "key map size must be equal to %lu\n", sizeof(session));
         ret = EINVAL;
         goto err;
@@ -311,7 +313,7 @@ static int pre_session_insert_entry(psabpf_context_t *ctx, const char *pr_map_na
     if (ret != 0) {
         ret = errno;
         if (ret == EEXIST) {
-            fprintf(stderr, "Clone session/multicast member [port=%d, instance=%d] already exists. "
+            fprintf(stderr, "Clone session/multicast member [port=%u, instance=%d] already exists. "
                             "Increment 'instance' to clone more than one packet to the same port.\n",
                     entry->egress_port,
                     entry->instance);
@@ -387,7 +389,7 @@ static int pre_session_del_entry(psabpf_context_t *ctx, const char *pr_map_name,
     if (ret != 0 || found == false) {
         if (ret == NO_ERROR)
             ret = ENOENT;
-        fprintf(stderr, "error getting element from list (egress_port=%d, instance=%d): %s\n",
+        fprintf(stderr, "error getting element from list (egress_port=%u, instance=%d): %s\n",
                 entry->egress_port, entry->instance, strerror(ret));
         goto err;
     }
@@ -625,6 +627,7 @@ void psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *en
     entry->packet_length_bytes = packet_length_bytes;
 }
 
+/* cppcheck-suppress unusedFunction ; public API call */
 void psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry)
 {
     entry->truncate = false;
@@ -668,6 +671,7 @@ int psabpf_clone_session_entry_delete(psabpf_context_t *ctx, psabpf_clone_sessio
     return pre_session_del_entry(ctx, CLONE_SESSION_TABLE, session->id, entry);
 }
 
+/* cppcheck-suppress unusedFunction ; public API call */
 int psabpf_clone_session_entry_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
 {
     (void) ctx; (void) session; (void) entry;
@@ -840,6 +844,7 @@ int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t
     return pre_session_insert_entry(ctx, MULTICAST_GROUP_TABLE, group->id, &entry);
 }
 
+/* cppcheck-suppress unusedFunction ; public API call */
 int psabpf_mcast_grp_member_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
 {
     (void) ctx; (void) group; (void) member;

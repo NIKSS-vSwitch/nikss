@@ -41,6 +41,6 @@ psabpf_struct_field_descriptor_t *get_struct_field_descriptor(psabpf_struct_fiel
 void free_struct_field_set(psabpf_struct_field_set_t *sfs);
 int struct_field_set_append(psabpf_struct_field_set_t *sfs, const void *data, size_t data_len);
 int construct_struct_from_fields(psabpf_struct_field_set_t *data, psabpf_struct_field_descriptor_set_t *fds,
-                                 void *buffer, size_t buffer_len);
+                                 char *buffer, size_t buffer_len);
 
 #endif  /* P4C_PSABPF_COMMON_H */

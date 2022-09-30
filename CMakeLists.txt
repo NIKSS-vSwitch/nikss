@@ -71,3 +71,23 @@ else ()
 endif ()
 target_link_libraries(psabpf-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
 install(TARGETS psabpf-ctl RUNTIME DESTINATION bin)
+
+# linter
+set(CPPCHECK_CONFIG
+        --quiet
+        --language=c
+        --std=c11
+        --error-exitcode=2
+        )
+set(CPPCHECK_CHECKS
+        --enable=all
+        --suppress=readdirCalled
+        --suppress=missingIncludeSystem
+        --inline-suppr
+        --library=std
+        --library=posix
+        )
+add_custom_target(clint
+        COMMAND cppcheck ${CPPCHECK_CONFIG} ${CPPCHECK_CHECKS} -I./include -I./install/usr/include ./CLI ./include ./lib main.c
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "C linter")

@@ -249,7 +249,7 @@ static void *allocate_key_buffer(psabpf_counter_context_t *ctx, psabpf_counter_e
     return entry->raw_key;
 }
 
-int convert_counter_data_to_entry(const uint8_t *data, size_t counter_size,
+int convert_counter_data_to_entry(const char *data, size_t counter_size,
                                   psabpf_counter_type_t counter_type, psabpf_counter_entry_t *entry)
 {
     entry->bytes = 0;
@@ -270,7 +270,7 @@ int convert_counter_data_to_entry(const uint8_t *data, size_t counter_size,
 
 static int read_and_parse_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
 {
-    uint8_t value[MAX_COUNTER_VALUE_SIZE];
+    char value[MAX_COUNTER_VALUE_SIZE];
     int ret = bpf_map_lookup_elem(ctx->counter.fd, entry->raw_key, &value[0]);
     if (ret != 0) {
         ret = errno;
@@ -329,7 +329,7 @@ psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx)
     return &ctx->current_entry;
 }
 
-int convert_counter_entry_to_data(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, uint8_t *buffer)
+int convert_counter_entry_to_data(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, char *buffer)
 {
     size_t counter_size = ctx->counter.value_size;
     if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES)
@@ -346,7 +346,7 @@ int convert_counter_entry_to_data(psabpf_counter_context_t *ctx, psabpf_counter_
     return NO_ERROR;
 }
 
-static bool is_zero_counter_value(const uint8_t *buffer, size_t buffer_len)
+static bool is_zero_counter_value(const char *buffer, size_t buffer_len)
 {
     for (size_t i = 0; i < buffer_len; i++) {
         if (buffer[i] != 0)
@@ -407,7 +407,7 @@ static int do_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t 
     if (ctx == NULL || entry == NULL)
         return EINVAL;
 
-    uint8_t value[MAX_COUNTER_VALUE_SIZE];
+    char value[MAX_COUNTER_VALUE_SIZE];
     if (convert_counter_entry_to_data(ctx, entry, &value[0]) != NO_ERROR)
         return EINVAL;
 

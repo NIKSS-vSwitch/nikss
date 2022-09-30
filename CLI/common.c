@@ -286,7 +286,7 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
 
     /* Try parse as a MAC address */
     if (is_valid_mac_address(data)) {
-        int v[6];
+        unsigned int v[6];
         if (sscanf(data, "%x%*c%x%*c%x%*c%x%*c%x%*c%x",
                    &(v[0]), &(v[1]), &(v[2]), &(v[3]), &(v[4]), &(v[5])) == 6) {
             uint8_t bytes[6];
@@ -419,7 +419,7 @@ json_t *create_json_entry_key(psabpf_table_entry_t *entry)
 int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
     bool has_any_key = false;
-    int error_code = EPERM;
+    int error_code;
 
     do {
         NEXT_ARGP_RET();

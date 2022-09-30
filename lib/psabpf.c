@@ -17,7 +17,7 @@
 
 #include <string.h>
 
-#include "../include/psabpf.h"
+#include <psabpf.h>
 
 void psabpf_context_init(psabpf_context_t *ctx)
 {

@@ -666,7 +666,7 @@ static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
      */
     DECLARE_LIBBPF_OPTS(bpf_map_batch_opts, opts,
                         .elem_flags = 0,
-                        .flags = 0,
+                        .flags = 0
     );
     uint32_t keys[3] =   { index_to_remove, 0,                     number_of_members };
     uint32_t values[3] = { last_member_ref, number_of_members - 1, 0 };

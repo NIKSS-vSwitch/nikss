@@ -32,7 +32,7 @@ int construct_buffer(char * buffer, size_t buffer_len,
 int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
 int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                    const void *key, const void *key_mask);
+                    const char *key, const char *key_mask);
 int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name);
 int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx);
 

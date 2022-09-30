@@ -29,7 +29,7 @@ typedef struct psabpf_digest_context {
 
 /* Used to read a next Digest message. */
 typedef struct psabpf_digest {
-    void *raw_data;  /* stores data from map as a single block */
+    char *raw_data;  /* stores data from map as a single block */
 
     size_t current_field_id;
     psabpf_struct_field_t current;

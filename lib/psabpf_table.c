@@ -94,8 +94,9 @@ static int get_value_type(psabpf_table_entry_ctx_t *ctx, const struct btf_type *
         return ENOENT;
     }
     *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, ctx->table.value_type_id);
-    if (value_type == NULL)
+    if (*value_type == NULL) {
         return EPERM;
+    }
 
     if (btf_kind(*value_type) != BTF_KIND_STRUCT) {
         fprintf(stderr, "expected struct as a map value\n");
@@ -714,6 +715,7 @@ size_t psabpf_matchkey_get_mask_size(psabpf_match_key_t *mk)
 }
 
 /* only for 'range' match */
+/* cppcheck-suppress unusedFunction ; public API call */
 int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start)
 {
     (void) mk; (void) start;
@@ -721,6 +723,7 @@ int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start)
 }
 
 /* only for 'range' match */
+/* cppcheck-suppress unusedFunction ; public API call */
 int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end)
 {
     (void) mk; (void) end;
@@ -979,8 +982,8 @@ enum write_flags {
     WRITE_NETWORK_ORDER
 };
 
-static int write_buffer_btf(char * buffer, size_t buffer_len, size_t offset,
-                            void * data, size_t data_len, psabpf_table_entry_ctx_t *ctx,
+static int write_buffer_btf(char *buffer, size_t buffer_len, size_t offset,
+                            const void *data, size_t data_len, psabpf_table_entry_ctx_t *ctx,
                             uint32_t dst_type_id, const char *dst_type, enum write_flags flags)
 {
     size_t data_type_len = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, dst_type_id);
@@ -1238,8 +1241,7 @@ static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx,
 static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx,
                             psabpf_table_entry_t *entry, uint32_t value_type_id)
 {
-    size_t base_offset, offset;
-    int ret;
+    size_t base_offset;
 
     /* find union with action data */
     psabtf_struct_member_md_t action_union_md = {};
@@ -1263,16 +1265,16 @@ static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx,
     /* fill action data */
     unsigned entries = btf_vlen(data_type);
     if (entry->action->n_params != entries) {
-        fprintf(stderr, "expected %d action parameters, got %zu\n",
+        fprintf(stderr, "expected %u action parameters, got %zu\n",
                 entries, entry->action->n_params);
         return EAGAIN;
     }
     const struct btf_member *member = btf_members(data_type);
     for (unsigned i = 0; i < entries; i++, member++) {
-        offset = btf_member_bit_offset(data_type, i) / 8;
-        ret = write_buffer_btf(buffer, ctx->table.value_size, base_offset + offset,
-                               entry->action->params[i].data, entry->action->params[i].len,
-                               ctx, member->type, "value", WRITE_HOST_ORDER);
+        size_t offset = btf_member_bit_offset(data_type, i) / 8;
+        int ret = write_buffer_btf(buffer, ctx->table.value_size, base_offset + offset,
+                                   entry->action->params[i].data, entry->action->params[i].len,
+                                   ctx, member->type, "value", WRITE_HOST_ORDER);
         if (ret != NO_ERROR)
             return ret;
     }
@@ -1327,6 +1329,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
                                current_data->len, ctx, member->type, "reference", WRITE_HOST_ORDER);
         if (ret != NO_ERROR)
             return ret;
+        /* cppcheck-suppress redundantAssignment ; cppcheck failed to properly understand the algorithm */
         entry_ref_used = true;
     }
     if (entry_ref_used)
@@ -1457,7 +1460,7 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
     const struct btf_member *member = btf_members(key_type);
     unsigned entries = btf_vlen(key_type);
     if (entry->n_keys != entries) {
-        fprintf(stderr, "expected %d keys, got %zu\n", entries, entry->n_keys);
+        fprintf(stderr, "expected %u keys, got %zu\n", entries, entry->n_keys);
         return EAGAIN;
     }
 
@@ -1567,7 +1570,7 @@ static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_
                 .counter.value_size = dc_ctx->counter_size,
         };
         int ret = convert_counter_entry_to_data(&counter_ctx, &entry->direct_counters[i].counter,
-                                                (uint8_t *) value + ctx->direct_counters_ctx[i].counter_offset);
+                                                value + ctx->direct_counters_ctx[i].counter_offset);
         if (ret != NO_ERROR)
             return ret;
     }
@@ -2309,7 +2312,7 @@ clean_up:
     return return_code;
 }
 
-static int parse_table_value_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+static int parse_table_value_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     size_t buffer_size = ctx->table.value_size;
 
@@ -2348,7 +2351,7 @@ static int parse_table_value_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_
 }
 
 static int parse_table_value_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                                    const void *value, uint32_t value_type_id)
+                                    const char *value, uint32_t value_type_id)
 {
     /* Get action ID */
     psabtf_struct_member_md_t action_id_md = {};
@@ -2403,7 +2406,7 @@ static int parse_table_value_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_
 }
 
 static int parse_table_value_priority(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                                      const void *value, uint32_t value_type_id)
+                                      const char *value, uint32_t value_type_id)
 {
     if (ctx->is_ternary == false)
         return NO_ERROR;
@@ -2420,7 +2423,7 @@ static int parse_table_value_priority(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
     return NO_ERROR;
 }
 
-static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     if (ctx->n_direct_counters == 0)
         return NO_ERROR;
@@ -2442,7 +2445,7 @@ static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabp
     return NO_ERROR;
 }
 
-static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     if (ctx->n_direct_meters == 0)
         return NO_ERROR;
@@ -2454,7 +2457,7 @@ static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_
     for (unsigned i = 0; i < ctx->n_direct_meters; i++) {
         psabpf_meter_entry_init(&entry->direct_meters[i].meter);
         entry->direct_meters[i].meter_idx = ctx->direct_meters_ctx[i].meter_idx;
-        convert_meter_data_to_entry(value + ctx->direct_meters_ctx[i].meter_offset,
+        convert_meter_data_to_entry((const psabpf_meter_data_t *) (value + ctx->direct_meters_ctx[i].meter_offset),
                                     &entry->direct_meters[i].meter);
     }
     entry->n_direct_meters = ctx->n_direct_meters;
@@ -2462,7 +2465,7 @@ static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_
     return NO_ERROR;
 }
 
-static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     int ret = parse_table_value_direct_counter(ctx, entry, value);
     if (ret != NO_ERROR)
@@ -2475,7 +2478,7 @@ static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabp
     return NO_ERROR;
 }
 
-static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     unsigned number_of_implementations = ctx->table_implementations.n_fields;
     if (number_of_implementations < 1)
@@ -2494,7 +2497,7 @@ static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_ta
 
         if (ctx->table_implementation_group_marks.fields[i].type == PSABPF_STRUCT_FIELD_TYPE_DATA) {
             /* Has group mark */
-            const uint32_t *is_group = value + ctx->table_implementation_group_marks.fields[i].data_offset;
+            const uint32_t *is_group = (uint32_t *) (value + ctx->table_implementation_group_marks.fields[i].data_offset);
             if (*is_group != 0)
                 entry->action->params[i].is_group_reference = true;
         }
@@ -2503,7 +2506,7 @@ static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     return NO_ERROR;
 }
 
-static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     int ret;
     uint32_t value_type_id = ctx->table.value_type_id;
@@ -2531,7 +2534,7 @@ static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
     return NO_ERROR;
 }
 
-static int parse_table_value(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const void *value)
+static int parse_table_value(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     entry->action = malloc(sizeof(psabpf_action_t));
     if (entry->action == NULL)
@@ -2634,7 +2637,7 @@ clean_up:
 }
 
 static int parse_table_key_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                                  const void *key, const void *key_mask)
+                                  const char *key, const char *key_mask)
 {
     psabpf_match_key_t mk;
     psabpf_matchkey_init(&mk);
@@ -2661,7 +2664,7 @@ static int parse_table_key_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_en
     return NO_ERROR;
 }
 
-static enum psabpf_matchkind_t decode_key_field_type_btf_info(psabpf_table_entry_ctx_t *ctx, const void *field_mask,
+static enum psabpf_matchkind_t decode_key_field_type_btf_info(psabpf_table_entry_ctx_t *ctx, const char *field_mask,
                                                               size_t field_len, uint32_t type_fields, uint32_t field_id)
 {
     if (ctx->is_ternary) {
@@ -2679,8 +2682,8 @@ static enum psabpf_matchkind_t decode_key_field_type_btf_info(psabpf_table_entry
     return PSABPF_EXACT;
 }
 
-static int parse_table_key_add_key_field(psabpf_table_entry_t *entry, int field_type, const void *field_data,
-                                         const void *field_mask, uint32_t prefix, size_t field_len)
+static int parse_table_key_add_key_field(psabpf_table_entry_t *entry, int field_type, const char *field_data,
+                                         const char *field_mask, uint32_t prefix, size_t field_len)
 {
     if (field_len < 1)
         return ENODATA;
@@ -2710,7 +2713,7 @@ static int parse_table_key_add_key_field(psabpf_table_entry_t *entry, int field_
 }
 
 static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                                    const void *key, const void *key_mask)
+                                    const char *key, const char *key_mask)
 {
     uint32_t key_type_id = ctx->table.key_type_id;
     if (key_type_id == 0)
@@ -2759,7 +2762,7 @@ static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_
 }
 
 int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                    const void *key, const void *key_mask)
+                    const char *key, const char *key_mask)
 {
     if (ctx->btf_metadata.btf == NULL || ctx->table.key_type_id == 0) {
         return parse_table_key_no_btf(ctx, entry, key, key_mask);
@@ -2771,8 +2774,8 @@ int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
 static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
 {
     int ret_code = NO_ERROR;
-    void *prefix_value = NULL;
-    void *next_key = NULL;
+    char *prefix_value = NULL;
+    char *next_key = NULL;
     uint8_t has_next_mask;
     uint32_t tuple_id;
     uint32_t inner_map_id;
@@ -2898,7 +2901,7 @@ int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
 psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
 {
     psabpf_table_entry_t *ret_instance = NULL;
-    void *value_buffer = NULL;
+    char *value_buffer = NULL;
 
     if (ctx == NULL)
         return NULL;
@@ -2949,9 +2952,6 @@ clean_up:
 
 int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    if (ctx == NULL || entry == NULL)
-        return EINVAL;
-
     uint32_t key_buffer = 0;
     char *value_buffer = NULL;
     int return_code = NO_ERROR;

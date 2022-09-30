@@ -23,8 +23,8 @@
 /* Might be used to test whether given type ID is a valid counter */
 psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id);
 
-int convert_counter_entry_to_data(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, uint8_t *buffer);
-int convert_counter_data_to_entry(const uint8_t *data, size_t counter_size,
+int convert_counter_entry_to_data(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, char *buffer);
+int convert_counter_data_to_entry(const char *data, size_t counter_size,
                                   psabpf_counter_type_t counter_type, psabpf_counter_entry_t *entry);
 
 #endif  /* P4C_PSABPF_COUNTER_H */

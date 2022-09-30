@@ -362,7 +362,7 @@ int struct_field_set_append(psabpf_struct_field_set_t *sfs, const void *data, si
 }
 
 int construct_struct_from_fields(psabpf_struct_field_set_t *data, psabpf_struct_field_descriptor_set_t *fds,
-                                 void *buffer, size_t buffer_len)
+                                 char *buffer, size_t buffer_len)
 {
     memset(buffer, 0, buffer_len);
 

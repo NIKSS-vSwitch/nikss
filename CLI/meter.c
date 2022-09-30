@@ -55,15 +55,13 @@ int parse_dst_meter(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
 }
 
 int parse_meter_index(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
-    int error_code = NO_ERROR;
-
     if (!is_keyword(**argv, "index"))
         return EPERM;
 
     NEXT_ARGP_RET();
 
     while (*argc > 0) {
-        error_code = translate_data_to_bytes(**argv, entry, CTX_METER_INDEX);
+        int error_code = translate_data_to_bytes(**argv, entry, CTX_METER_INDEX);
         if (error_code != NO_ERROR)
             return error_code;
 
