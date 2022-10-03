@@ -15,15 +15,16 @@
  * limitations under the License.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
 
 #include <jansson.h>
 
-#include "counter.h"
 #include <psabpf.h>
+
+#include "counter.h"
 
 static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
                              psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx)
@@ -33,11 +34,13 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
         return EINVAL;
     }
 
-    if (counter_name != NULL)
+    if (counter_name != NULL) {
         *counter_name = **argv;
+    }
     int error_code = psabpf_counter_ctx_name(psabpf_ctx, ctx, **argv);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
     NEXT_ARGP();
     return NO_ERROR;
@@ -46,20 +49,23 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
 static int parse_counter_key(int *argc, char ***argv, psabpf_counter_entry_t *entry)
 {
     /* TODO: replace 'key' keyword with 'index' */
-    if (!is_keyword(**argv, "key"))
+    if (!is_keyword(**argv, "key")) {
         return NO_ERROR; /* key is optional */
+    }
     NEXT_ARGP_RET();
 
     bool has_any_key = false;
     while (*argc > 0) {
         if (has_any_key) {
-            if (is_keyword(**argv, "value"))
+            if (is_keyword(**argv, "value")) {
                 return NO_ERROR;
+            }
         }
 
         int err = translate_data_to_bytes(**argv, entry, CTX_COUNTER_KEY);
-        if (err != NO_ERROR)
+        if (err != NO_ERROR) {
             return err;
+        }
 
         has_any_key = true;
         NEXT_ARGP();
@@ -74,18 +80,21 @@ int parse_counter_value_str(const char *str, psabpf_counter_type_t type, psabpf_
 
     psabpf_counter_value_t parsed_value = strtoull(str, &end_ptr, 0);
     if (type == PSABPF_COUNTER_TYPE_BYTES) {
-        if (*end_ptr == '\0')
+        if (*end_ptr == '\0') {
             psabpf_counter_entry_set_bytes(entry, parsed_value);
+        }
     } else if (type == PSABPF_COUNTER_TYPE_PACKETS) {
-        if (*end_ptr == '\0')
+        if (*end_ptr == '\0') {
             psabpf_counter_entry_set_packets(entry, parsed_value);
+        }
     } else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
         if (*end_ptr == ':') {
             psabpf_counter_entry_set_bytes(entry, parsed_value);
             ++end_ptr;
             parsed_value = strtoull(end_ptr, &end_ptr, 0);
-            if (*end_ptr == '\0')
+            if (*end_ptr == '\0') {
                 psabpf_counter_entry_set_packets(entry, parsed_value);
+            }
         }
     } else {
         fprintf(stderr, "unknown Counter type\n");
@@ -122,8 +131,9 @@ static int build_json_counter_key(json_t *parent, psabpf_counter_context_t *ctx,
     while ((key = psabpf_counter_entry_get_next_key(ctx, entry)) != NULL) {
         if (psabpf_struct_get_field_type(key) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_START) {
             json_t *sub_struct = json_object();
-            if (sub_struct == NULL)
+            if (sub_struct == NULL) {
                 return ENOMEM;
+            }
             if (json_object_set(parent, psabpf_struct_get_field_name(key), sub_struct)) {
                 json_decref(sub_struct);
                 return EPERM;
@@ -131,24 +141,29 @@ static int build_json_counter_key(json_t *parent, psabpf_counter_context_t *ctx,
 
             int ret = build_json_counter_key(sub_struct, ctx, entry);
             json_decref(sub_struct);
-            if (ret != NO_ERROR)
+            if (ret != NO_ERROR) {
                 return ret;
+            }
 
             continue;
         }
 
-        if (psabpf_struct_get_field_type(key) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_END)
+        if (psabpf_struct_get_field_type(key) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_END) {
             return NO_ERROR;
+        }
 
-        if (psabpf_struct_get_field_type(key) != PSABPF_STRUCT_FIELD_TYPE_DATA)
+        if (psabpf_struct_get_field_type(key) != PSABPF_STRUCT_FIELD_TYPE_DATA) {
             continue;
+        }
 
         const char *field_name = psabpf_struct_get_field_name(key);
-        if (field_name == NULL)
+        if (field_name == NULL) {
             continue;
+        }
         char *data = convert_bin_data_to_hexstr(psabpf_struct_get_field_data(key), psabpf_struct_get_field_data_len(key));
-        if (data == NULL)
+        if (data == NULL) {
             continue;
+        }
 
         json_object_set_new(parent, field_name, json_string(data));
         free(data);
@@ -167,8 +182,9 @@ int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf
         if (bytes_str != NULL) {
             json_object_set_new(parent, "bytes", json_string(bytes_str));
             free(bytes_str);
-        } else
+        } else {
             return ENOMEM;
+        }
     }
 
     if (type == PSABPF_COUNTER_TYPE_PACKETS || type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
@@ -177,8 +193,9 @@ int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf
         if (packets_str != NULL) {
             json_object_set_new(parent, "packets", json_string(packets_str));
             free(packets_str);
-        } else
+        } else {
             return ENOMEM;
+        }
     }
 
     return NO_ERROR;
@@ -186,12 +203,14 @@ int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf
 
 static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
 {
-    if (parent == NULL)
+    if (parent == NULL) {
         return ENOMEM;
+    }
 
     json_t *json_key = json_object();
-    if (json_key == NULL)
+    if (json_key == NULL) {
         return ENOMEM;
+    }
     json_object_set(parent, "key", json_key);
 
     if (build_json_counter_key(json_key, ctx, entry) != NO_ERROR) {
@@ -202,8 +221,9 @@ static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ct
 
     psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
     json_t *json_value = json_object();
-    if (json_value == NULL)
+    if (json_value == NULL) {
         return ENOMEM;
+    }
     json_object_set(parent, "value", json_value);
 
     int ret = build_json_counter_value(json_value, entry, type);
@@ -214,14 +234,15 @@ static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ct
 
 int build_json_counter_type(void *parent, psabpf_counter_type_t type)
 {
-    if (type == PSABPF_COUNTER_TYPE_BYTES)
+    if (type == PSABPF_COUNTER_TYPE_BYTES) {
         json_object_set_new(parent, "type", json_string("BYTES"));
-    else if (type == PSABPF_COUNTER_TYPE_PACKETS)
+    } else if (type == PSABPF_COUNTER_TYPE_PACKETS) {
         json_object_set_new(parent, "type", json_string("PACKETS"));
-    else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS)
+    } else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
         json_object_set_new(parent, "type", json_string("PACKETS_AND_BYTES"));
-    else
+    } else {
         json_object_set_new(parent, "type", json_string("UNKNOWN"));
+    }
 
     return NO_ERROR;
 }
@@ -249,8 +270,9 @@ static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entr
     build_json_counter_type(instance_name, psabpf_counter_get_type(ctx));
 
     if (entry_has_key) {
-        if ((ret = psabpf_counter_get(ctx, entry)) != NO_ERROR)
+        if ((ret = psabpf_counter_get(ctx, entry)) != NO_ERROR) {
             goto clean_up;
+        }
         json_t *current_obj = json_object();
         ret = build_json_counter_entry(current_obj, ctx, entry);
         json_array_append_new(entries, current_obj);
@@ -261,8 +283,9 @@ static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entr
             ret = build_json_counter_entry(current_obj, ctx, iter);
             json_array_append_new(entries, current_obj);
             psabpf_counter_entry_free(iter);
-            if (ret != NO_ERROR)
+            if (ret != NO_ERROR) {
                 break;
+            }
         }
     }
 
@@ -295,16 +318,19 @@ int do_counter_get(int argc, char **argv)
     psabpf_counter_ctx_init(&ctx);
     psabpf_counter_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_dst_counter(&argc, &argv, &counter_name, &psabpf_ctx, &ctx) != NO_ERROR)
+    if (parse_dst_counter(&argc, &argv, &counter_name, &psabpf_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     bool counter_key_provided = (argc >= 1 && is_keyword(*argv, "key"));
     if (counter_key_provided) {
-        if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR)
+        if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     if (argc > 0) {
@@ -333,17 +359,21 @@ int do_counter_set(int argc, char **argv)
     psabpf_counter_ctx_init(&ctx);
     psabpf_counter_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_dst_counter(&argc, &argv, NULL, &psabpf_ctx, &ctx) != NO_ERROR)
+    if (parse_dst_counter(&argc, &argv, NULL, &psabpf_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_counter_value(&argc, &argv, &ctx, &entry) != NO_ERROR)
+    if (parse_counter_value(&argc, &argv, &ctx, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -371,14 +401,17 @@ int do_counter_reset(int argc, char **argv)
     psabpf_counter_ctx_init(&ctx);
     psabpf_counter_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_dst_counter(&argc, &argv, NULL, &psabpf_ctx, &ctx) != NO_ERROR)
+    if (parse_dst_counter(&argc, &argv, NULL, &psabpf_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_counter_key(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);

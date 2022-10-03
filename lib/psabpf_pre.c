@@ -15,15 +15,16 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
+#include <bpf/bpf.h>
 #include <errno.h>
+#include <stdio.h>
 #include <unistd.h>
-#include "bpf/bpf.h"
 
 #include <psabpf_pre.h>
+
 #include "bpf_defs.h"
-#include "common.h"
 #include "btf.h"
+#include "common.h"
 
 struct list_key_t {
     __u32 port;
@@ -44,8 +45,9 @@ static int open_pr_maps(psabpf_context_t *ctx, const char *pr_map_outer, const c
                         psabpf_bpf_map_descriptor_t *outer, psabpf_bpf_map_descriptor_t *inner)
 {
     outer->fd = -1;
-    if (inner != NULL)
+    if (inner != NULL) {
         inner->fd = -1;
+    }
 
     int ret = open_bpf_map(ctx, pr_map_outer, NULL, outer);
     if (ret != NO_ERROR) {
@@ -63,8 +65,9 @@ static int open_pr_maps(psabpf_context_t *ctx, const char *pr_map_outer, const c
 
 err:
     if (ret != NO_ERROR) {
-        if (inner != NULL)
+        if (inner != NULL) {
             close_object_fd(&inner->fd);
+        }
         close_object_fd(&outer->fd);
     }
     return ret;
@@ -100,8 +103,9 @@ static int open_session_map(psabpf_bpf_map_descriptor_t *pr_map,
     }
 
     ret = update_map_info(session_map);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     if (session_map->key_size != sizeof(elem_t) || session_map->value_size != sizeof(struct element)) {
         fprintf(stderr, "invalid session/group inner map\n");
@@ -158,8 +162,9 @@ static int do_create_pre_session(psabpf_bpf_map_descriptor_t *pr_map,
 
     /* add inner map to outer map */
     uint64_t flags = BPF_NOEXIST;
-    if (pr_map->type == BPF_MAP_TYPE_ARRAY_OF_MAPS)
+    if (pr_map->type == BPF_MAP_TYPE_ARRAY_OF_MAPS) {
         flags = BPF_ANY;
+    }
     error_code = bpf_map_update_elem(pr_map->fd, &session, &inner_map_fd, flags);
     if (error_code != 0) {
         error_code = errno;
@@ -184,15 +189,17 @@ static int create_pre_session(psabpf_context_t *ctx, const char *pr_map, const c
     init_btf(&btf);
 
     int ret = open_pr_maps(ctx, pr_map, pr_map_inner, &outer_map, &inner_map);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         goto err;
+    }
 
     load_btf(ctx, &btf);
     ret = do_create_pre_session(&outer_map, &inner_map, session, &btf);
     free_btf(&btf);
 
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         fprintf(stderr, "failed to create session/group: %s\n", strerror(ret));
+    }
 
 err:
     close_object_fd(&inner_map.fd);
@@ -202,8 +209,9 @@ err:
 
 static int remove_pre_session(psabpf_context_t *ctx, const char *pr_map_name, uint32_t session)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return EINVAL;
+    }
     if (session == 0) {
         fprintf(stderr, "invalid session/group id\n");
         return EINVAL;
@@ -212,8 +220,9 @@ static int remove_pre_session(psabpf_context_t *ctx, const char *pr_map_name, ui
     psabpf_bpf_map_descriptor_t pr_map;
 
     int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
-    if (ret != 0)
+    if (ret != 0) {
         goto err;
+    }
 
     if (pr_map.key_size != sizeof(session)) {
         /* cppcheck-suppress invalidPrintfArgType_uint ; cppcheck failed to recognize a real type of size_t */
@@ -238,13 +247,15 @@ err:
 
 static bool pre_session_exists(psabpf_context_t *ctx, const char *pr_map_name, uint32_t session)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return false;
+    }
 
     psabpf_bpf_map_descriptor_t pr_map;
     int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
-    if (ret != 0)
+    if (ret != 0) {
         return false;
+    }
 
     if (pr_map.key_size != sizeof(uint32_t) || pr_map.value_size != sizeof(uint32_t)) {
         fprintf(stderr, "invalid session/group map\n");
@@ -256,8 +267,9 @@ static bool pre_session_exists(psabpf_context_t *ctx, const char *pr_map_name, u
     ret = bpf_map_lookup_elem(pr_map.fd, &session, &inner_map_id);
     close_object_fd(&pr_map.fd);
 
-    if (ret != 0)
+    if (ret != 0) {
         return false;
+    }
 
     return inner_map_id != 0;
 }
@@ -277,12 +289,14 @@ static int pre_session_insert_entry(psabpf_context_t *ctx, const char *pr_map_na
     int ret;
 
     ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
-    if (ret != 0)
+    if (ret != 0) {
         return ret;
+    }
 
     ret = open_session_map(&pr_map, &session_map, session);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         goto err;
+    }
 
     if (session_map.key_size != sizeof(elem_t) || session_map.value_size != sizeof(struct element)) {
         fprintf(stderr, "invalid session/group inner map\n");
@@ -354,12 +368,14 @@ static int pre_session_del_entry(psabpf_context_t *ctx, const char *pr_map_name,
     int ret;
 
     ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
-    if (ret != 0)
+    if (ret != 0) {
         return ret;
+    }
 
     ret = open_session_map(&pr_map, &session_map, session);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         goto err;
+    }
 
     if (session_map.key_size != sizeof(elem_t) || session_map.value_size != sizeof(struct element)) {
         ret = EINVAL;
@@ -387,8 +403,9 @@ static int pre_session_del_entry(psabpf_context_t *ctx, const char *pr_map_name,
     } while (prev_elem_value.next_id.port != 0 && prev_elem_value.next_id.instance != 0);
 
     if (ret != 0 || found == false) {
-        if (ret == NO_ERROR)
+        if (ret == NO_ERROR) {
             ret = ENOENT;
+        }
         fprintf(stderr, "error getting element from list (egress_port=%u, instance=%d): %s\n",
                 entry->egress_port, entry->instance, strerror(ret));
         goto err;
@@ -445,13 +462,15 @@ static int pre_get_next_entry(psabpf_context_t *ctx,
         psabpf_bpf_map_descriptor_t pr_map;
 
         int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
 
         ret = open_session_map(&pr_map, session_map, session);
         close_object_fd(&pr_map.fd);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
 
         /* Start iteration from head */
         *current_egress_port = 0;
@@ -470,8 +489,9 @@ static int pre_get_next_entry(psabpf_context_t *ctx,
     memcpy(&key, &value.next_id, sizeof(elem_t));
 
     /* Next entry exists? */
-    if (key.port == 0 && key.instance == 0)
+    if (key.port == 0 && key.instance == 0) {
         goto no_more_entries;
+    }
 
     /* Read next entry */
     if (bpf_map_lookup_elem(session_map->fd, &key, &value) != 0) {
@@ -514,8 +534,9 @@ static int pre_get_next_session(psabpf_bpf_map_descriptor_t *pr_map, uint32_t *c
             return ENOENT;
         }
 
-        if (bpf_map_lookup_elem(pr_map->fd, current_session_id, &value) == 0)
+        if (bpf_map_lookup_elem(pr_map->fd, current_session_id, &value) == 0) {
             break;
+        }
     }
 
     return NO_ERROR;
@@ -527,8 +548,9 @@ static int pre_get_next_session(psabpf_bpf_map_descriptor_t *pr_map, uint32_t *c
 
 void psabpf_clone_session_context_init(psabpf_clone_session_ctx_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
     memset( ctx, 0, sizeof(psabpf_clone_session_ctx_t));
 
     ctx->session_map.fd = -1;
@@ -536,16 +558,18 @@ void psabpf_clone_session_context_init(psabpf_clone_session_ctx_t *ctx)
 
 void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
 
     close_object_fd(&ctx->session_map.fd);
 }
 
 void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_id_t id)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
     ctx->id = id;
 
     /* Also reset session map if opened */
@@ -554,15 +578,17 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
 
 psabpf_clone_session_id_t psabpf_clone_session_get_id(psabpf_clone_session_ctx_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return 0;
+    }
     return ctx->id;
 }
 
 bool psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
-    if (session == NULL)
+    if (session == NULL) {
         return false;
+    }
     return pre_session_exists(ctx, CLONE_SESSION_TABLE, session->id);
 }
 
@@ -573,15 +599,17 @@ int psabpf_clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_ctx_
 
 void psabpf_clone_session_entry_init(psabpf_clone_session_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return;
+    }
     memset( entry, 0, sizeof(psabpf_clone_session_entry_t));
 }
 
 void psabpf_clone_session_entry_free(psabpf_clone_session_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return;
+    }
     memset(entry, 0, sizeof(psabpf_clone_session_entry_t));
 }
 
@@ -592,8 +620,9 @@ void psabpf_clone_session_entry_port(psabpf_clone_session_entry_t *entry, uint32
 
 uint32_t psabpf_clone_session_entry_get_port(psabpf_clone_session_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return 0;
+    }
     return entry->egress_port;
 }
 
@@ -604,8 +633,9 @@ void psabpf_clone_session_entry_instance(psabpf_clone_session_entry_t *entry, ui
 
 uint16_t psabpf_clone_session_entry_get_instance(psabpf_clone_session_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return 0;
+    }
     return entry->instance;
 }
 
@@ -616,8 +646,9 @@ void psabpf_clone_session_entry_cos(psabpf_clone_session_entry_t *entry, uint8_t
 
 uint8_t psabpf_clone_session_entry_get_cos(psabpf_clone_session_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return 0;
+    }
     return entry->class_of_service;
 }
 
@@ -636,38 +667,43 @@ void psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *e
 
 bool psabpf_clone_session_entry_get_truncate_state(psabpf_clone_session_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return 0;
+    }
     return entry->truncate != 0;
 }
 
 uint16_t psabpf_clone_session_entry_get_truncate_length(psabpf_clone_session_entry_t *entry)
 {
-    if (entry == NULL || entry->truncate == 0)
+    if (entry == NULL || entry->truncate == 0) {
         return 0;
+    }
     return entry->packet_length_bytes;
 }
 
 int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
 {
-    if (session == NULL)
+    if (session == NULL) {
         return EINVAL;
+    }
 
     return pre_session_insert_entry(ctx, CLONE_SESSION_TABLE, session->id, entry);
 }
 
 int psabpf_clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
 {
-    if (session == NULL)
+    if (session == NULL) {
         return EINVAL;
+    }
 
     return remove_pre_session(ctx, CLONE_SESSION_TABLE, session->id);
 }
 
 int psabpf_clone_session_entry_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
 {
-    if (session == NULL)
+    if (session == NULL) {
         return EINVAL;
+    }
     return pre_session_del_entry(ctx, CLONE_SESSION_TABLE, session->id, entry);
 }
 
@@ -689,16 +725,18 @@ psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context
                                  session->id,
                                  &session->current_egress_port, &session->current_instance,
                                  &session->current_entry);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return NULL;
+    }
 
     return &session->current_entry;
 }
 
 int psabpf_clone_session_list_init(psabpf_context_t *ctx, psabpf_clone_session_list_t *list)
 {
-    if (ctx == NULL || list == NULL)
+    if (ctx == NULL || list == NULL) {
         return EINVAL;
+    }
 
     memset(list, 0, sizeof(psabpf_clone_session_list_t));
     list->session_map.fd = -1;
@@ -709,8 +747,9 @@ int psabpf_clone_session_list_init(psabpf_context_t *ctx, psabpf_clone_session_l
 
 void psabpf_clone_session_list_free(psabpf_clone_session_list_t *list)
 {
-    if (list == NULL)
+    if (list == NULL) {
         return;
+    }
 
     close_object_fd(&list->session_map.fd);
     psabpf_clone_session_context_free(&list->current_session);
@@ -718,11 +757,13 @@ void psabpf_clone_session_list_free(psabpf_clone_session_list_t *list)
 
 psabpf_clone_session_ctx_t *psabpf_clone_session_list_get_next_group(psabpf_clone_session_list_t *list)
 {
-    if (list == NULL)
+    if (list == NULL) {
         return NULL;
+    }
 
-    if (pre_get_next_session(&list->session_map, &list->current_id) != NO_ERROR)
+    if (pre_get_next_session(&list->session_map, &list->current_id) != NO_ERROR) {
         return NULL;
+    }
 
     psabpf_clone_session_context_init(&list->current_session);
     psabpf_clone_session_id(&list->current_session, list->current_id);
@@ -736,8 +777,9 @@ psabpf_clone_session_ctx_t *psabpf_clone_session_list_get_next_group(psabpf_clon
 
 void psabpf_mcast_grp_context_init(psabpf_mcast_grp_ctx_t *group)
 {
-    if (group == NULL)
+    if (group == NULL) {
         return;
+    }
     memset(group, 0, sizeof(psabpf_mcast_grp_ctx_t));
 
     group->group_map.fd = -1;
@@ -745,8 +787,9 @@ void psabpf_mcast_grp_context_init(psabpf_mcast_grp_ctx_t *group)
 
 void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group)
 {
-    if (group == NULL)
+    if (group == NULL) {
         return;
+    }
 
     close_object_fd(&group->group_map.fd);
 
@@ -756,8 +799,9 @@ void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group)
 
 void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mcast_grp_id)
 {
-    if (group != NULL)
+    if (group != NULL) {
         group->id = mcast_grp_id;
+    }
 
     /* Also reset group map */
     close_object_fd(&group->group_map.fd);
@@ -765,8 +809,9 @@ void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mc
 
 psabpf_mcast_grp_id_t psabpf_mcast_grp_get_id(psabpf_mcast_grp_ctx_t *group)
 {
-    if (group == NULL)
+    if (group == NULL) {
         return 0;
+    }
 
     return group->id;
 }
@@ -778,63 +823,72 @@ int psabpf_mcast_grp_create(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group
 
 bool psabpf_mcast_grp_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
 {
-    if (group == NULL)
+    if (group == NULL) {
         return false;
+    }
     return pre_session_exists(ctx, MULTICAST_GROUP_TABLE, group->id);
 }
 
 int psabpf_mcast_grp_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
 {
-    if (group == NULL)
+    if (group == NULL) {
         return EINVAL;
+    }
 
     return remove_pre_session(ctx, MULTICAST_GROUP_TABLE, group->id);
 }
 
 void psabpf_mcast_grp_member_init(psabpf_mcast_grp_member_t *member)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return;
+    }
     memset(member, 0, sizeof(psabpf_mcast_grp_member_t));
 }
 
 void psabpf_mcast_grp_member_free(psabpf_mcast_grp_member_t *member)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return;
+    }
     memset(member, 0, sizeof(psabpf_mcast_grp_member_t));
 }
 
 void psabpf_mcast_grp_member_port(psabpf_mcast_grp_member_t *member, uint32_t egress_port)
 {
-    if (member != NULL)
+    if (member != NULL) {
         member->egress_port = egress_port;
+    }
 }
 
 void psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_t instance)
 {
-    if (member != NULL)
+    if (member != NULL) {
         member->instance = instance;
+    }
 }
 
 uint32_t psabpf_mcast_grp_member_get_port(psabpf_mcast_grp_member_t *member)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return 0;
+    }
     return member->egress_port;
 }
 
 uint16_t psabpf_mcast_grp_member_get_instance(psabpf_mcast_grp_member_t *member)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return 0;
+    }
     return member->instance;
 }
 
 int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
 {
-    if (group == NULL || member == NULL)
+    if (group == NULL || member == NULL) {
         return EINVAL;
+    }
 
     psabpf_clone_session_entry_t entry = {
             .egress_port = member->egress_port,
@@ -853,8 +907,9 @@ int psabpf_mcast_grp_member_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t
 
 int psabpf_mcast_grp_member_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
 {
-    if (group == NULL || member == NULL)
+    if (group == NULL || member == NULL) {
         return EINVAL;
+    }
 
     psabpf_clone_session_entry_t entry = {
             .egress_port = member->egress_port,
@@ -876,8 +931,9 @@ psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ct
                                  group->id,
                                  &group->current_egress_port, &group->current_instance,
                                  &entry);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return NULL;
+    }
 
     group->current_member.egress_port = entry.egress_port;
     group->current_member.instance = entry.instance;
@@ -887,8 +943,9 @@ psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ct
 
 int psabpf_mcast_grp_list_init(psabpf_context_t *ctx, psabpf_mcast_grp_list_t *list)
 {
-    if (ctx == NULL || list == NULL)
+    if (ctx == NULL || list == NULL) {
         return EINVAL;
+    }
 
     memset(list, 0, sizeof(psabpf_mcast_grp_list_t));
     list->group_map.fd = -1;
@@ -899,8 +956,9 @@ int psabpf_mcast_grp_list_init(psabpf_context_t *ctx, psabpf_mcast_grp_list_t *l
 
 void psabpf_mcast_grp_list_free(psabpf_mcast_grp_list_t *list)
 {
-    if (list == NULL)
+    if (list == NULL) {
         return;
+    }
 
     close_object_fd(&list->group_map.fd);
     psabpf_mcast_grp_context_free(&list->current_group);
@@ -908,11 +966,13 @@ void psabpf_mcast_grp_list_free(psabpf_mcast_grp_list_t *list)
 
 psabpf_mcast_grp_ctx_t *psabpf_mcast_grp_list_get_next_group(psabpf_mcast_grp_list_t *list)
 {
-    if (list == NULL)
+    if (list == NULL) {
         return NULL;
+    }
 
-    if (pre_get_next_session(&list->group_map, &list->current_id) != NO_ERROR)
+    if (pre_get_next_session(&list->group_map, &list->current_id) != NO_ERROR) {
         return NULL;
+    }
 
     psabpf_mcast_grp_context_init(&list->current_group);
     psabpf_mcast_grp_id(&list->current_group, list->current_id);

@@ -20,31 +20,33 @@
 #define _XOPEN_SOURCE 500
 #define _GNU_SOURCE
 
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
+#include <dirent.h>
+#include <errno.h>
+#include <ftw.h>
+#include <linux/if_link.h>
+#include <net/if.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <net/if.h>
-#include <unistd.h>
-#include <linux/if_link.h>
-#include "bpf/bpf.h"
-#include "bpf/libbpf.h"
 #include <string.h>
-#include <ftw.h>
 #include <sys/time.h>
-#include <dirent.h>
+#include <unistd.h>
 
 #include <psabpf_pipeline.h>
+
 #include "bpf_defs.h"
-#include "common.h"
 #include "btf.h"
+#include "common.h"
 
 static char *program_pin_name(struct bpf_program *prog)
 {
     char *name, *p;
 
     name = p = strdup(bpf_program__section_name(prog));
-    while ((p = strchr(p, '/')))
+    while ((p = strchr(p, '/'))) {
         *p = '_';
+    }
 
     return name;
 }
@@ -116,16 +118,19 @@ clean_up:
 static int tc_create_hook_and_attach_progs(psabpf_context_t *ctx, int ifindex, const char *interface)
 {
     int ret = tc_create_hook(ifindex, interface);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     ret = tc_attach_prog(ctx, TC_INGRESS_PROG, ifindex, BPF_TC_INGRESS, interface);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     ret = tc_attach_prog(ctx, TC_EGRESS_PROG, ifindex, BPF_TC_EGRESS, interface);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     return NO_ERROR;
 }
@@ -202,8 +207,9 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
     /* TODO: Should we attach ingress pipeline at the end of whole procedure?
      *  For short time packets will be served only in ingress but not in egress pipeline. */
     ret = xdp_attach_prog_to_port(&ig_prog_fd, ctx, ifindex, XDP_INGRESS_PROG);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
     close_object_fd(&ig_prog_fd);
 
     /* may not exist, ignore errors */
@@ -246,8 +252,9 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
     }
 
     ret = tc_create_hook_and_attach_progs(ctx, ifindex, intf);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     return NO_ERROR;
 }
@@ -257,13 +264,15 @@ static int tc_port_add(psabpf_context_t *ctx, const char *interface, int ifindex
     int xdp_helper_fd;
 
     int ret = xdp_attach_prog_to_port(&xdp_helper_fd, ctx, ifindex, XDP_HELPER_PROG);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
     close_object_fd(&xdp_helper_fd);
 
     ret = tc_create_hook_and_attach_progs(ctx, ifindex, interface);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     return NO_ERROR;
 }
@@ -379,8 +388,9 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
         const char *map_name = bpf_map__name(map);
 
         /* Pinned file name cannot contain a dot */
-        if (strstr(map_name, ".") != NULL)
+        if (strstr(map_name, ".") != NULL) {
             continue;
+        }
 
         build_ebpf_map_filename(pinned_file, sizeof(pinned_file), ctx, map_name);
         ret = bpf_map__set_pin_path(map, pinned_file);
@@ -474,8 +484,9 @@ int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *
         return ENODEV;
     }
 
-    if (port_id != NULL)
+    if (port_id != NULL) {
         *port_id = ifindex;
+    }
 
     return isXDP ? xdp_port_add(ctx, interface, ifindex) : tc_port_add(ctx, interface, ifindex);
 }
@@ -516,14 +527,16 @@ int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
 int psabpf_port_list_init(psabpf_port_list_t *list, psabpf_context_t *ctx)
 {
     int ret = NO_ERROR;
-    if (list == NULL || ctx == NULL)
+    if (list == NULL || ctx == NULL) {
         return EINVAL;
+    }
 
     memset(list, 0, sizeof(psabpf_port_list_t));
 
     list->iface_list = if_nameindex();
-    if (list->iface_list == NULL)
+    if (list->iface_list == NULL) {
         return errno;
+    }
 
     int fd = open_prog_by_name(ctx, XDP_HELPER_PROG);
     if (fd < 0) {
@@ -554,11 +567,13 @@ free_program:
 
 void psabpf_port_list_free(psabpf_port_list_t *list)
 {
-    if (list == NULL)
+    if (list == NULL) {
         return;
+    }
 
-    if (list->iface_list != NULL)
+    if (list->iface_list != NULL) {
         if_freenameindex(list->iface_list);
+    }
 
     list->iface_list = NULL;
     list->current_iface = NULL;
@@ -566,18 +581,21 @@ void psabpf_port_list_free(psabpf_port_list_t *list)
 
 psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list)
 {
-    if (list == NULL)
+    if (list == NULL) {
         return NULL;
-    if (list->iface_list == NULL)
+    }
+    if (list->iface_list == NULL) {
         return NULL;
+    }
 
     bool iface_found = false;
 
     while (!iface_found) {
-        if (list->current_iface == NULL)
+        if (list->current_iface == NULL) {
             list->current_iface = list->iface_list;
-        else
+        } else {
             list->current_iface = ((struct if_nameindex *) list->current_iface) + 1;
+        }
 
         list->current_port.id = ((struct if_nameindex *) list->current_iface)->if_index;
         list->current_port.name = ((struct if_nameindex *) list->current_iface)->if_name;
@@ -590,8 +608,9 @@ psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list)
 
         uint32_t prog_id = 0;
         int ret = bpf_get_link_xdp_id((int) list->current_port.id, &prog_id, 0);
-        if (ret != 0 || prog_id == 0)
+        if (ret != 0 || prog_id == 0) {
             continue;
+        }
 
         if (prog_id == list->xdp_prog_id) {
             iface_found = true;
@@ -599,23 +618,26 @@ psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list)
         }
     }
 
-    if (!iface_found)
+    if (!iface_found) {
         return NULL;
+    }
     return &list->current_port;
 }
 
 const char * psabpf_port_spec_get_name(psabpf_port_spec_t *port)
 {
-    if (port == NULL)
+    if (port == NULL) {
         return NULL;
+    }
 
     return port->name;
 }
 
 unsigned psabpf_port_sepc_get_id(psabpf_port_spec_t *port)
 {
-    if (port == NULL)
+    if (port == NULL) {
         return 0;
+    }
 
     return port->id;
 }
@@ -655,10 +677,11 @@ uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx)
         fclose(uptime_file);
 
         char *end_ptr;
-        if (b == buf)
+        if (b == buf) {
             uptime = strtod(buf, &end_ptr);
-        else
+        } else {
             goto clean_up;
+        }
     } else {
         fprintf(stderr, "failed to get uptime: %s\n", strerror(errno));
         goto clean_up;
@@ -688,8 +711,9 @@ static bool check_if_program_exists(psabpf_context_t *ctx, const char *prog)
 
 bool psabpf_pipeline_is_TC_based(psabpf_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return false;
+    }
     return check_if_program_exists(ctx, XDP_HELPER_PROG) ||
            check_if_program_exists(ctx, TC_INGRESS_PROG) ||
            check_if_program_exists(ctx, TC_EGRESS_PROG);
@@ -697,8 +721,9 @@ bool psabpf_pipeline_is_TC_based(psabpf_context_t *ctx)
 
 bool psabpf_pipeline_has_egress_program(psabpf_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return false;
+    }
     return check_if_program_exists(ctx, TC_EGRESS_PROG) ||
            check_if_program_exists(ctx, XDP_EGRESS_PROG) ||
            check_if_program_exists(ctx, XDP_EGRESS_PROG_OPTIMIZED);
@@ -706,26 +731,30 @@ bool psabpf_pipeline_has_egress_program(psabpf_context_t *ctx)
 
 int psabpf_pipeline_objects_list_init(psabpf_pipeline_objects_list_t *list, psabpf_context_t *ctx)
 {
-    if (list == NULL || ctx == NULL)
+    if (list == NULL || ctx == NULL) {
         return EINVAL;
+    }
 
     memset(list, 0, sizeof(psabpf_pipeline_objects_list_t));
 
     build_ebpf_map_filename(&list->base_objects_path[0], sizeof(list->base_objects_path), ctx, "");
     list->directory = opendir(&list->base_objects_path[0]);
-    if (list->directory == NULL)
+    if (list->directory == NULL) {
         return errno;
+    }
 
     return NO_ERROR;
 }
 
 void psabpf_pipeline_objects_list_free(psabpf_pipeline_objects_list_t *list)
 {
-    if (list == NULL)
+    if (list == NULL) {
         return;
+    }
 
-    if (list->directory != NULL)
+    if (list->directory != NULL) {
         closedir(list->directory);
+    }
     list->directory = NULL;
 }
 
@@ -756,8 +785,9 @@ bool is_valid_object_name(psabpf_pipeline_objects_list_t *list, const char *name
 
     /* Reserved names are not allowed (exact match) */
     for (unsigned i = 0; i < no_reserved_names; ++i) {
-        if (strcmp(name, reserved_names[i]) == 0)
+        if (strcmp(name, reserved_names[i]) == 0) {
             return false;
+        }
     }
 
     /* Check for known suffix */
@@ -771,23 +801,26 @@ bool is_valid_object_name(psabpf_pipeline_objects_list_t *list, const char *name
 
     /* No suffix no problem. Unless we have a ternary tuple */
     if (!has_suffix) {
-        if (strstr(name, ternary_tuple_infix) != NULL)
+        if (strstr(name, ternary_tuple_infix) != NULL) {
             return false;
+        }
         return true;
     }
 
     /* Allow occurrence of some prefixes */
     for (unsigned i = 0; i < no_allowed_suffixes; ++i) {
-        if (str_ends_with(name, allowed_suffixes[i]))
+        if (str_ends_with(name, allowed_suffixes[i])) {
             return true;
+        }
     }
 
     /* Let's check whether there is object which has additional suffix, e.g. ends with "_groups_groups" */
     char path[512];
     for (unsigned i = 0; i < no_suffixes; ++i) {
         snprintf(path, sizeof(path), "%s%s%s", list->base_objects_path, name, suffixes[i]);
-        if (access(path, F_OK) == 0)
+        if (access(path, F_OK) == 0) {
             return true;
+        }
     }
 
     return false;
@@ -795,10 +828,12 @@ bool is_valid_object_name(psabpf_pipeline_objects_list_t *list, const char *name
 
 psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_pipeline_objects_list_t *list)
 {
-    if (list == NULL)
+    if (list == NULL) {
         return NULL;
-    if (list->directory == NULL)
+    }
+    if (list->directory == NULL) {
         return NULL;
+    }
 
     /* Some object has no direct names in the file system, they occur only with suffix(es) */
     const char *allowed_suffixes[] = {
@@ -809,17 +844,20 @@ psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_p
 
     struct dirent *file;
     while ((file = readdir(list->directory)) != NULL) {
-        if (file->d_type != DT_REG)
+        if (file->d_type != DT_REG) {
             continue;
+        }
 
-        if (!is_valid_object_name(list, file->d_name, allowed_suffixes, no_allowed_suffixes))
+        if (!is_valid_object_name(list, file->d_name, allowed_suffixes, no_allowed_suffixes)) {
             continue;
+        }
 
         snprintf(&list->current_object.name[0], sizeof(list->current_object.name), "%s", file->d_name);
         for (unsigned i = 0; i < no_allowed_suffixes; ++i) {
             /* Remove only one suffix */
-            if (remove_suffix_from_str(&list->current_object.name[0], allowed_suffixes[i]))
+            if (remove_suffix_from_str(&list->current_object.name[0], allowed_suffixes[i])) {
                 break;
+            }
         }
 
         return &list->current_object;
@@ -830,8 +868,9 @@ psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_p
 
 const char * psabpf_pipeline_object_get_name(psabpf_pipeline_object_t *obj)
 {
-    if (obj == NULL)
+    if (obj == NULL) {
         return NULL;
+    }
     return &obj->name[0];
 }
 

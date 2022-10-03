@@ -15,14 +15,15 @@
  * limitations under the License.
  */
 
+#include <bpf/bpf.h>
+#include <errno.h>
+#include <linux/bpf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <bpf/bpf.h>
-#include <linux/bpf.h>
 
 #include <psabpf.h>
+
 #include "btf.h"
 #include "common.h"
 #include "psabpf_table.h"
@@ -54,7 +55,8 @@ static int open_group_map(psabpf_action_selector_context_t *ctx,
     return NO_ERROR;
 }
 
-static int get_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t *number_of_members) {
+static int get_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t *number_of_members)
+{
     uint32_t key = 0;
     int return_code = bpf_map_lookup_elem(ctx->group.fd, &key, number_of_members);
     if (return_code != 0) {
@@ -65,7 +67,8 @@ static int get_number_of_members_in_group(psabpf_action_selector_context_t *ctx,
     return NO_ERROR;
 }
 
-static int update_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t new_value) {
+static int update_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t new_value)
+{
     uint32_t key = 0;
     int return_code = bpf_map_update_elem(ctx->group.fd, &key, &new_value, BPF_ANY);
     if (return_code != 0) {
@@ -94,21 +97,24 @@ static bool validate_member_reference(psabpf_action_selector_context_t *ctx,
                                       psabpf_action_selector_member_context_t *member)
 {
     char *value = malloc(ctx->map_of_members.value_size);
-    if (value == NULL)
+    if (value == NULL) {
         return false;
+    }
 
     int ret = bpf_map_lookup_elem(ctx->map_of_members.fd, &member->member_ref, value);
     free(value);
 
-    if (ret != 0)
+    if (ret != 0) {
         return false;
+    }
     return true;
 }
 
 void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
     memset(ctx, 0, sizeof(*ctx));
 
     init_btf(&ctx->btf);
@@ -128,8 +134,9 @@ void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx)
 
 void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
 
     free_btf(&ctx->btf);
 
@@ -202,12 +209,14 @@ static int do_open_action_profile(psabpf_context_t *psabpf_ctx, psabpf_action_se
 
 int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
 {
-    if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
+    if (ctx == NULL || psabpf_ctx == NULL || name == NULL) {
         return EINVAL;
+    }
 
     /* get the BTF, it is optional so print only warning */
-    if (load_btf(psabpf_ctx, &ctx->btf) != NO_ERROR)
+    if (load_btf(psabpf_ctx, &ctx->btf) != NO_ERROR) {
         fprintf(stderr, "warning: couldn't find BTF info\n");
+    }
 
     int ret = do_open_action_selector(psabpf_ctx, ctx, name);
     if (ret == ENOENT) {
@@ -223,8 +232,9 @@ int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_
 
 void psabpf_action_selector_member_init(psabpf_action_selector_member_context_t *member)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return;
+    }
 
     memset(member, 0, sizeof(*member));
     member->member_ref = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
@@ -234,8 +244,9 @@ void psabpf_action_selector_member_init(psabpf_action_selector_member_context_t 
 
 void psabpf_action_selector_member_free(psabpf_action_selector_member_context_t *member)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return;
+    }
 
     psabpf_action_free(&member->action);
     psabpf_action_param_free(&member->current_action_param);
@@ -243,8 +254,9 @@ void psabpf_action_selector_member_free(psabpf_action_selector_member_context_t 
 
 void psabpf_action_selector_group_init(psabpf_action_selector_group_context_t *group)
 {
-    if (group == NULL)
+    if (group == NULL) {
         return;
+    }
 
     memset(group, 0, sizeof(*group));
     group->group_ref = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
@@ -265,8 +277,9 @@ bool psabpf_action_selector_has_group_capability(psabpf_action_selector_context_
 
 int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t *member, psabpf_action_t *action)
 {
-    if (member == NULL || action == NULL)
+    if (member == NULL || action == NULL) {
         return EINVAL;
+    }
 
     move_action(&member->action, action);
     return NO_ERROR;
@@ -274,29 +287,33 @@ int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t
 
 uint32_t psabpf_action_selector_get_member_reference(psabpf_action_selector_member_context_t *member)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    }
     return member->member_ref;
 }
 
 void psabpf_action_selector_set_member_reference(psabpf_action_selector_member_context_t *member, uint32_t member_ref)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return;
+    }
     member->member_ref = member_ref;
 }
 
 uint32_t psabpf_action_selector_get_group_reference(psabpf_action_selector_group_context_t *group)
 {
-    if (group == NULL)
+    if (group == NULL) {
         return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    }
     return group->group_ref;
 }
 
 void psabpf_action_selector_set_group_reference(psabpf_action_selector_group_context_t *group, uint32_t group_ref)
 {
-    if (group == NULL)
+    if (group == NULL) {
         return;
+    }
     group->group_ref = group_ref;
 }
 
@@ -317,10 +334,11 @@ static uint32_t find_and_reserve_reference(psabpf_bpf_map_descriptor_t *map, voi
         fprintf(stderr, "not enough memory\n");
         return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
     }
-    if (data != NULL)
+    if (data != NULL) {
         memcpy(value, data, map->value_size);
-    else
+    } else {
         memset(value, 0, map->value_size);
+    }
 
     bool found = false;
     for (ref = 1; ref <= map->max_entries; ++ref) {
@@ -332,15 +350,17 @@ static uint32_t find_and_reserve_reference(psabpf_bpf_map_descriptor_t *map, voi
     }
     free(value);
 
-    if (found == true)
+    if (found == true) {
         return ref;
+    }
     return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
 }
 
 int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
-    if (ctx == NULL || member == NULL)
+    if (ctx == NULL || member == NULL) {
         return EINVAL;
+    }
     if (ctx->map_of_members.fd < 0) {
         fprintf(stderr, "Map of members not opened\n");
         return EINVAL;
@@ -364,8 +384,9 @@ int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psa
 
 int psabpf_action_selector_update_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
-    if (ctx == NULL || member == NULL)
+    if (ctx == NULL || member == NULL) {
         return EINVAL;
+    }
     if (ctx->map_of_members.fd < 0) {
         fprintf(stderr, "Map of members not opened\n");
         return EINVAL;
@@ -405,8 +426,9 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
     }
 
     /* Iterate over every group and check if member reference exists */
-    if (bpf_map_get_next_key(ctx->map_of_groups.fd, NULL, &next_key) != 0)
+    if (bpf_map_get_next_key(ctx->map_of_groups.fd, NULL, &next_key) != 0) {
         return false;  /* no groups */
+    }
     do {
         /* Swap buffers, so next_key will become key and next_key may be reused */
         uint32_t tmp_key = next_key;
@@ -416,8 +438,9 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
         /* Get group */
         psabpf_action_selector_group_context_t group;
         group.group_ref = key;
-        if (open_group_map(ctx, &group) != NO_ERROR)
+        if (open_group_map(ctx, &group) != NO_ERROR) {
             continue;
+        }
 
         /* Try to find member in a current group */
         uint32_t number_of_members = 0;
@@ -435,8 +458,9 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
 
 int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
-    if (ctx == NULL || member == NULL)
+    if (ctx == NULL || member == NULL) {
         return EINVAL;
+    }
     if (ctx->map_of_members.fd < 0) {
         fprintf(stderr, "Map of members not opened\n");
         return EINVAL;
@@ -473,8 +497,9 @@ int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psa
 
 int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
 {
-    if (ctx == NULL || group == NULL)
+    if (ctx == NULL || group == NULL) {
         return EINVAL;
+    }
     if (ctx->map_of_groups.fd < 0) {
         fprintf(stderr, "Map of groups not opened\n");
         return EINVAL;
@@ -518,8 +543,9 @@ int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psab
 
 int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
 {
-    if (ctx == NULL || group == NULL)
+    if (ctx == NULL || group == NULL) {
         return EINVAL;
+    }
     if (ctx->map_of_groups.fd < 0) {
         fprintf(stderr, "Map of groups not opened\n");
         return EINVAL;
@@ -543,16 +569,18 @@ int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psab
 static int append_member_to_group(psabpf_action_selector_context_t *ctx,
                                   psabpf_action_selector_member_context_t *member)
 {
-    if (ctx->group.key_size != 4 || ctx->group.value_size != 4 || ctx->group.fd < 0)
+    if (ctx->group.key_size != 4 || ctx->group.value_size != 4 || ctx->group.fd < 0) {
         return EINVAL;
+    }
 
     uint32_t group_key;
     uint32_t number_of_members;
     int return_code;
 
     /* Get number of members. */
-    if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR)
+    if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR) {
         return EPERM;
+    }
 
     /* Verify that member reference not existed in group before */
     if (find_member_entry_idx_in_group(&ctx->group, number_of_members, member) != 0) {
@@ -571,8 +599,9 @@ static int append_member_to_group(psabpf_action_selector_context_t *ctx,
 
     /* Register new member - increase number of members */
     return_code = update_number_of_members_in_group(ctx, number_of_members + 1);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         return return_code;
+    }
 
     return NO_ERROR;
 }
@@ -583,8 +612,9 @@ int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t 
 {
     int return_code;
 
-    if (ctx == NULL || group == NULL || member == NULL)
+    if (ctx == NULL || group == NULL || member == NULL) {
         return EINVAL;
+    }
     if (ctx->group.key_size != 4 || ctx->group.value_size != 4) {
         fprintf(stderr, "invalid group map\n");
         return EINVAL;
@@ -601,13 +631,15 @@ int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t 
     }
 
     return_code = open_group_map(ctx, group);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         return return_code;
+    }
 
     return_code = append_member_to_group(ctx, member);
     close_object_fd(&ctx->group.fd);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         return return_code;
+    }
 
     return_code = clear_table_cache(&ctx->cache);
     if (return_code != NO_ERROR) {
@@ -620,10 +652,12 @@ int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t 
 static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
                                     psabpf_action_selector_member_context_t *member)
 {
-    if (ctx->group.key_size != 4 || ctx->group.value_size != 4 || ctx->group.fd < 0)
+    if (ctx->group.key_size != 4 || ctx->group.value_size != 4 || ctx->group.fd < 0) {
         return EINVAL;
-    if (member->member_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE)
+    }
+    if (member->member_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
         return EINVAL;
+    }
 
     int return_code;
     uint32_t number_of_members;
@@ -631,8 +665,9 @@ static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
     uint32_t last_member_ref;
 
     /* 1. Find out number of members */
-    if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR)
+    if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR) {
         return EPERM;
+    }
 
     /* 2. Find index of our reference */
     index_to_remove = find_member_entry_idx_in_group(&ctx->group, number_of_members, member);
@@ -671,8 +706,9 @@ static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
     uint32_t keys[3] =   { index_to_remove, 0,                     number_of_members };
     uint32_t values[3] = { last_member_ref, number_of_members - 1, 0 };
     uint32_t n_keys = 3;
-    if (index_to_remove == number_of_members)
+    if (index_to_remove == number_of_members) {
         n_keys = 2;
+    }
     return_code = bpf_map_update_batch(ctx->group.fd, &(keys[3-n_keys]), &(values[3-n_keys]), &n_keys, &opts);
     if (return_code != 0) {
         return_code = errno;
@@ -689,8 +725,9 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
 {
     int return_code;
 
-    if (ctx == NULL || group == NULL || member == NULL)
+    if (ctx == NULL || group == NULL || member == NULL) {
         return EINVAL;
+    }
     if (ctx->group.key_size != 4 || ctx->group.value_size != 4) {
         fprintf(stderr, "invalid group map\n");
         return EINVAL;
@@ -706,15 +743,17 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
     }
 
     return_code = open_group_map(ctx, group);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         return return_code;
+    }
 
     return_code = remove_member_from_group(ctx, member);
 
     close_object_fd(&ctx->group.fd);
 
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         return return_code;
+    }
 
     return_code = clear_table_cache(&ctx->cache);
     if (return_code != NO_ERROR) {
@@ -726,8 +765,9 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
 
 int psabpf_action_selector_set_empty_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action)
 {
-    if (ctx == NULL || action == NULL)
+    if (ctx == NULL || action == NULL) {
         return EINVAL;
+    }
     if (ctx->empty_group_action.fd < 0) {
         fprintf(stderr, "map with default action for empty group not opened\n");
         return EINVAL;
@@ -765,8 +805,9 @@ int psabpf_action_selector_set_empty_group_action(psabpf_action_selector_context
 int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context_t *ctx,
                                                   psabpf_action_selector_member_context_t *member)
 {
-    if (ctx == NULL || member == NULL)
+    if (ctx == NULL || member == NULL) {
         return EINVAL;
+    }
     if (ctx->empty_group_action.fd < 0) {
         fprintf(stderr, "map with default action for empty group not opened\n");
         return EINVAL;
@@ -797,8 +838,9 @@ int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context
 
     int ret = psabpf_table_entry_get(&tec, &te);
     move_action(&member->action, te.action);
-    if (te.action)
+    if (te.action) {
         free(te.action);
+    }
 
     return ret;
 }
@@ -816,8 +858,9 @@ uint32_t psabpf_action_selector_get_action_id_by_name(psabpf_action_selector_con
 
 int psabpf_action_selector_get_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
 {
-    if (ctx == NULL || group == NULL)
+    if (ctx == NULL || group == NULL) {
         return EINVAL;
+    }
     if (ctx->map_of_groups.fd < 0) {
         fprintf(stderr, "map of groups not opened\n");
         return EINVAL;
@@ -841,8 +884,9 @@ int psabpf_action_selector_get_group(psabpf_action_selector_context_t *ctx, psab
 
 psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(psabpf_action_selector_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return NULL;
+    }
     if (ctx->map_of_groups.fd < 0) {
         fprintf(stderr, "map of groups not opened\n");
         return NULL;
@@ -858,12 +902,14 @@ psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(ps
 
     if (ctx->current_group_id == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
         /* group map is not open, so we start from this point */
-        if (bpf_map_get_next_key(ctx->map_of_groups.fd, NULL, &ctx->current_group.group_ref) != 0)
+        if (bpf_map_get_next_key(ctx->map_of_groups.fd, NULL, &ctx->current_group.group_ref) != 0) {
             goto err_or_no_more_groups;
+        }
     } else {
         /* find next group reference */
-        if (bpf_map_get_next_key(ctx->map_of_groups.fd, &ctx->current_group_id, &ctx->current_group.group_ref) != 0)
+        if (bpf_map_get_next_key(ctx->map_of_groups.fd, &ctx->current_group_id, &ctx->current_group.group_ref) != 0) {
             goto err_or_no_more_groups;
+        }
     }
 
     ctx->current_group_id = ctx->current_group.group_ref;
@@ -907,8 +953,9 @@ static int get_member_action(psabpf_action_selector_context_t *ctx,
 psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_member(psabpf_action_selector_context_t *ctx,
                                                                                       psabpf_action_selector_group_context_t *group)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return NULL;
+    }
     /* key is a group reference, value contains member references, so both always are 32 bits */
     if (ctx->group.key_size != 4 || ctx->group.value_size != 4) {
         fprintf(stderr, "invalid group map\n");
@@ -921,27 +968,31 @@ psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_m
     if (ctx->group.fd < 0 || ctx->current_group_id != group->group_ref) {
         close_object_fd(&ctx->group.fd);
         ctx->current_group_id = group->group_ref;
-        if (open_group_map(ctx, group) != NO_ERROR)
+        if (open_group_map(ctx, group) != NO_ERROR) {
             goto err_or_no_more_members;
+        }
 
         ctx->current_member_id = 0;
     }
 
     uint32_t number_of_members = 0;
     int ret = get_number_of_members_in_group(ctx, &number_of_members);
-    if (ret != NO_ERROR || number_of_members == 0)
+    if (ret != NO_ERROR || number_of_members == 0) {
         goto err_or_no_more_members;
+    }
 
     if (ctx->current_member_id < number_of_members) {
         ctx->current_member_id += 1;
-        if (bpf_map_lookup_elem(ctx->group.fd, &ctx->current_member_id, &ctx->current_member.member_ref))
+        if (bpf_map_lookup_elem(ctx->group.fd, &ctx->current_member_id, &ctx->current_member.member_ref)) {
             goto err_or_no_more_members;
+        }
     } else {
         goto err_or_no_more_members;
     }
 
-    if (get_member_action(ctx, &ctx->current_member) != 0)
+    if (get_member_action(ctx, &ctx->current_member) != 0) {
         return NULL;
+    }
 
     return &ctx->current_member;
 
@@ -953,8 +1004,9 @@ err_or_no_more_members:
 
 psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_member(psabpf_action_selector_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return NULL;
+    }
 
     if (ctx->map_of_members.fd < 0) {
         fprintf(stderr, "Map of members not opened\n");
@@ -969,15 +1021,18 @@ psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_member(
     psabpf_action_selector_member_init(&ctx->current_member);
 
     if (ctx->current_member_id == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
-        if (bpf_map_get_next_key(ctx->map_of_members.fd, NULL, &ctx->current_member.member_ref) != 0)
+        if (bpf_map_get_next_key(ctx->map_of_members.fd, NULL, &ctx->current_member.member_ref) != 0) {
             goto err_or_no_more_members;
+        }
     } else {
-        if (bpf_map_get_next_key(ctx->map_of_members.fd, &ctx->current_member_id, &ctx->current_member.member_ref) != 0)
+        if (bpf_map_get_next_key(ctx->map_of_members.fd, &ctx->current_member_id, &ctx->current_member.member_ref) != 0) {
             goto err_or_no_more_members;
+        }
     }
 
-    if (get_member_action(ctx, &ctx->current_member) != 0)
+    if (get_member_action(ctx, &ctx->current_member) != 0) {
         return NULL;
+    }
 
     ctx->current_member_id = ctx->current_member.member_ref;
     return &ctx->current_member;
@@ -989,8 +1044,9 @@ err_or_no_more_members:
 
 int psabpf_action_selector_get_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
-    if (ctx == NULL || member == NULL)
+    if (ctx == NULL || member == NULL) {
         return EINVAL;
+    }
     if (ctx->map_of_members.fd < 0) {
         fprintf(stderr, "Map of members not opened\n");
         return EINVAL;
@@ -1006,8 +1062,9 @@ int psabpf_action_selector_get_member(psabpf_action_selector_context_t *ctx, psa
 uint32_t psabpf_action_selector_get_member_action_id(psabpf_action_selector_context_t *ctx,
                                                      psabpf_action_selector_member_context_t *member)
 {
-    if (ctx == NULL || member == NULL)
+    if (ctx == NULL || member == NULL) {
         return 0;
+    }
 
     return member->action.action_id;
 }
@@ -1015,8 +1072,9 @@ uint32_t psabpf_action_selector_get_member_action_id(psabpf_action_selector_cont
 const char *psabpf_action_selector_get_member_action_name(psabpf_action_selector_context_t *ctx,
                                                           psabpf_action_selector_member_context_t *member)
 {
-    if (ctx == NULL || member == NULL)
+    if (ctx == NULL || member == NULL) {
         return NULL;
+    }
 
     psabpf_table_entry_ctx_t tec = {
             .table = ctx->map_of_members,
@@ -1027,8 +1085,9 @@ const char *psabpf_action_selector_get_member_action_name(psabpf_action_selector
 
 psabpf_action_param_t *psabpf_action_selector_action_param_get_next(psabpf_action_selector_member_context_t *member)
 {
-    if (member == NULL)
+    if (member == NULL) {
         return NULL;
+    }
 
     if (member->current_action_param_id >= member->action.n_params) {
         member->current_action_param_id = 0;
@@ -1049,8 +1108,9 @@ const char *psabpf_action_selector_action_param_get_name(psabpf_action_selector_
                                                          psabpf_action_selector_member_context_t *member,
                                                          psabpf_action_param_t *param)
 {
-    if (ctx == NULL || member == NULL)
+    if (ctx == NULL || member == NULL) {
         return NULL;
+    }
 
     psabpf_table_entry_ctx_t tec = {
             .table = ctx->map_of_members,

@@ -15,21 +15,23 @@
  * limitations under the License.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #include <jansson.h>
 
 #include <psabpf.h>
+
 #include "meter.h"
 
 /******************************************************************************
  * Command line parsing functions
  *****************************************************************************/
 
-int convert_str_to_meter_value(const char *str, psabpf_meter_value_t *value) {
+int convert_str_to_meter_value(const char *str, psabpf_meter_value_t *value)
+{
     char * end_ptr = NULL;
     *value = strtoull(str, &end_ptr, 0);
     if (*end_ptr != '\0') {
@@ -43,30 +45,36 @@ int parse_dst_meter(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
                     psabpf_meter_ctx_t *ctx, const char **instance_name)
 {
     int error_code = psabpf_meter_ctx_name(ctx, psabpf_ctx, **argv);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
-    if (instance_name != NULL)
+    if (instance_name != NULL) {
         *instance_name = **argv;
+    }
 
     NEXT_ARGP();
 
     return NO_ERROR;
 }
 
-int parse_meter_index(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
-    if (!is_keyword(**argv, "index"))
+int parse_meter_index(int *argc, char ***argv, psabpf_meter_entry_t *entry)
+{
+    if (!is_keyword(**argv, "index")) {
         return EPERM;
+    }
 
     NEXT_ARGP_RET();
 
     while (*argc > 0) {
         int error_code = translate_data_to_bytes(**argv, entry, CTX_METER_INDEX);
-        if (error_code != NO_ERROR)
+        if (error_code != NO_ERROR) {
             return error_code;
+        }
 
-        if (*argc > 1 && strstr(*(*argv + 1), ":") != NULL)
+        if (*argc > 1 && strstr(*(*argv + 1), ":") != NULL) {
             break;
+        }
 
         NEXT_ARGP();
     }
@@ -74,7 +82,8 @@ int parse_meter_index(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
     return NO_ERROR;
 }
 
-int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
+int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry)
+{
     NEXT_ARGP_RET();
 
     int error_code = NO_ERROR;
@@ -97,23 +106,27 @@ int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
 
     psabpf_meter_value_t pir;
     error_code = convert_str_to_meter_value(pir_str, &pir);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
     psabpf_meter_value_t pbs;
     error_code = convert_str_to_meter_value(pbs_str, &pbs);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
     psabpf_meter_value_t cir;
     error_code = convert_str_to_meter_value(cir_str, &cir);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
     psabpf_meter_value_t cbs;
     error_code = convert_str_to_meter_value(cbs_str, &cbs);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
     return psabpf_meter_entry_data(entry, pir, pbs, cir, cbs);
 }
@@ -122,10 +135,12 @@ int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry) {
  * JSON functions
  *****************************************************************************/
 
-void *create_json_meter_config(psabpf_meter_entry_t *meter) {
+void *create_json_meter_config(psabpf_meter_entry_t *meter)
+{
     json_t *meter_config = json_object();
-    if (meter_config == NULL)
+    if (meter_config == NULL) {
         return NULL;
+    }
 
     psabpf_meter_value_t pir, cir, pbs, cbs;
     psabpf_meter_entry_get_data(meter, &pir, &pbs, &cir, &cbs);
@@ -139,7 +154,8 @@ void *create_json_meter_config(psabpf_meter_entry_t *meter) {
     return meter_config;
 }
 
-json_t *create_json_meter_index(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *meter) {
+json_t *create_json_meter_index(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *meter)
+{
     json_t *index_root = json_object();
 
     int ret = build_struct_json(index_root, ctx, meter, (get_next_field_func_t) psabpf_meter_entry_get_next_index_field);
@@ -151,7 +167,8 @@ json_t *create_json_meter_index(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *m
     return index_root;
 }
 
-json_t *create_json_meter_entry(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *meter) {
+json_t *create_json_meter_entry(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *meter)
+{
     json_t *entry_root = json_object();
     json_t *meter_config = create_json_meter_config(meter);
     json_t *meter_index = create_json_meter_index(ctx, meter);
@@ -170,7 +187,8 @@ json_t *create_json_meter_entry(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *m
     return entry_root;
 }
 
-int print_meter(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry, const char *meter_name) {
+int print_meter(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry, const char *meter_name)
+{
     int ret = EINVAL;
     json_t *root = json_object();
     json_t *instance_name = json_object();
@@ -223,7 +241,8 @@ clean_up:
  * Command line meter functions
  *****************************************************************************/
 
-int do_meter_get(int argc, char **argv) {
+int do_meter_get(int argc, char **argv)
+{
     psabpf_meter_entry_t entry;
     psabpf_meter_ctx_t meter_ctx;
     psabpf_context_t psabpf_ctx;
@@ -235,18 +254,21 @@ int do_meter_get(int argc, char **argv) {
     psabpf_context_init(&psabpf_ctx);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 1. Get meter */
-    if (parse_dst_meter(&argc, &argv, &psabpf_ctx, &meter_ctx, &meter_name) != NO_ERROR)
+    if (parse_dst_meter(&argc, &argv, &psabpf_ctx, &meter_ctx, &meter_name) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get index */
     bool index_provided = argc > 0 && is_keyword(*argv, "index");
     if (index_provided) {
-        if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
+        if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     if (argc > 0) {
@@ -256,8 +278,9 @@ int do_meter_get(int argc, char **argv) {
 
     /* 3. Get meter value and display it */
     if (index_provided) {
-        if (psabpf_meter_entry_get(&meter_ctx, &entry) != NO_ERROR)
+        if (psabpf_meter_entry_get(&meter_ctx, &entry) != NO_ERROR) {
             goto clean_up;
+        }
 
         error_code = print_meter(&meter_ctx, &entry, meter_name);
     } else {
@@ -271,7 +294,8 @@ clean_up:
     return error_code;
 }
 
-int do_meter_update(int argc, char **argv) {
+int do_meter_update(int argc, char **argv)
+{
     psabpf_meter_entry_t entry;
     psabpf_meter_ctx_t meter_ctx;
     psabpf_context_t psabpf_ctx;
@@ -282,20 +306,24 @@ int do_meter_update(int argc, char **argv) {
     psabpf_context_init(&psabpf_ctx);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 1. Get meter */
-    if (parse_dst_meter(&argc, &argv, &psabpf_ctx, &meter_ctx, NULL) != NO_ERROR)
+    if (parse_dst_meter(&argc, &argv, &psabpf_ctx, &meter_ctx, NULL) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get index */
-    if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 3. Get meter parameters */
-    if (parse_meter_data(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_meter_data(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
     NEXT_ARG();
 
@@ -313,7 +341,8 @@ clean_up:
     return error_code;
 }
 
-int do_meter_reset(int argc, char **argv) {
+int do_meter_reset(int argc, char **argv)
+{
     psabpf_meter_entry_t entry;
     psabpf_meter_ctx_t meter_ctx;
     psabpf_context_t psabpf_ctx;
@@ -324,18 +353,21 @@ int do_meter_reset(int argc, char **argv) {
     psabpf_context_init(&psabpf_ctx);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 1. Get meter */
-    if (parse_dst_meter(&argc, &argv, &psabpf_ctx, &meter_ctx, NULL) != NO_ERROR)
+    if (parse_dst_meter(&argc, &argv, &psabpf_ctx, &meter_ctx, NULL) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get index */
     bool index_provided = argc > 0 && is_keyword(*argv, "index");
     if (index_provided) {
-        if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR)
+        if (parse_meter_index(&argc, &argv, &entry) != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     if (argc > 0) {
@@ -352,7 +384,8 @@ clean_up:
     return error_code;
 }
 
-int do_meter_help(int argc, char **argv) {
+int do_meter_help(int argc, char **argv)
+{
     (void) argc; (void) argv;
 
     fprintf(stderr,

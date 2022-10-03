@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
+
 #include <jansson.h>
 
 #include "action_selector.h"
@@ -31,11 +32,13 @@ static int parse_dst_action_selector(int *argc, char ***argv, psabpf_context_t *
                                      psabpf_action_selector_context_t *ctx, bool is_last, const char **instance_name)
 {
     int error_code = psabpf_action_selector_ctx_name(psabpf_ctx, ctx, **argv);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
-    if (instance_name)
+    if (instance_name) {
         *instance_name = **argv;
+    }
 
     if (is_last) {
         NEXT_ARGP();
@@ -98,8 +101,9 @@ static int parse_action_data(int *argc, char ***argv, psabpf_action_t *action)
             return error_code;
         }
         error_code = psabpf_action_param(action, &param);
-        if (error_code != NO_ERROR)
+        if (error_code != NO_ERROR) {
             return error_code;
+        }
     } while ((*argc) > 1);
     NEXT_ARGP();
 
@@ -165,8 +169,9 @@ static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t
 {
     *mode = GET_MODE_ALL;
 
-    if (*argc < 1)
+    if (*argc < 1) {
         return NO_ERROR;
+    }
 
     if (is_keyword(**argv, "member") || is_keyword(**argv, "group")) {
         *mode = GET_MODE_MEMBER;
@@ -206,8 +211,9 @@ static int set_json_object_at_index(json_t *parent, json_t *object, uint32_t ind
 {
     char idx_str[16]; /* index is 32 bits, 2^32=4.3e+9, so at least 11 bytes are required to convert idx to string */
     snprintf(idx_str, sizeof(idx_str), "%u", index);
-    if (json_object_set_new(parent, idx_str, object) != 0)
+    if (json_object_set_new(parent, idx_str, object) != 0) {
         return EINVAL;
+    }
 
     return NO_ERROR;
 }
@@ -215,8 +221,9 @@ static int set_json_object_at_index(json_t *parent, json_t *object, uint32_t ind
 json_t *create_json_member_entry_parameters(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
     json_t *params_root = json_array();
-    if (params_root == NULL)
+    if (params_root == NULL) {
         return NULL;
+    }
 
     psabpf_action_param_t *ap = NULL;
     while ((ap = psabpf_action_selector_action_param_get_next(member)) != NULL) {
@@ -234,8 +241,9 @@ json_t *create_json_member_entry_parameters(psabpf_action_selector_context_t *ct
         }
         const char *name = psabpf_action_selector_action_param_get_name(ctx, member, ap);
 
-        if (name != NULL)
+        if (name != NULL) {
             json_object_set_new(param_entry, "name", json_string(name));
+        }
         json_object_set_new(param_entry, "value", json_string(data));
         json_array_append(params_root, param_entry);
 
@@ -249,13 +257,15 @@ json_t *create_json_member_entry_parameters(psabpf_action_selector_context_t *ct
 json_t *create_json_member_entry(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
 {
     json_t *member_root = json_object();
-    if (member_root == NULL)
+    if (member_root == NULL) {
         return NULL;
+    }
 
     json_object_set_new(member_root, "action_id", json_integer(psabpf_action_selector_get_member_action_id(ctx, member)));
     const char *action_name = psabpf_action_selector_get_member_action_name(ctx, member);
-    if (action_name != NULL)
+    if (action_name != NULL) {
         json_object_set_new(member_root, "action_name", json_string(action_name));
+    }
 
     json_t *params = create_json_member_entry_parameters(ctx, member);
     if (params == NULL) {
@@ -270,8 +280,9 @@ json_t *create_json_member_entry(psabpf_action_selector_context_t *ctx, psabpf_a
 json_t *create_json_all_members(psabpf_action_selector_context_t *ctx)
 {
     json_t *members_root = json_object();
-    if (members_root == NULL)
+    if (members_root == NULL) {
         return NULL;
+    }
 
     psabpf_action_selector_member_context_t *member;
     while ((member = psabpf_action_selector_get_next_member(ctx)) != NULL) {
@@ -316,8 +327,9 @@ json_t *create_json_group_entry(psabpf_action_selector_context_t *ctx, psabpf_ac
 json_t *create_json_all_groups(psabpf_action_selector_context_t *ctx)
 {
     json_t *groups_root = json_object();
-    if (groups_root == NULL)
+    if (groups_root == NULL) {
         return NULL;
+    }
 
     psabpf_action_selector_group_context_t *group;
     while ((group = psabpf_action_selector_get_next_group(ctx)) != NULL) {
@@ -410,12 +422,14 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
     } else if (mode == GET_MODE_EMPTY_GROUP_ACTION) {
         empty_group_action = create_json_empty_group_action(ctx);
 
-        if (empty_group_action == NULL)
+        if (empty_group_action == NULL) {
             failed = true;
+        }
     } else if (mode == ADD_MEMBER || mode == ADD_GROUP) {
         new_entry = json_integer(reference);
-        if (new_entry == NULL)
+        if (new_entry == NULL) {
             failed = true;
+        }
     }
 
     if (root == NULL || instance == NULL || failed) {
@@ -429,16 +443,21 @@ int print_action_selector(psabpf_action_selector_context_t *ctx, const char *ins
         goto clean_up;
     }
 
-    if (members != NULL)
+    if (members != NULL) {
         json_object_set(instance, "member_refs", members);
-    if (groups != NULL)
+    }
+    if (groups != NULL) {
         json_object_set(instance, "group_refs", groups);
-    if (empty_group_action != NULL)
+    }
+    if (empty_group_action != NULL) {
         json_object_set(instance, "empty_group_action", empty_group_action);
-    if (new_entry != NULL && mode == ADD_MEMBER)
+    }
+    if (new_entry != NULL && mode == ADD_MEMBER) {
         json_object_set(instance, "added_member_ref", new_entry);
-    if (new_entry != NULL && mode == ADD_GROUP)
+    }
+    if (new_entry != NULL && mode == ADD_GROUP) {
         json_object_set(instance, "added_group_ref", new_entry);
+    }
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
     ret = NO_ERROR;
@@ -473,8 +492,9 @@ int do_action_selector_add_member(int argc, char **argv)
     psabpf_action_selector_member_init(&member);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -482,16 +502,19 @@ int do_action_selector_add_member(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, &instance_name) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, &instance_name) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get action */
-    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR)
+    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 3. Get action parameters */
-    if (parse_action_data(&argc, &argv, &action) != NO_ERROR)
+    if (parse_action_data(&argc, &argv, &action) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -501,8 +524,9 @@ int do_action_selector_add_member(int argc, char **argv)
     psabpf_action_selector_member_action(&member, &action);
 
     error_code = psabpf_action_selector_add_member(&ctx, &member);
-    if (error_code == NO_ERROR)
+    if (error_code == NO_ERROR) {
         print_action_selector(&ctx, instance_name, ADD_MEMBER, psabpf_action_selector_get_member_reference(&member));
+    }
 
 clean_up:
     psabpf_action_selector_member_free(&member);
@@ -525,8 +549,9 @@ int do_action_selector_delete_member(int argc, char **argv)
     psabpf_action_selector_member_init(&member);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -534,12 +559,14 @@ int do_action_selector_delete_member(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get member reference */
-    if (parse_member_reference(&argc, &argv, &member, true) != NO_ERROR)
+    if (parse_member_reference(&argc, &argv, &member, true) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -570,8 +597,9 @@ int do_action_selector_update_member(int argc, char **argv)
     psabpf_action_selector_member_init(&member);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -579,20 +607,24 @@ int do_action_selector_update_member(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get member reference */
-    if (parse_member_reference(&argc, &argv, &member, false) != NO_ERROR)
+    if (parse_member_reference(&argc, &argv, &member, false) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 3. Get action */
-    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR)
+    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 4. Get action parameters */
-    if (parse_action_data(&argc, &argv, &action) != NO_ERROR)
+    if (parse_action_data(&argc, &argv, &action) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -625,8 +657,9 @@ int do_action_selector_create_group(int argc, char **argv)
     psabpf_action_selector_group_init(&group);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -634,8 +667,9 @@ int do_action_selector_create_group(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, true, &instance_name) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, true, &instance_name) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -643,8 +677,9 @@ int do_action_selector_create_group(int argc, char **argv)
     }
 
     error_code = psabpf_action_selector_add_group(&ctx, &group);
-    if (error_code == NO_ERROR)
+    if (error_code == NO_ERROR) {
         print_action_selector(&ctx, instance_name, ADD_GROUP, psabpf_action_selector_get_group_reference(&group));
+    }
 
 clean_up:
     psabpf_action_selector_group_free(&group);
@@ -666,8 +701,9 @@ int do_action_selector_delete_group(int argc, char **argv)
     psabpf_action_selector_group_init(&group);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -675,12 +711,14 @@ int do_action_selector_delete_group(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get group reference */
-    if (parse_group_reference(&argc, &argv, &group) != NO_ERROR)
+    if (parse_group_reference(&argc, &argv, &group) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -711,8 +749,9 @@ static int add_or_remove_member_from_group(int argc, char **argv, bool add)
     psabpf_action_selector_group_init(&group);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -720,35 +759,41 @@ static int add_or_remove_member_from_group(int argc, char **argv, bool add)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get member reference */
-    if (parse_member_reference(&argc, &argv, &member, false) != NO_ERROR)
+    if (parse_member_reference(&argc, &argv, &member, false) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 3. Skip keyword */
     if (add) {
-        if (parse_skip_keyword(&argc, &argv, "to") != NO_ERROR)
+        if (parse_skip_keyword(&argc, &argv, "to") != NO_ERROR) {
             goto clean_up;
+        }
     } else {
-        if (parse_skip_keyword(&argc, &argv, "from") != NO_ERROR)
+        if (parse_skip_keyword(&argc, &argv, "from") != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     /* 4. Get group reference */
-    if (parse_group_reference(&argc, &argv, &group) != NO_ERROR)
+    if (parse_group_reference(&argc, &argv, &group) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
         goto clean_up;
     }
 
-    if (add)
+    if (add) {
         error_code = psabpf_action_selector_add_member_to_group(&ctx, &group, &member);
-    else
+    } else {
         error_code = psabpf_action_selector_del_member_from_group(&ctx, &group, &member);
+    }
 
 clean_up:
     psabpf_action_selector_group_free(&group);
@@ -781,8 +826,9 @@ int do_action_selector_empty_group_action(int argc, char **argv)
     psabpf_action_init(&action);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -790,16 +836,19 @@ int do_action_selector_empty_group_action(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, false, NULL) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get action */
-    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR)
+    if (parse_action_selector_action(&argc, &argv, &ctx, &action) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 3. Get action parameters */
-    if (parse_action_data(&argc, &argv, &action) != NO_ERROR)
+    if (parse_action_data(&argc, &argv, &action) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -827,8 +876,9 @@ int do_action_selector_get(int argc, char **argv)
     psabpf_action_selector_ctx_init(&ctx);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -836,14 +886,16 @@ int do_action_selector_get(int argc, char **argv)
     }
 
     /* 1. Get Action Selector */
-    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, true, &instance_name) != NO_ERROR)
+    if (parse_dst_action_selector(&argc, &argv, &psabpf_ctx, &ctx, true, &instance_name) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Try to get specific mode */
     get_mode_t mode;
     uint32_t reference = 0;
-    if (parse_get_options(&argc, &argv, &mode, &reference, &ctx) != NO_ERROR)
+    if (parse_get_options(&argc, &argv, &mode, &reference, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);

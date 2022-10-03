@@ -15,37 +15,42 @@
  * limitations under the License.
  */
 
+#include <bpf/bpf.h>
+#include <errno.h>
+#include <linux/bpf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <bpf/bpf.h>
-#include <linux/bpf.h>
 
 #include <psabpf.h>
 #include <psabpf_value_set.h>
-#include "psabpf_table.h"
-#include "common.h"
+
 #include "btf.h"
+#include "common.h"
+#include "psabpf_table.h"
 
 void psabpf_value_set_context_init(psabpf_value_set_context_t *ctx) {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
 
     memset(ctx, 0, sizeof(psabpf_value_set_context_t));
     init_btf(&ctx->btf_metadata);
 }
 
 void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx) {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
 
-    if (ctx->current_raw_key != NULL)
+    if (ctx->current_raw_key != NULL) {
         free(ctx->current_raw_key);
+    }
     ctx->current_raw_key = NULL;
 
-    if (ctx->current_raw_key_mask != NULL)
+    if (ctx->current_raw_key_mask != NULL) {
         free(ctx->current_raw_key_mask);
+    }
     ctx->current_raw_key_mask = NULL;
 
     free_btf(&ctx->btf_metadata);
@@ -58,9 +63,11 @@ static int parse_key_type(psabpf_value_set_context_t *ctx)
     return parse_struct_type(&ctx->btf_metadata, ctx->set_map.key_type_id, ctx->set_map.key_size, &ctx->fds);
 }
 
-int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set_context_t *ctx, const char *name) {
-    if (psabpf_ctx == NULL || ctx == NULL || name == NULL)
+int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set_context_t *ctx, const char *name)
+{
+    if (psabpf_ctx == NULL || ctx == NULL || name == NULL) {
         return EINVAL;
+    }
 
     if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "couldn't find a BTF info\n");
@@ -117,13 +124,15 @@ psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t
     }
 
     /* Copy current keys from table_entry_ctx to value_set_ctx */
-    if (ctx->current_raw_key != NULL)
+    if (ctx->current_raw_key != NULL) {
         free(ctx->current_raw_key);
+    }
     ctx->current_raw_key = malloc(ctx->set_map.key_size);
     memcpy(ctx->current_raw_key, tec.current_raw_key, ctx->set_map.key_size);
 
-    if (ctx->current_raw_key_mask != NULL)
+    if (ctx->current_raw_key_mask != NULL) {
         free(ctx->current_raw_key_mask);
+    }
     ctx->current_raw_key_mask = malloc(tec.prefixes.key_size);
     memcpy(ctx->current_raw_key_mask, tec.current_raw_key_mask, tec.prefixes.key_size);
 
@@ -147,8 +156,9 @@ int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
 
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return EINVAL;
+    }
 
     /* prepare buffers for map key/value */
     key_buffer = malloc(ctx->set_map.key_size);
@@ -173,8 +183,9 @@ int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_
 
     /* update map */
     uint64_t bpf_flags = BPF_NOEXIST;
-    if (ctx->set_map.type == BPF_MAP_TYPE_ARRAY)
+    if (ctx->set_map.type == BPF_MAP_TYPE_ARRAY) {
         bpf_flags = BPF_ANY;
+    }
     return_code = bpf_map_update_elem(ctx->set_map.fd, key_buffer, value_buffer, bpf_flags);
     if (return_code != 0) {
         return_code = errno;
@@ -182,10 +193,12 @@ int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_
     }
 
 clean_up:
-    if (key_buffer != NULL)
+    if (key_buffer != NULL) {
         free(key_buffer);
-    if (value_buffer != NULL)
+    }
+    if (value_buffer != NULL) {
         free(value_buffer);
+    }
 
     return return_code;
 }

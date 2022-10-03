@@ -16,12 +16,14 @@
  */
 
 #include <errno.h>
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
+
 #include <jansson.h>
 
-#include "clone_session.h"
 #include <psabpf_pre.h>
+
+#include "clone_session.h"
 #include "common.h"
 
 static int clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
@@ -39,8 +41,9 @@ static int clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_id_t
     }
 
     error = psabpf_clone_session_create(ctx, &session);
-    if (error)
+    if (error) {
         goto err;
+    }
 
 err:
     psabpf_clone_session_context_free(&session);
@@ -63,8 +66,9 @@ static int clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_id_t
     }
 
     error = psabpf_clone_session_delete(ctx, &session);
-    if (error)
+    if (error) {
         goto err;
+    }
 
 err:
     psabpf_clone_session_context_free(&session);
@@ -154,8 +158,9 @@ int do_clone_session_create(int argc, char **argv)
     psabpf_context_init(&ctx);
     int ret = EINVAL;
 
-    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR) {
         goto err;
+    }
 
     uint32_t session_id;
     parser_keyword_value_pair_t kv[] = {
@@ -163,8 +168,9 @@ int do_clone_session_create(int argc, char **argv)
             { 0 },
     };
 
-    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR) {
         goto err;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -185,8 +191,9 @@ int do_clone_session_delete(int argc, char **argv)
     psabpf_context_init(&ctx);
     int ret = EINVAL;
 
-    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR) {
         goto err;
+    }
 
     uint32_t session_id;
     parser_keyword_value_pair_t kv[] = {
@@ -194,8 +201,9 @@ int do_clone_session_delete(int argc, char **argv)
             { 0 },
     };
 
-    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR) {
         goto err;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -216,8 +224,9 @@ int do_clone_session_add_member(int argc, char **argv)
     psabpf_context_init(&ctx);
     int ret = EINVAL;
 
-    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR) {
         goto err;
+    }
 
     uint32_t session_id, egress_port;
     uint16_t instance, plen_bytes;
@@ -235,14 +244,16 @@ int do_clone_session_add_member(int argc, char **argv)
             { 0 },
     };
 
-    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR) {
         goto err;
+    }
 
     if (is_keyword(*argv, "truncate")) {
         NEXT_ARG();
         truncate = true;
-        if (parse_keyword_value_pairs(&argc, &argv, &truncate_kv[0]) != NO_ERROR)
+        if (parse_keyword_value_pairs(&argc, &argv, &truncate_kv[0]) != NO_ERROR) {
             goto err;
+        }
     }
 
     if (argc > 0) {
@@ -264,8 +275,9 @@ int do_clone_session_del_member(int argc, char **argv)
     psabpf_context_init(&ctx);
     int ret = EINVAL;
 
-    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &ctx) != NO_ERROR) {
         goto err;
+    }
 
     uint32_t session_id, egress_port;
     uint16_t instance;
@@ -276,8 +288,9 @@ int do_clone_session_del_member(int argc, char **argv)
             { 0 },
     };
 
-    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR)
+    if (parse_keyword_value_pairs(&argc, &argv, &kv[0]) != NO_ERROR) {
         goto err;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -319,8 +332,9 @@ static json_t *create_json_single_session(psabpf_context_t *ctx, psabpf_clone_se
         json_object_set_new(session_root, "class_of_service", json_integer(psabpf_clone_session_entry_get_cos(entry)));
         bool truncate = psabpf_clone_session_entry_get_truncate_state(entry);
         json_object_set_new(session_root, "truncate", json_boolean(truncate));
-        if (truncate)
+        if (truncate) {
             json_object_set_new(session_root, "truncate_length", json_integer(psabpf_clone_session_entry_get_truncate_length(entry)));
+        }
 
         json_array_append_new(all_sessions, session_root);
 
@@ -337,15 +351,17 @@ static int print_clone_session(psabpf_context_t *ctx, psabpf_clone_session_ctx_t
     json_t *groups = json_array();
     json_t *session_json;
 
-    if (root == NULL || groups == NULL)
+    if (root == NULL || groups == NULL) {
         goto clean_up;
+    }
 
     json_object_set(root, "clone_sessions", groups);
 
     if (session != NULL) {
         session_json = create_json_single_session(ctx, session);
-        if (session_json == NULL)
+        if (session_json == NULL) {
             goto clean_up;
+        }
         json_array_append_new(groups, session_json);
     } else {
         psabpf_clone_session_list_t list;
@@ -385,8 +401,9 @@ int do_clone_session_get(int argc, char **argv)
     psabpf_context_init(&ctx);
     psabpf_clone_session_context_init(&session);
 
-    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         session_id_specified = true;
@@ -397,8 +414,9 @@ int do_clone_session_get(int argc, char **argv)
                 { 0 },
         };
 
-        if ((ret = parse_keyword_value_pairs(&argc, &argv, &kv[0])) != NO_ERROR)
+        if ((ret = parse_keyword_value_pairs(&argc, &argv, &kv[0])) != NO_ERROR) {
             goto clean_up;
+        }
 
         psabpf_clone_session_id(&session, session_id);
         if (!psabpf_clone_session_exists(&ctx, &session)) {

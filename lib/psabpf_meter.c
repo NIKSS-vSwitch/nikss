@@ -15,16 +15,17 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <math.h>
-#include <unistd.h>
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
+#include <errno.h>
 #include <linux/bpf.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include <psabpf.h>
+
 #include "btf.h"
 #include "common.h"
 #include "psabpf_meter.h"
@@ -38,7 +39,8 @@
  * @param unit_per_period In byte or packet
  */
 static void convert_rate(const psabpf_meter_value_t *rate, psabpf_meter_value_t *period,
-                         psabpf_meter_value_t *unit_per_period) {
+                         psabpf_meter_value_t *unit_per_period)
+{
     if (*rate == 0) {
         *unit_per_period = 0;
         *period = 0;
@@ -55,9 +57,11 @@ static void convert_rate(const psabpf_meter_value_t *rate, psabpf_meter_value_t 
     }
 }
 
-int convert_meter_data_to_entry(const psabpf_meter_data_t *data, psabpf_meter_entry_t *entry) {
-    if (entry == NULL || data == NULL)
+int convert_meter_data_to_entry(const psabpf_meter_data_t *data, psabpf_meter_entry_t *entry)
+{
+    if (entry == NULL || data == NULL) {
         return ENODATA;
+    }
 
     psabpf_meter_value_t pir = 0;
     psabpf_meter_value_t cir = 0;
@@ -77,9 +81,11 @@ int convert_meter_data_to_entry(const psabpf_meter_data_t *data, psabpf_meter_en
     return NO_ERROR;
 }
 
-int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_data_t *data) {
-    if (entry == NULL || data == NULL)
+int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_data_t *data)
+{
+    if (entry == NULL || data == NULL) {
         return ENODATA;
+    }
 
     convert_rate(&entry->pir, &data->pir_period, &data->pir_unit_per_period);
     convert_rate(&entry->cir, &data->cir_period, &data->cir_unit_per_period);
@@ -92,19 +98,24 @@ int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_
     return NO_ERROR;
 }
 
-void psabpf_meter_entry_init(psabpf_meter_entry_t *entry) {
-    if (entry == NULL)
+void psabpf_meter_entry_init(psabpf_meter_entry_t *entry)
+{
+    if (entry == NULL) {
         return;
+    }
 
     memset(entry, 0, sizeof(psabpf_meter_entry_t));
 }
 
-void psabpf_meter_entry_free(psabpf_meter_entry_t *entry) {
-    if (entry == NULL)
+void psabpf_meter_entry_free(psabpf_meter_entry_t *entry)
+{
+    if (entry == NULL) {
         return;
+    }
 
-    if (entry->raw_index != NULL)
+    if (entry->raw_index != NULL) {
         free(entry->raw_index);
+    }
     entry->raw_index = NULL;
 
     free_struct_field_set(&entry->index_sfs);
@@ -112,13 +123,16 @@ void psabpf_meter_entry_free(psabpf_meter_entry_t *entry) {
     memset(entry, 0, sizeof(psabpf_meter_entry_t));
 }
 
-int psabpf_meter_entry_index(psabpf_meter_entry_t *entry, const char *data, size_t size) {
-    if (entry == NULL || data == NULL || size < 1)
+int psabpf_meter_entry_index(psabpf_meter_entry_t *entry, const char *data, size_t size)
+{
+    if (entry == NULL || data == NULL || size < 1) {
         return ENODATA;
+    }
 
     int ret = struct_field_set_append(&entry->index_sfs, data, size);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't append key to an entry: %s\n", strerror(ret));
+    }
 
     return ret;
 }
@@ -127,9 +141,11 @@ int psabpf_meter_entry_data(psabpf_meter_entry_t *entry,
                             psabpf_meter_value_t pir,
                             psabpf_meter_value_t pbs,
                             psabpf_meter_value_t cir,
-                            psabpf_meter_value_t cbs) {
-    if (entry == NULL)
+                            psabpf_meter_value_t cbs)
+{
+    if (entry == NULL) {
         return ENODATA;
+    }
 
     entry->pir = pir;
     entry->pbs = pbs;
@@ -143,25 +159,33 @@ int psabpf_meter_entry_get_data(psabpf_meter_entry_t *entry,
                                 psabpf_meter_value_t *pir,
                                 psabpf_meter_value_t *pbs,
                                 psabpf_meter_value_t *cir,
-                                psabpf_meter_value_t *cbs) {
-    if (entry == NULL)
+                                psabpf_meter_value_t *cbs)
+{
+    if (entry == NULL) {
         return ENODATA;
+    }
 
-    if (pir != NULL)
+    if (pir != NULL) {
         *pir = entry->pir;
-    if (pbs != NULL)
+    }
+    if (pbs != NULL) {
         *pbs = entry->pbs;
-    if (cir != NULL)
+    }
+    if (cir != NULL) {
         *cir = entry->cir;
-    if (cbs != NULL)
+    }
+    if (cbs != NULL) {
         *cbs = entry->cbs;
+    }
 
     return NO_ERROR;
 }
 
-psabpf_struct_field_t * psabpf_meter_entry_get_next_index_field(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
-    if (ctx == NULL || entry == NULL)
+psabpf_struct_field_t * psabpf_meter_entry_get_next_index_field(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
+{
+    if (ctx == NULL || entry == NULL) {
         return NULL;
+    }
 
     psabpf_struct_field_descriptor_t *fd;
     fd = get_struct_field_descriptor(&ctx->index_fds, entry->current_index_field_id);
@@ -180,9 +204,11 @@ psabpf_struct_field_t * psabpf_meter_entry_get_next_index_field(psabpf_meter_ctx
     return &entry->current_index_field;
 }
 
-void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx) {
-    if (ctx == NULL)
+void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx)
+{
+    if (ctx == NULL) {
         return;
+    }
 
     memset(ctx, 0, sizeof(psabpf_meter_ctx_t));
 
@@ -191,23 +217,28 @@ void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx) {
     init_btf(&ctx->btf_metadata);
 }
 
-void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx) {
-    if (ctx == NULL)
+void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx)
+{
+    if (ctx == NULL) {
         return;
+    }
 
     psabpf_meter_entry_free(&ctx->current_entry);
     free_btf(&ctx->btf_metadata);
     free_struct_field_descriptor_set(&ctx->index_fds);
     close_object_fd(&ctx->meter.fd);
 
-    if (ctx->previous_index != NULL)
+    if (ctx->previous_index != NULL) {
         free(ctx->previous_index);
+    }
     ctx->previous_index = NULL;
 }
 
-int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name) {
-    if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
+int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name)
+{
+    if (ctx == NULL || psabpf_ctx == NULL || name == NULL) {
         return EPERM;
+    }
 
     if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "couldn't find a BTF info\n");
@@ -237,21 +268,24 @@ int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx,
     return NO_ERROR;
 }
 
-int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
+int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
+{
     int return_code = NO_ERROR;
     uint64_t bpf_flags = BPF_F_LOCK;
     char *value_buffer = NULL;
 
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return EINVAL;
+    }
 
     if (entry->index_sfs.n_fields == 0) {
         fprintf(stderr, "Index not provided");
         return EINVAL;
     }
 
-    if (entry->raw_index == NULL)
+    if (entry->raw_index == NULL) {
         entry->raw_index = malloc(ctx->meter.key_size);
+    }
     value_buffer = malloc(ctx->meter.value_size);
     if (entry->raw_index == NULL || value_buffer == NULL) {
         fprintf(stderr, "not enough memory\n");
@@ -261,8 +295,9 @@ int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
 
     memset(value_buffer, 0, ctx->meter.value_size);
     return_code = construct_struct_from_fields(&entry->index_sfs, &ctx->index_fds, entry->raw_index, ctx->meter.key_size);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         goto clean_up;
+    }
 
     return_code = bpf_map_lookup_elem_flags(ctx->meter.fd, entry->raw_index, value_buffer, bpf_flags);
     if (return_code != 0) {
@@ -280,13 +315,15 @@ clean_up:
     return return_code;
 }
 
-psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx) {
+psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx)
+{
     psabpf_meter_entry_t *ret_instance = NULL;
     void *next_key = NULL;
     void *value_buffer = NULL;
 
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return NULL;
+    }
 
     next_key = malloc(ctx->meter.key_size);
     value_buffer = malloc(ctx->meter.value_size);
@@ -297,22 +334,25 @@ psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx) {
 
     if (bpf_map_get_next_key(ctx->meter.fd, ctx->previous_index, next_key) != 0) {
         /* restart iteration */
-        if (ctx->previous_index != NULL)
+        if (ctx->previous_index != NULL) {
             free(ctx->previous_index);
+        }
         ctx->previous_index = NULL;
 
         goto clean_up;
     }
 
-    if (ctx->previous_index == NULL)
+    if (ctx->previous_index == NULL) {
         ctx->previous_index = malloc(ctx->meter.key_size);
+    }
     if (ctx->previous_index == NULL) {
         fprintf(stderr, "not enough memory\n");
         goto clean_up;
     }
 
-    if (ctx->current_entry.raw_index != NULL)
+    if (ctx->current_entry.raw_index != NULL) {
         free(ctx->current_entry.raw_index);
+    }
     ctx->current_entry.raw_index = next_key;
     memcpy(ctx->previous_index, next_key, ctx->meter.key_size);
     next_key = NULL;
@@ -327,28 +367,33 @@ psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx) {
     psabpf_meter_data_t data;
     memcpy(&data, value_buffer, sizeof(data));
     return_code = convert_meter_data_to_entry(&data, &ctx->current_entry);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         goto clean_up;
+    }
 
     ret_instance = &ctx->current_entry;
 
 clean_up:
-    if (next_key != NULL)
+    if (next_key != NULL) {
         free(next_key);
-    if (value_buffer != NULL)
+    }
+    if (value_buffer != NULL) {
         free(value_buffer);
+    }
 
     return ret_instance;
 }
 
-int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
+int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
+{
     int return_code = NO_ERROR;
     uint64_t bpf_flags = BPF_F_LOCK;
     char *value_buffer = NULL;
     psabpf_meter_data_t data;
 
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return EINVAL;
+    }
 
     if (entry->index_sfs.n_fields == 0) {
         fprintf(stderr, "Index not provided");
@@ -356,11 +401,13 @@ int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *ent
     }
 
     return_code = convert_meter_entry_to_data(entry, &data);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         return return_code;
+    }
 
-    if (entry->raw_index == NULL)
+    if (entry->raw_index == NULL) {
         entry->raw_index = malloc(ctx->meter.key_size);
+    }
     value_buffer = malloc(ctx->meter.value_size);
     if (entry->raw_index == NULL || value_buffer == NULL) {
         fprintf(stderr, "not enough memory\n");
@@ -371,8 +418,9 @@ int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *ent
     memset(value_buffer, 0, ctx->meter.value_size);
     memcpy(value_buffer, &data, sizeof(data));
     return_code = construct_struct_from_fields(&entry->index_sfs, &ctx->index_fds, entry->raw_index, ctx->meter.key_size);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         goto clean_up;
+    }
 
     return_code = bpf_map_update_elem(ctx->meter.fd, entry->raw_index, value_buffer, bpf_flags);
     if (return_code != 0) {
@@ -386,18 +434,22 @@ clean_up:
     return return_code;
 }
 
-int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry) {
-    if (ctx == NULL)
+int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
+{
+    if (ctx == NULL) {
         return EINVAL;
+    }
 
     /* Remove all entries if psabpf_meter_entry_index were not executed on meter entry. */
-    if (entry == NULL || entry->index_sfs.n_fields < 1)
+    if (entry == NULL || entry->index_sfs.n_fields < 1) {
         return delete_all_map_entries(&ctx->meter);
+    }
 
     if (ctx->meter.type == BPF_MAP_TYPE_ARRAY) {
         int return_code = psabpf_meter_entry_data(entry, 0, 0, 0, 0);
-        if (return_code != NO_ERROR)
+        if (return_code != NO_ERROR) {
             return return_code;
+        }
         return psabpf_meter_entry_update(ctx, entry);
     }
 
@@ -408,8 +460,9 @@ int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entr
     }
 
     int return_code = construct_struct_from_fields(&entry->index_sfs, &ctx->index_fds, key_buffer, ctx->meter.key_size);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         goto clean_up;
+    }
 
     if (bpf_map_delete_elem(ctx->meter.fd, key_buffer) != 0) {
         return_code = errno;

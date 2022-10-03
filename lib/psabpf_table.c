@@ -15,26 +15,28 @@
  * limitations under the License.
  */
 
+#include <bpf/bpf.h>
+#include <bpf/btf.h>
+#include <errno.h>
+#include <linux/bpf.h>
+#include <linux/btf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
-#include <bpf/bpf.h>
-#include <bpf/btf.h>
-#include <linux/bpf.h>
-#include <linux/btf.h>
 
 #include <psabpf.h>
+
 #include "btf.h"
 #include "common.h"
-#include "psabpf_table.h"
 #include "psabpf_counter.h"
 #include "psabpf_meter.h"
+#include "psabpf_table.h"
 
 void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
     memset(ctx, 0, sizeof(psabpf_table_entry_ctx_t));
 
     init_btf(&ctx->btf_metadata);
@@ -51,8 +53,9 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
 
 void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
 
     free_btf(&ctx->btf_metadata);
 
@@ -63,16 +66,18 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     close_object_fd(&(ctx->cache.fd));
 
     if (ctx->direct_counters_ctx != NULL) {
-        for (unsigned i = 0; i < ctx->n_direct_counters; i++)
+        for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
             psabpf_direct_counter_ctx_free(&ctx->direct_counters_ctx[i]);
+        }
         free(ctx->direct_counters_ctx);
         ctx->direct_counters_ctx = NULL;
     }
     ctx->n_direct_counters = 0;
 
     if (ctx->direct_meters_ctx != NULL) {
-        for (unsigned i = 0; i < ctx->n_direct_meters; i++)
+        for (unsigned i = 0; i < ctx->n_direct_meters; i++) {
             psabpf_direct_meter_ctx_free(&ctx->direct_meters_ctx[i]);
+        }
         free(ctx->direct_meters_ctx);
         ctx->direct_meters_ctx = NULL;
     }
@@ -81,8 +86,9 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     free_struct_field_descriptor_set(&ctx->table_implementations);
     free_struct_field_descriptor_set(&ctx->table_implementation_group_marks);
 
-    if (ctx->current_raw_key != NULL)
+    if (ctx->current_raw_key != NULL) {
         free(ctx->current_raw_key);
+    }
     ctx->current_raw_key = NULL;
 
     psabpf_table_entry_free(&ctx->current_entry);
@@ -110,28 +116,35 @@ static bool member_is_direct_or_implementation_object(psabpf_btf_t *btf, const s
                                                       const char **name, const char **type_name)
 {
     *name = btf__name_by_offset(btf->btf, member->name_off);
-    if (*name == NULL)
+    if (*name == NULL) {
         return false;
-    if (strcmp(*name, "u") == 0)
+    }
+    if (strcmp(*name, "u") == 0) {
         return false;
+    }
 
     const struct btf_type *type = psabtf_get_type_by_id(btf->btf, member->type);
-    if (type == NULL)
+    if (type == NULL) {
         return false;
+    }
     *type_name = btf__name_by_offset(btf->btf, type->name_off);
-    if (*type_name == NULL)
+    if (*type_name == NULL) {
         return false;
-    if (strcmp(*type_name, "bpf_spin_lock") == 0)
+    }
+    if (strcmp(*type_name, "bpf_spin_lock") == 0) {
         return false;
+    }
 
     if (btf_is_int(type)) {
         /* treat ActionSelector and ActionProfile references as a direct object */
-        if (str_ends_with(*name, "_ref") || str_ends_with(*name, "_key"))
+        if (str_ends_with(*name, "_ref") || str_ends_with(*name, "_key")) {
             return true;
+        }
     }
 
-    if (!btf_is_struct(type))
+    if (!btf_is_struct(type)) {
         return false;
+    }
 
     return true;
 }
@@ -144,16 +157,18 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
 
     const struct btf_type *value_type;
     int ret = get_value_type(ctx, &value_type);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     unsigned entries = btf_vlen(value_type);
     const struct btf_member *member = btf_members(value_type);
     for (unsigned i = 0; i < entries; i++, member++) {
         const char *member_name = NULL;
         const char *member_type_name = NULL;
-        if (!member_is_direct_or_implementation_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
+        if (!member_is_direct_or_implementation_object(&ctx->btf_metadata, member, &member_name, &member_type_name)) {
             continue;
+        }
 
         size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
         psabpf_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
@@ -165,8 +180,9 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
             ctx->n_direct_meters += 1;
         } else if (str_ends_with(member_name, "_ref") || str_ends_with(member_name, "_key")) {
             /* ActionSelector or ActionProfile, skip group mark */
-            if (str_ends_with(member_name, "_is_group_ref"))
+            if (str_ends_with(member_name, "_is_group_ref")) {
                 continue;
+            }
             ctx->table_implementations.n_fields += 1;
         } else {
             fprintf(stderr, "%s: unknown type direct object instance, ignored\n", member_name);
@@ -193,8 +209,9 @@ static void try_find_group_mark_for_table_impl(psabpf_table_entry_ctx_t *ctx, un
     }
 
     size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, md.effective_type_id);
-    if (size != sizeof(uint32_t))
+    if (size != sizeof(uint32_t)) {
         return;
+    }
 
     ctx->table_implementation_group_marks.fields[table_impl_id].name = NULL;
     ctx->table_implementation_group_marks.fields[table_impl_id].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
@@ -210,8 +227,9 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
 
     const struct btf_type *value_type;
     int ret = get_value_type(ctx, &value_type);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     unsigned entries = btf_vlen(value_type);
     const struct btf_member *member = btf_members(value_type);
@@ -221,8 +239,9 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
     for (unsigned i = 0; i < entries; i++, member++) {
         const char *member_name = NULL;
         const char *member_type_name = NULL;
-        if (!member_is_direct_or_implementation_object(&ctx->btf_metadata, member, &member_name, &member_type_name))
+        if (!member_is_direct_or_implementation_object(&ctx->btf_metadata, member, &member_name, &member_type_name)) {
             continue;
+        }
 
         size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
         size_t member_offset = btf_member_bit_offset(value_type, i) / 8;
@@ -236,8 +255,9 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
             ctx->direct_counters_ctx[current_counter].counter_offset = member_offset;
             ctx->direct_counters_ctx[current_counter].counter_size = member_size;
             ctx->direct_counters_ctx[current_counter].counter_idx = current_counter;
-            if (ctx->direct_counters_ctx[current_counter].name == NULL)
+            if (ctx->direct_counters_ctx[current_counter].name == NULL) {
                 return ENOMEM;
+            }
 
             ++current_counter;
         } else if (strcmp(member_type_name, "meter_value") == 0 && member_size == DIRECT_METER_SIZE) {
@@ -247,8 +267,9 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
             ctx->direct_meters_ctx[current_meter].meter_offset = member_offset;
             ctx->direct_meters_ctx[current_meter].meter_size = member_size;
             ctx->direct_meters_ctx[current_meter].meter_idx = current_meter;
-            if (ctx->direct_meters_ctx[current_meter].name == NULL)
+            if (ctx->direct_meters_ctx[current_meter].name == NULL) {
                 return ENOMEM;
+            }
 
             ++current_meter;
         } else if (str_ends_with(member_name, "_ref") || str_ends_with(member_name, "_key")) {
@@ -257,8 +278,9 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
                 ctx->table_implementations.fields[current_table_impl].data_offset = member_offset;
                 ctx->table_implementations.fields[current_table_impl].data_len = member_size;
                 ctx->table_implementations.fields[current_table_impl].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
-                if (tbl_impl_name == NULL)
+                if (tbl_impl_name == NULL) {
                     return ENOMEM;
+                }
 
                 /* Now name contains suffix "_ref" or "_key", remove it. */
                 unsigned len = strlen(tbl_impl_name);
@@ -283,21 +305,24 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
     }
 
     int ret = count_direct_objects(ctx);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     if (ctx->n_direct_counters > 0) {
         ctx->direct_counters_ctx = malloc(ctx->n_direct_counters * sizeof(psabpf_direct_counter_context_t));
-        if (ctx->direct_counters_ctx == NULL)
+        if (ctx->direct_counters_ctx == NULL) {
             return ENOMEM;
+        }
     }
 
     if (ctx->n_direct_meters > 0) {
         ctx->direct_meters_ctx = malloc(ctx->n_direct_meters * sizeof(psabpf_direct_meter_context_t));
         if (ctx->direct_meters_ctx == NULL) {
             /* Avoid memory corruption */
-            if (ctx->direct_counters_ctx != NULL)
+            if (ctx->direct_counters_ctx != NULL) {
                 free(ctx->direct_counters_ctx);
+            }
             ctx->direct_counters_ctx = NULL;
             return ENOMEM;
         }
@@ -312,10 +337,12 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
                                                               sizeof(psabpf_struct_field_descriptor_t));
 
         if (ctx->table_implementations.fields == NULL || ctx->table_implementation_group_marks.fields == NULL) {
-            if (ctx->direct_counters_ctx != NULL)
+            if (ctx->direct_counters_ctx != NULL) {
                 free(ctx->direct_counters_ctx);
-            if (ctx->direct_meters_ctx != NULL)
+            }
+            if (ctx->direct_meters_ctx != NULL) {
                 free(ctx->direct_meters_ctx);
+            }
             ctx->direct_counters_ctx = NULL;
             ctx->direct_meters_ctx = NULL;
             return ENOMEM;
@@ -359,18 +386,21 @@ int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *c
 
 int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
 {
-    if (ctx == NULL || psabpf_ctx == NULL || name == NULL)
+    if (ctx == NULL || psabpf_ctx == NULL || name == NULL) {
         return EINVAL;
+    }
 
     /* get the BTF, it is optional so print only warning */
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR)
+    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "warning: couldn't find BTF info\n");
+    }
 
     int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->table);
 
     /* if map does not exist, try the ternary table */
-    if (ret == ENOENT)
+    if (ret == ENOENT) {
         ret = open_ternary_table(psabpf_ctx, ctx, name);
+    }
 
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open table %s: %s\n", name, strerror(ret));
@@ -389,8 +419,9 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     /* open cache table, this is optional feature for table*/
     snprintf(map_name, sizeof(map_name), "%s_cache", name);
     ret = open_bpf_map(psabpf_ctx, map_name, &ctx->btf_metadata, &ctx->cache);
-    if (ret == NO_ERROR)
+    if (ret == NO_ERROR) {
         fprintf(stderr, "found cache for table: %s\n", name);
+    }
 
     ret = init_direct_objects(ctx);
     if (ret != NO_ERROR) {
@@ -403,29 +434,33 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
 
 void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
     ctx->is_indirect = true;
 }
 
 bool psabpf_table_entry_ctx_is_indirect(psabpf_table_entry_ctx_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return false;
+    }
     return ctx->is_indirect;
 }
 
 bool psabpf_table_entry_ctx_has_priority(psabpf_table_entry_ctx_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return false;
+    }
     return ctx->is_ternary;
 }
 
 void psabpf_table_entry_init(psabpf_table_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return;
+    }
     memset(entry, 0, sizeof(psabpf_table_entry_t));
 
     psabpf_matchkey_init(&entry->current_match_key);
@@ -435,15 +470,17 @@ void psabpf_table_entry_init(psabpf_table_entry_t *entry)
 
 void psabpf_table_entry_free(psabpf_table_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return;
+    }
 
     /* free match keys */
     for (size_t i = 0; i < entry->n_keys; i++) {
         psabpf_matchkey_free(entry->match_keys[i]);
     }
-    if (entry->match_keys)
+    if (entry->match_keys) {
         free(entry->match_keys);
+    }
     entry->match_keys = NULL;
     entry->n_keys = 0;
 
@@ -456,8 +493,9 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
 
     /* free DirectCounter instances */
     if (entry->direct_counters != NULL) {
-        for (unsigned i = 0; i < entry->n_direct_counters; i++)
+        for (unsigned i = 0; i < entry->n_direct_counters; i++) {
             psabpf_counter_entry_free(&entry->direct_counters[i].counter);
+        }
         free(entry->direct_counters);
     }
     entry->direct_counters = NULL;
@@ -465,8 +503,9 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
 
     /* free DirectMeter instances */
     if (entry->direct_meters != NULL) {
-        for (unsigned i = 0; i < entry->n_direct_meters; i++)
+        for (unsigned i = 0; i < entry->n_direct_meters; i++) {
             psabpf_meter_entry_free(&entry->direct_meters[i].meter);
+        }
         free(entry->direct_meters);
     }
     entry->direct_meters = NULL;
@@ -482,10 +521,12 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
 /* can be invoked multiple times */
 int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t *mk)
 {
-    if (entry == NULL || mk == NULL)
+    if (entry == NULL || mk == NULL) {
         return EINVAL;
-    if (mk->data == NULL)
+    }
+    if (mk->data == NULL) {
         return ENODATA;
+    }
 
     if (mk->type == PSABPF_LPM) {
         for (size_t i = 0; i < entry->n_keys; ++i) {
@@ -501,18 +542,21 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
     psabpf_match_key_t * new_mk = malloc(sizeof(psabpf_match_key_t));
 
     if (tmp == NULL || new_mk == NULL) {
-        if (tmp != NULL)
+        if (tmp != NULL) {
             free(tmp);
-        if (new_mk != NULL)
+        }
+        if (new_mk != NULL) {
             free(new_mk);
+        }
         return ENOMEM;
     }
 
     if (entry->n_keys != 0) {
         memcpy(tmp, entry->match_keys, (entry->n_keys) * sizeof(psabpf_match_key_t *));
     }
-    if (entry->match_keys != NULL)
+    if (entry->match_keys != NULL) {
         free(entry->match_keys);
+    }
     entry->match_keys = tmp;
 
     memcpy(new_mk, mk, sizeof(psabpf_match_key_t));
@@ -520,8 +564,9 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
 
     /* stole data from mk to new_mk */
     mk->data = NULL;
-    if (mk->type == PSABPF_TERNARY)
+    if (mk->type == PSABPF_TERNARY) {
         mk->u.ternary.mask = NULL;
+    }
 
     entry->n_keys += 1;
 
@@ -530,8 +575,9 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
 
 psabpf_match_key_t *psabpf_table_entry_get_next_matchkey(psabpf_table_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return NULL;
+    }
 
     if (entry->current_match_key_id >= entry->n_keys) {
         entry->current_match_key_id = 0;
@@ -545,9 +591,11 @@ psabpf_match_key_t *psabpf_table_entry_get_next_matchkey(psabpf_table_entry_t *e
     return &entry->current_match_key;
 }
 
-void move_action(psabpf_action_t *dst, psabpf_action_t *src) {
-    if (dst == NULL || src == NULL)
+void move_action(psabpf_action_t *dst, psabpf_action_t *src)
+{
+    if (dst == NULL || src == NULL) {
         return;
+    }
 
     /* stole action data from src */
     memcpy(dst, src, sizeof(psabpf_action_t));
@@ -557,74 +605,86 @@ void move_action(psabpf_action_t *dst, psabpf_action_t *src) {
 
 void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act)
 {
-    if (entry == NULL || act == NULL)
+    if (entry == NULL || act == NULL) {
         return;
-
-    if (entry->action != NULL)
+    }
+    if (entry->action != NULL) {
         return;
+    }
 
     entry->action = malloc(sizeof(psabpf_action_t));
-    if (entry->action == NULL)
+    if (entry->action == NULL) {
         return;
+    }
     move_action(entry->action, act);
 }
 
 /* only for ternary */
 void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return;
+    }
     entry->priority = priority;
 }
 
 uint32_t psabpf_table_entry_get_priority(psabpf_table_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return 0;
+    }
     return entry->priority;
 }
 
 void psabpf_matchkey_init(psabpf_match_key_t *mk)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return;
+    }
     memset(mk, 0, sizeof(psabpf_match_key_t));
     mk->mem_can_be_freed = true;
 }
 
 void psabpf_matchkey_free(psabpf_match_key_t *mk)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return;
+    }
 
-    if (mk->data != NULL && mk->mem_can_be_freed == true)
+    if (mk->data != NULL && mk->mem_can_be_freed == true) {
         free(mk->data);
+    }
     mk->data = NULL;
 
     if (mk->type == PSABPF_TERNARY) {
-        if (mk->u.ternary.mask != NULL && mk->mem_can_be_freed == true)
+        if (mk->u.ternary.mask != NULL && mk->mem_can_be_freed == true) {
             free(mk->u.ternary.mask);
+        }
         mk->u.ternary.mask = NULL;
     }
 }
 
 void psabpf_matchkey_type(psabpf_match_key_t *mk, enum psabpf_matchkind_t type)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return;
+    }
     mk->type = type;
 }
 
 int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
 {
-    if (mk == NULL || data == NULL)
+    if (mk == NULL || data == NULL) {
         return EINVAL;
-    if (mk->data != NULL)
+    }
+    if (mk->data != NULL) {
         return EEXIST;
+    }
 
     mk->data = malloc(size);
-    if (mk->data == NULL)
+    if (mk->data == NULL) {
         return ENOMEM;
+    }
     memcpy(mk->data, data, size);
     mk->key_size = size;
 
@@ -633,32 +693,37 @@ int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
 
 enum psabpf_matchkind_t psabpf_matchkey_get_type(psabpf_match_key_t *mk)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return PSABPF_EXACT;
+    }
     return mk->type;
 }
 
 const void *psabpf_matchkey_get_data(psabpf_match_key_t *mk)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return NULL;
+    }
     return mk->data;
 }
 
 size_t psabpf_matchkey_get_data_size(psabpf_match_key_t *mk)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return 0;
+    }
     return mk->key_size;
 }
 
 /* only for lpm */
 int psabpf_matchkey_prefix_len(psabpf_match_key_t *mk, uint32_t prefix)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return EINVAL;
-    if (mk->type != PSABPF_LPM)
+    }
+    if (mk->type != PSABPF_LPM) {
         return EINVAL;
+    }
 
     mk->u.lpm.prefix_len = prefix;
 
@@ -668,27 +733,33 @@ int psabpf_matchkey_prefix_len(psabpf_match_key_t *mk, uint32_t prefix)
 /* only for lpm */
 uint32_t psabpf_matchkey_get_prefix_len(psabpf_match_key_t *mk)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return 0;
-    if (mk->type != PSABPF_LPM)
+    }
+    if (mk->type != PSABPF_LPM) {
         return 0;
+    }
     return mk->u.lpm.prefix_len;
 }
 
 /* only for ternary */
 int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size)
 {
-    if (mk == NULL || mask == NULL)
+    if (mk == NULL || mask == NULL) {
         return EINVAL;
-    if (mk->type != PSABPF_TERNARY)
+    }
+    if (mk->type != PSABPF_TERNARY) {
         return EINVAL;
-    if (mk->u.ternary.mask != NULL)
+    }
+    if (mk->u.ternary.mask != NULL) {
         return EEXIST;
+    }
 
     mk->u.ternary.mask_size = size;
     mk->u.ternary.mask = malloc(size);
-    if (mk->u.ternary.mask == NULL)
+    if (mk->u.ternary.mask == NULL) {
         return ENOMEM;
+    }
     memcpy(mk->u.ternary.mask, mask, size);
 
     return NO_ERROR;
@@ -697,20 +768,24 @@ int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size)
 /* only for ternary */
 const void *psabpf_matchkey_get_mask(psabpf_match_key_t *mk)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return NULL;
-    if (mk->type != PSABPF_TERNARY)
+    }
+    if (mk->type != PSABPF_TERNARY) {
         return NULL;
+    }
     return mk->u.ternary.mask;
 }
 
 /* only for ternary */
 size_t psabpf_matchkey_get_mask_size(psabpf_match_key_t *mk)
 {
-    if (mk == NULL)
+    if (mk == NULL) {
         return 0;
-    if (mk->type != PSABPF_TERNARY)
+    }
+    if (mk->type != PSABPF_TERNARY) {
         return 0;
+    }
     return mk->u.ternary.mask_size;
 }
 
@@ -732,8 +807,9 @@ int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end)
 
 int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size)
 {
-    if (param == NULL || data == NULL)
+    if (param == NULL || data == NULL) {
         return EINVAL;
+    }
 
     param->is_group_reference = false;
     param->mem_can_be_freed = true;
@@ -744,8 +820,9 @@ int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, s
         return NO_ERROR;
     }
     param->data = malloc(size);
-    if (param->data == NULL)
+    if (param->data == NULL) {
         return ENOMEM;
+    }
     memcpy(param->data, data, size);
 
     return NO_ERROR;
@@ -753,33 +830,39 @@ int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, s
 
 void psabpf_action_param_free(psabpf_action_param_t *param)
 {
-    if (param == NULL)
+    if (param == NULL) {
         return;
-    if (param->data != NULL && param->mem_can_be_freed == true)
+    }
+    if (param->data != NULL && param->mem_can_be_freed == true) {
         free(param->data);
+    }
     param->data = NULL;
 }
 
 void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param)
 {
-    if (param == NULL)
+    if (param == NULL) {
         return;
+    }
     param->is_group_reference = true;
 }
 
 bool psabpf_action_param_is_group_reference(psabpf_action_param_t *param)
 {
-    if (param == NULL)
+    if (param == NULL) {
         return false;
+    }
     return param->is_group_reference;
 }
 
 psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return NULL;
-    if (entry->action == NULL)
+    }
+    if (entry->action == NULL) {
         return NULL;
+    }
 
     if (entry->current_action_param_id >= entry->action->n_params) {
         entry->current_action_param_id = 0;
@@ -798,29 +881,32 @@ psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry)
 
 void *psabpf_action_param_get_data(psabpf_action_param_t *param)
 {
-    if (param == NULL)
+    if (param == NULL) {
         return NULL;
+    }
     return param->data;
 }
 
 size_t psabpf_action_param_get_data_len(psabpf_action_param_t *param)
 {
-    if (param == NULL)
+    if (param == NULL) {
         return 0;
+    }
     return param->len;
 }
 
 const char *psabpf_action_param_get_name(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, psabpf_action_param_t *param)
 {
-    if (ctx == NULL || entry == NULL || param == NULL)
+    if (ctx == NULL || entry == NULL || param == NULL) {
         return NULL;
     if (entry->action == NULL || ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         return NULL;
     }
 
     if (ctx->is_indirect) {
-        if (param->param_id >= ctx->table_implementations.n_fields)
+        if (param->param_id >= ctx->table_implementations.n_fields) {
             return NULL;
+        }
         return ctx->table_implementations.fields[param->param_id].name;
     }
 
@@ -833,61 +919,71 @@ const char *psabpf_action_param_get_name(psabpf_table_entry_ctx_t *ctx, psabpf_t
     }
 
     psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, entry->action->action_id, &action_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, entry->action->action_id, &action_md) != NO_ERROR) {
         return NULL;
+    }
 
     const struct btf_type *action_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, action_md.effective_type_id);
-    if (action_type == NULL)
+    if (action_type == NULL) {
         return NULL;
-    if (!btf_is_struct(action_type))
+    }
+    if (!btf_is_struct(action_type)) {
         return NULL;
+    }
 
     const unsigned number_of_params = btf_vlen(action_type);
-    if (param->param_id >= number_of_params || entry->action->n_params != number_of_params)
+    if (param->param_id >= number_of_params || entry->action->n_params != number_of_params) {
         return NULL;
+    }
 
     psabtf_struct_member_md_t param_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, action_md.effective_type_id, param->param_id, &param_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, action_md.effective_type_id, param->param_id, &param_md) != NO_ERROR) {
         return NULL;
+    }
 
     const char *type_name = btf__name_by_offset(ctx->btf_metadata.btf, param_md.member->name_off);
-    if (type_name != NULL && type_name[0] == '\0')
+    if (type_name != NULL && type_name[0] == '\0') {
         return NULL;
+    }
 
     return type_name;
 }
 
 void psabpf_action_init(psabpf_action_t *action)
 {
-    if (action == NULL)
+    if (action == NULL) {
         return;
+    }
     memset(action, 0, sizeof(psabpf_action_t));
 }
 
 void psabpf_action_free(psabpf_action_t *action)
 {
-    if (action == NULL)
+    if (action == NULL) {
         return;
+    }
 
     for (size_t i = 0; i < action->n_params; i++) {
         psabpf_action_param_free(&(action->params[i]));
     }
-    if (action->params != NULL)
+    if (action->params != NULL) {
         free(action->params);
+    }
     action->params = NULL;
     action->n_params = 0;
 }
 
 void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id)
 {
-    if (action == NULL)
+    if (action == NULL) {
         return;
+    }
     action->action_id = action_id;
 }
 
 uint32_t psabpf_table_get_action_id_by_name(psabpf_table_entry_ctx_t *ctx, const char *name)
 {
-    if (ctx == NULL || name == NULL)
+    if (ctx == NULL || name == NULL) {
         return PSABPF_INVALID_ACTION_ID;
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0 || ctx->is_indirect) {
         return PSABPF_INVALID_ACTION_ID;
@@ -899,28 +995,33 @@ uint32_t psabpf_table_get_action_id_by_name(psabpf_table_entry_ctx_t *ctx, const
     }
 
     psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, union_md.effective_type_id, name, &action_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, union_md.effective_type_id, name, &action_md) != NO_ERROR) {
         return PSABPF_INVALID_ACTION_ID;
+    }
 
     return action_md.index;
 }
 
 int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
 {
-    if (action == NULL || param == NULL)
+    if (action == NULL || param == NULL) {
         return EINVAL;
-    if (param->data == NULL && param->len != 0)
+    }
+    if (param->data == NULL && param->len != 0) {
         return ENODATA;
+    }
 
-    if (param->len == 0)
+    if (param->len == 0) {
         return NO_ERROR;
+    }
 
     size_t new_size = (action->n_params + 1) * sizeof(psabpf_action_param_t);
     psabpf_action_param_t * tmp = malloc(new_size);
 
     if (tmp == NULL) {
-        if (param->data != NULL)
+        if (param->data != NULL) {
             free(param->data);
+        }
         param->data = NULL;
         return ENOMEM;
     }
@@ -928,8 +1029,9 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
     if (action->n_params != 0) {
         memcpy(tmp, action->params, (action->n_params) * sizeof(psabpf_action_param_t));
     }
-    if (action->params != NULL)
+    if (action->params != NULL) {
         free(action->params);
+    }
     action->params = tmp;
 
     memcpy(&(action->params[action->n_params]), param, sizeof(psabpf_action_param_t));
@@ -945,17 +1047,19 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
 
 uint32_t psabpf_action_get_id(psabpf_table_entry_t *entry)
 {
-    if (entry == NULL)
+    if (entry == NULL) {
         return 0;
+    }
 
-    if (entry->action == NULL)
+    if (entry->action == NULL) {
         return 0;
+    }
     return entry->action->action_id;
 }
 
 const char *psabpf_action_get_name(psabpf_table_entry_ctx_t *ctx, uint32_t action_id)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return NULL;
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         return NULL;
@@ -967,12 +1071,14 @@ const char *psabpf_action_get_name(psabpf_table_entry_ctx_t *ctx, uint32_t actio
     }
 
     psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, action_id, &action_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, action_id, &action_md) != NO_ERROR) {
         return NULL;
+    }
 
     const char *type_name = btf__name_by_offset(ctx->btf_metadata.btf, action_md.member->name_off);
-    if (type_name != NULL && type_name[0] == '\0')
+    if (type_name != NULL && type_name[0] == '\0') {
         return NULL;
+    }
 
     return type_name;
 }
@@ -994,9 +1100,9 @@ static int write_buffer_btf(char *buffer, size_t buffer_len, size_t offset,
                 dst_type, buffer_len, offset, data_len, data_type_len);
         return EAGAIN;
     }
-    if (flags == WRITE_HOST_ORDER)
+    if (flags == WRITE_HOST_ORDER) {
         memcpy(buffer + offset, data, data_len);
-    else if (flags == WRITE_NETWORK_ORDER) {
+    } else if (flags == WRITE_NETWORK_ORDER) {
         for (size_t i = 0; i < data_len; i++) {
             buffer[offset + data_type_len - 1 - i] = ((char *) data)[i];
         }
@@ -1030,8 +1136,9 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
 
         if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
             /* copy data in network byte order (in reverse order) */
-            for (size_t k = 0; k < mk->key_size; ++k)
+            for (size_t k = 0; k < mk->key_size; ++k) {
                 buffer[k] = ((char *) (mk->data))[mk->key_size - k - 1];
+            }
         } else {
             memcpy(buffer, mk->data, mk->key_size);
         }
@@ -1039,9 +1146,9 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
         /* Write prefix length for every field, so overwrite previous value */
         if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
             uint32_t prefix_len = mk->key_size * 8;
-            if (mk->type == PSABPF_LPM)
+            if (mk->type == PSABPF_LPM) {
                 prefix_len = mk->u.lpm.prefix_len;
-            else if (mk->type == PSABPF_TERNARY) {
+            } else if (mk->type == PSABPF_TERNARY) {
                 fprintf(stderr, "ternary key is not allowed for this table\n");
                 return EINVAL;
             }
@@ -1060,17 +1167,21 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     return NO_ERROR;
 }
 
-static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_type *key_type, uint32_t key_type_id) {
-    if (btf_kind(key_type) != BTF_KIND_STRUCT)
+static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_type *key_type, uint32_t key_type_id)
+{
+    if (btf_kind(key_type) != BTF_KIND_STRUCT) {
         return false;
+    }
 
     int entries = btf_vlen(key_type);
-    if (entries != 1)
+    if (entries != 1) {
         return false;
+    }
 
     psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, key_type_id, "__dummy_table_key", &action_md) == NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, key_type_id, "__dummy_table_key", &action_md) == NO_ERROR) {
         return true;
+    }
 
     return false;
 }
@@ -1078,11 +1189,13 @@ static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_t
 int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     uint32_t key_type_id = ctx->table.key_type_id;
-    if (key_type_id == 0)
+    if (key_type_id == 0) {
         return EAGAIN;
+    }
     const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, key_type_id);
-    if (key_type == NULL)
+    if (key_type == NULL) {
         return EAGAIN;
+    }
 
     if (btf_kind(key_type) == BTF_KIND_INT) {
         if (entry->n_keys != 1) {
@@ -1104,8 +1217,9 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
             /* Omit prefix length */
             --expected_entries;
             /* Get prefix metadata */
-            if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, key_type_id, 0, &prefix_md) != NO_ERROR)
+            if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, key_type_id, 0, &prefix_md) != NO_ERROR) {
                 return EAGAIN;
+            }
         }
         if (is_table_dummy_key(ctx, key_type, key_type_id)) {
             /* Preserve zeroed bytes if table do not define key */
@@ -1118,36 +1232,40 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
         }
 
         for (unsigned member_idx = 0, key_idx = 0; member_idx < entries; member_idx++, member++) {
-            if (member_idx == 0 && ctx->table.type == BPF_MAP_TYPE_LPM_TRIE)
+            if (member_idx == 0 && ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
                 continue;  /* skip prefix length */
+            }
 
             /* assume that every field is byte aligned */
             unsigned offset = btf_member_bit_offset(key_type, member_idx) / 8;
             psabpf_match_key_t *mk = entry->match_keys[key_idx];
             int ret = 0, flags = WRITE_HOST_ORDER;
 
-            if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM)
+            if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
                 flags = WRITE_NETWORK_ORDER;
+            }
             ret = write_buffer_btf(buffer, ctx->table.key_size, offset, mk->data, mk->key_size,
                                    ctx, member->type, "key", flags);
-            if (ret != NO_ERROR)
+            if (ret != NO_ERROR) {
                 return ret;
+            }
 
             /* write prefix value for LPM field */
             if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
                 /* LPM field have to be last field in the key structure, so we can assume that whole key must match for other keys */
                 uint32_t prefix_value = ctx->table.key_size * 8 - 32;
-                if (mk->type == PSABPF_LPM)
+                if (mk->type == PSABPF_LPM) {
                     prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
-                else if (mk->type == PSABPF_TERNARY) {
+                } else if (mk->type == PSABPF_TERNARY) {
                     fprintf(stderr, "ternary key is not allowed for this table\n");
                     return EINVAL;
                 }
                 ret = write_buffer_btf(buffer, ctx->table.key_size, prefix_md.bit_offset / 8,
                                        &prefix_value, sizeof(prefix_value), ctx,
                                        prefix_md.effective_type_id, "prefix", WRITE_HOST_ORDER);
-                if (ret != NO_ERROR)
+                if (ret != NO_ERROR) {
                     return ret;
+                }
             }
 
             ++key_idx;
@@ -1225,8 +1343,9 @@ static int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx,
 static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx,
                          psabpf_table_entry_t *entry, uint32_t value_type_id)
 {
-    if (ctx->is_ternary == false)
+    if (ctx->is_ternary == false) {
         return NO_ERROR;
+    }
 
     psabtf_struct_member_md_t priority_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "priority", &priority_md) != NO_ERROR) {
@@ -1275,8 +1394,9 @@ static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx,
         int ret = write_buffer_btf(buffer, ctx->table.value_size, base_offset + offset,
                                    entry->action->params[i].data, entry->action->params[i].len,
                                    ctx, member->type, "value", WRITE_HOST_ORDER);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
     }
 
     return NO_ERROR;
@@ -1300,10 +1420,12 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
         const char * member_name = btf__name_by_offset(ctx->btf_metadata.btf, member->name_off);
 
         /* skip errors, non-int members and reserved names */
-        if (member_name == NULL || btf_kind(member_type) != BTF_KIND_INT)
+        if (member_name == NULL || btf_kind(member_type) != BTF_KIND_INT) {
             continue;
-        if (strcmp(member_name, "priority") == 0 || strcmp(member_name, "action") == 0)
+        }
+        if (strcmp(member_name, "priority") == 0 || strcmp(member_name, "action") == 0) {
             continue;
+        }
 
         if (str_ends_with(member_name, "_is_group_ref")) {
             offset = btf_member_bit_offset(value_type, i) / 8;
@@ -1311,8 +1433,9 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
                                    &(current_data->is_group_reference),
                                    sizeof(current_data->is_group_reference),
                                    ctx, member->type, "reference type", WRITE_HOST_ORDER);
-            if (ret != NO_ERROR)
+            if (ret != NO_ERROR) {
                 return ret;
+            }
             continue;
         }
         if (entry_ref_used) {
@@ -1327,13 +1450,15 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
         offset = btf_member_bit_offset(value_type, i) / 8;
         ret = write_buffer_btf(buffer, ctx->table.value_size, offset, current_data->data,
                                current_data->len, ctx, member->type, "reference", WRITE_HOST_ORDER);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
         /* cppcheck-suppress redundantAssignment ; cppcheck failed to properly understand the algorithm */
         entry_ref_used = true;
     }
-    if (entry_ref_used)
+    if (entry_ref_used) {
         used_params++;
+    }
     if (used_params != entry->action->n_params) {
         fprintf(stderr, "too many member/group references\n");
         return EAGAIN;
@@ -1347,11 +1472,13 @@ static int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psa
     int ret;
 
     uint32_t value_type_id = ctx->table.value_type_id;
-    if (value_type_id == 0)
+    if (value_type_id == 0) {
         return EAGAIN;
+    }
     const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_type_id);
-    if (value_type == NULL)
+    if (value_type == NULL) {
         return EAGAIN;
+    }
 
     if (btf_kind(value_type) != BTF_KIND_STRUCT) {
         fprintf(stderr, "expected struct as a map value\n");
@@ -1360,21 +1487,25 @@ static int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psa
 
     if (ctx->is_indirect == false) {
         ret = fill_action_id(buffer, ctx, entry, value_type_id);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
 
         ret = fill_action_data(buffer, ctx, entry, value_type_id);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
     } else {
         ret = fill_action_references(buffer, ctx, entry, value_type);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
     }
 
     ret = fill_priority(buffer, ctx, entry, value_type_id);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     return NO_ERROR;
 }
@@ -1383,8 +1514,9 @@ static int lpm_prefix_to_mask(char * buffer, size_t buffer_len, uint32_t prefix,
 {
     unsigned ff_bytes = prefix / 8;
     size_t bytes_to_write = ff_bytes;
-    if (prefix % 8 != 0)
+    if (prefix % 8 != 0) {
         ++bytes_to_write;
+    }
 
     if (bytes_to_write > data_len || bytes_to_write > buffer_len) {
         fprintf(stderr, "LPM prefix too long\n");
@@ -1416,15 +1548,17 @@ static int fill_key_mask_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *c
         } else if (mk->type == PSABPF_LPM) {
             data_len = mk->key_size;
             int ret = lpm_prefix_to_mask(buffer, bytes_to_write, mk->u.lpm.prefix_len, data_len);
-            if (ret != NO_ERROR)
+            if (ret != NO_ERROR) {
                 return ret;
+            }
         } else if (mk->type == PSABPF_TERNARY) {
             if (mk->u.ternary.mask_size > bytes_to_write) {
                 fprintf(stderr, "provided ternary key mask is too long\n");
                 return EPERM;
             }
-            if (mk->u.ternary.mask_size != mk->key_size)
+            if (mk->u.ternary.mask_size != mk->key_size) {
                 fprintf(stderr, "warning: key and its mask have different length\n");
+            }
             data_len = mk->u.ternary.mask_size;
             memcpy(buffer, mk->u.ternary.mask, data_len);
         } else {
@@ -1452,10 +1586,12 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
     }
 
     const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, ctx->table.key_type_id);
-    if (key_type == NULL)
+    if (key_type == NULL) {
         return EAGAIN;
-    if (btf_kind(key_type) != BTF_KIND_STRUCT)
+    }
+    if (btf_kind(key_type) != BTF_KIND_STRUCT) {
         return EAGAIN;
+    }
 
     const struct btf_member *member = btf_members(key_type);
     unsigned entries = btf_vlen(key_type);
@@ -1466,8 +1602,9 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
 
     /* Prepare temporary mask buffer for current field. Every field size <= key_size */
     char * tmp_mask = malloc(ctx->table.key_size);
-    if (tmp_mask == NULL)
+    if (tmp_mask == NULL) {
         return ENOMEM;
+    }
 
     int ret = EAGAIN;
     for (unsigned i = 0; i < entries; i++, member++) {
@@ -1478,8 +1615,9 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
         ret = EAGAIN;
         memset(tmp_mask, 0, ctx->table.key_size);
         if (mk->type == PSABPF_EXACT) {
-            if (size > ctx->table.key_size)
+            if (size > ctx->table.key_size) {
                 break;
+            }
             memset(tmp_mask, 0xFF, size);
             ret = write_buffer_btf(buffer, ctx->prefixes.key_size, offset, tmp_mask, size,
                                    ctx, member->type, "exact mask key", WRITE_HOST_ORDER);
@@ -1498,8 +1636,9 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
             fprintf(stderr, "unsupported key mask type\n");
         }
 
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             break;
+        }
     }
     free(tmp_mask);
 
@@ -1517,8 +1656,9 @@ int construct_buffer(char * buffer, size_t buffer_len,
     if (ctx->btf_metadata.btf != NULL && (ctx->table.value_type_id != 0 || ctx->table.key_type_id != 0)) {
         memset(buffer, 0, buffer_len);
         return_code = btf_info_func(buffer, ctx, entry);
-        if (return_code == EAGAIN)
+        if (return_code == EAGAIN) {
             fprintf(stderr, "falling back to byte by byte mode\n");
+        }
     }
     if (return_code == EAGAIN) {
         memset(buffer, 0, buffer_len);
@@ -1533,14 +1673,16 @@ static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_
     /* 1. Entry provided - build counter based on it (on update and add)
      * 2. Entry not provided - init to zero on add (already done), on update copy old value */
 
-    if (ctx->n_direct_counters == 0)
+    if (ctx->n_direct_counters == 0) {
         return NO_ERROR;
+    }
 
     if (bpf_flags == BPF_EXIST) {
         char *old_value_buffer = NULL;
         old_value_buffer = malloc(map->value_size);
-        if (old_value_buffer == NULL)
+        if (old_value_buffer == NULL) {
             return ENOMEM;
+        }
         memset(old_value_buffer, 0, map->value_size);
 
         int err = bpf_map_lookup_elem(map->fd, key, old_value_buffer);
@@ -1556,14 +1698,16 @@ static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_
                    ctx->direct_counters_ctx[i].counter_size);
         }
 
-        if (old_value_buffer != NULL)
+        if (old_value_buffer != NULL) {
             free(old_value_buffer);
+        }
     }
 
     for (unsigned i = 0; i < entry->n_direct_counters; i++) {
         unsigned idx = entry->direct_counters[i].counter_idx;
-        if (idx >= ctx->n_direct_counters)
+        if (idx >= ctx->n_direct_counters) {
             return EINVAL;
+        }
         psabpf_direct_counter_context_t *dc_ctx = &ctx->direct_counters_ctx[idx];
         psabpf_counter_context_t counter_ctx = {
                 .counter_type = dc_ctx->counter_type,
@@ -1571,8 +1715,9 @@ static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_
         };
         int ret = convert_counter_entry_to_data(&counter_ctx, &entry->direct_counters[i].counter,
                                                 value + ctx->direct_counters_ctx[i].counter_offset);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
     }
 
     return NO_ERROR;
@@ -1584,11 +1729,13 @@ static int handle_direct_meter_write(char *value, psabpf_table_entry_ctx_t *ctx,
 
     for (unsigned i = 0; i < entry->n_direct_meters; i++) {
         unsigned idx = entry->direct_meters[i].meter_idx;
-        if (idx >= ctx->n_direct_meters)
+        if (idx >= ctx->n_direct_meters) {
             return EINVAL;
+        }
         psabpf_direct_meter_context_t *dm_ctx = &ctx->direct_meters_ctx[idx];
-        if (dm_ctx->meter_size != DIRECT_METER_SIZE)
+        if (dm_ctx->meter_size != DIRECT_METER_SIZE) {
             return EINVAL;
+        }
 
         convert_meter_entry_to_data(&entry->direct_meters[i].meter,
                                     (psabpf_meter_data_t *) (value + dm_ctx->meter_offset));
@@ -1605,8 +1752,9 @@ static int handle_direct_objects_write(const char *key, char *value, psabpf_bpf_
     }
 
     int ret = handle_direct_meter_write(value, ctx, entry);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     return handle_direct_counter_write(key, value, map, ctx, entry, bpf_flags);
 }
@@ -1632,28 +1780,33 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
     md->next_mask_offset = ctx->table.key_size > 4 ? 8 : 4;  /* after tuple_id field */
     md->has_next_offset = md->next_mask_offset + md->next_mask_size;  /* after next_mask field */
 
-    if (ctx->btf_metadata.btf == NULL || ctx->prefixes.value_type_id == 0)
+    if (ctx->btf_metadata.btf == NULL || ctx->prefixes.value_type_id == 0) {
         return NO_ERROR;
+    }
 
     uint32_t type_id = ctx->prefixes.value_type_id;
-    if (type_id == 0)
+    if (type_id == 0) {
         return EPERM;
+    }
 
     /* tuple id */
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "tuple_id", &member) != NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "tuple_id", &member) != NO_ERROR) {
         return EPERM;
+    }
     md->tuple_id_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
     md->tuple_id_offset = member.bit_offset / 8;
 
     /* next mask */
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "next_tuple_mask", &member) != NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "next_tuple_mask", &member) != NO_ERROR) {
         return EPERM;
+    }
     md->next_mask_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
     md->next_mask_offset = member.bit_offset / 8;
 
     /* has next */
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "has_next", &member) != NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "has_next", &member) != NO_ERROR) {
         return EPERM;
+    }
     md->has_next_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
     md->has_next_offset = member.bit_offset / 8;
 
@@ -1701,8 +1854,9 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
     /* Iterate over every prefix to the last one */
     while (true) {
         uint8_t has_next = *((uint8_t *) (value + prefix_md.has_next_offset));
-        if (has_next == 0)
+        if (has_next == 0) {
             break;
+        }
 
         /* Get next prefix */
         memcpy(key, value + prefix_md.next_mask_offset, prefix_md.next_mask_size);
@@ -1715,31 +1869,36 @@ static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
 
         /* Find highest tuple id */
         uint32_t current_tuple_id = *((uint32_t *) (value + prefix_md.tuple_id_offset));
-        if (current_tuple_id > tuple_id)
+        if (current_tuple_id > tuple_id) {
             tuple_id = current_tuple_id;
+        }
     }
 
     /* First add new prefix to avoid data inconsistency */
     memset(prefix_value, 0, ctx->prefixes.value_size);
     *((uint32_t *) (prefix_value + prefix_md.tuple_id_offset)) = ++tuple_id;
     err = bpf_map_update_elem(ctx->prefixes.fd, new_prefix, prefix_value, BPF_NOEXIST);
-    if (err != 0)
+    if (err != 0) {
         goto clean_up;
+    }
 
     /* Update previous node */
     memcpy(value + prefix_md.next_mask_offset, new_prefix, prefix_md.next_mask_size);
     *((uint8_t *) (value + prefix_md.has_next_offset)) = 1;
     err = bpf_map_update_elem(ctx->prefixes.fd, key, value, BPF_ANY);
-    if (err != 0)
+    if (err != 0) {
         goto clean_up;
+    }
 
     err = NO_ERROR;
 
 clean_up:
-    if (key != NULL)
+    if (key != NULL) {
         free(key);
-    if (value != NULL)
+    }
+    if (value != NULL) {
         free(value);
+    }
 
     return err;
 }
@@ -1805,8 +1964,9 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
 
     err = construct_buffer(*key_mask, ctx->prefixes.key_size, ctx, entry,
                            fill_key_mask_btf, fill_key_mask_byte_by_byte);
-    if (err != NO_ERROR)
+    if (err != NO_ERROR) {
         goto clean_up;
+    }
 
     /* prefixes head protection - check whether mask is different from all 0 */
     bool mask_is_valid = false;
@@ -1859,8 +2019,9 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     }
 
 clean_up:
-    if (value_mask != NULL)
+    if (value_mask != NULL) {
         free(value_mask);
+    }
 
     return err;
 }
@@ -1868,8 +2029,9 @@ clean_up:
 static void ternary_table_close_tuple(psabpf_table_entry_ctx_t *ctx)
 {
     /* Allow for reuse table context with the same table but other tuple (inner map). */
-    if (ctx->is_ternary)
+    if (ctx->is_ternary) {
         close_object_fd(&(ctx->table.fd));
+    }
 }
 
 int delete_all_map_entries(psabpf_bpf_map_descriptor_t *map)
@@ -1887,8 +2049,9 @@ int delete_all_map_entries(psabpf_bpf_map_descriptor_t *map)
         goto clean_up;
     }
 
-    if (bpf_map_get_next_key(map->fd, NULL, next_key) != 0)
+    if (bpf_map_get_next_key(map->fd, NULL, next_key) != 0) {
         goto clean_up;  /* table empty */
+    }
     do {
         /* Swap buffers, so next_key will become key and next_key may be reused */
         char * tmp_key = next_key;
@@ -1899,26 +2062,31 @@ int delete_all_map_entries(psabpf_bpf_map_descriptor_t *map)
          * but entry not exists (e.g. array map in map). So in any case we have to
          * iterate over all keys and try to delete it. It is not possible to remove
          * entry from array map, in such case reset entries to zero value. */
-        if (map->type == BPF_MAP_TYPE_ARRAY)
+        if (map->type == BPF_MAP_TYPE_ARRAY) {
             bpf_map_update_elem(map->fd, key, value, BPF_ANY);
-        else
+        } else {
             bpf_map_delete_elem(map->fd, key);
+        }
     } while (bpf_map_get_next_key(map->fd, key, next_key) == 0);
 
 clean_up:
-    if (key)
+    if (key) {
         free(key);
-    if (next_key)
+    }
+    if (next_key) {
         free(next_key);
-    if (value)
+    }
+    if (value) {
         free(value);
+    }
     return error_code;
 }
 
 int clear_table_cache(psabpf_bpf_map_descriptor_t *map)
 {
-    if (map == NULL || map->fd < 0)
+    if (map == NULL || map->fd < 0) {
         return NO_ERROR;
+    }
 
     fprintf(stderr, "clearing table cache: ");
     return delete_all_map_entries(map);
@@ -1931,13 +2099,15 @@ static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
 
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return EINVAL;
+    }
 
     if (ctx->is_ternary) {
         return_code = ternary_table_open_tuple(ctx, entry, &key_mask_buffer, bpf_flags);
-        if (return_code != NO_ERROR)
+        if (return_code != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     if (ctx->table.fd < 0) {
@@ -1979,8 +2149,9 @@ static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         goto clean_up;
     }
 
-    if (ctx->is_ternary == true && key_mask_buffer != NULL)
+    if (ctx->is_ternary == true && key_mask_buffer != NULL) {
         mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->table.key_size);
+    }
 
     /* Handle direct objects */
     return_code = handle_direct_objects_write(key_buffer, value_buffer, &ctx->table, ctx, entry, bpf_flags);
@@ -1990,8 +2161,9 @@ static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     }
 
     /* update map */
-    if (ctx->table.type == BPF_MAP_TYPE_ARRAY)
+    if (ctx->table.type == BPF_MAP_TYPE_ARRAY) {
         bpf_flags = BPF_ANY;
+    }
     return_code = bpf_map_update_elem(ctx->table.fd, key_buffer, value_buffer, bpf_flags);
     if (return_code != 0) {
         return_code = errno;
@@ -2004,15 +2176,19 @@ static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     }
 
 clean_up:
-    if (key_buffer != NULL)
+    if (key_buffer != NULL) {
         free(key_buffer);
-    if (key_mask_buffer != NULL)
+    }
+    if (key_mask_buffer != NULL) {
         free(key_mask_buffer);
-    if (value_buffer != NULL)
+    }
+    if (value_buffer != NULL) {
         free(value_buffer);
+    }
 
-    if (ctx->is_ternary)
+    if (ctx->is_ternary) {
         ternary_table_close_tuple(ctx);
+    }
 
     return return_code;
 }
@@ -2029,8 +2205,9 @@ int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_
 
 static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, char **key_mask)
 {
-    if (entry->n_keys != 0)
+    if (entry->n_keys != 0) {
         return ternary_table_open_tuple(ctx, entry, key_mask, BPF_EXIST);
+    }
 
     delete_all_map_entries(&ctx->prefixes);
     fprintf(stderr, "removing entries from tuples_map, this may take a while\n");
@@ -2086,11 +2263,13 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, const char
 
         /* get next prefix */
         uint8_t has_next = *((uint8_t *) (prev_value_mask + prefix_md.has_next_offset));
-        if (has_next == 0)
+        if (has_next == 0) {
             break;
+        }
         memcpy(prev_key_mask, prev_value_mask + prefix_md.next_mask_offset, prefix_md.next_mask_size);
-        if (bpf_map_lookup_elem(ctx->prefixes.fd, prev_key_mask, prev_value_mask) != 0)
+        if (bpf_map_lookup_elem(ctx->prefixes.fd, prev_key_mask, prev_value_mask) != 0) {
             break;
+        }
     }
 
     if (prev_prefix_found == false) {
@@ -2111,35 +2290,42 @@ static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, const char
     }
 
     /* there are no prefixes that points to removing prefix, so it can be safely removed now */
-    if (bpf_map_delete_elem(ctx->prefixes.fd, key_mask) != 0)
+    if (bpf_map_delete_elem(ctx->prefixes.fd, key_mask) != 0) {
         fprintf(stderr, "warning: failed to remove prefix from prefixes list\n");
+    }
 
     /* also remove tuple from tuple_map */
     uint32_t tuple_id = *((uint32_t *) (value_mask + prefix_md.tuple_id_offset));
-    if (bpf_map_delete_elem(ctx->tuple_map.fd, &tuple_id) != 0)
+    if (bpf_map_delete_elem(ctx->tuple_map.fd, &tuple_id) != 0) {
         fprintf(stderr, "warning: failed to remove tuple from tuples_map\n");
+    }
 
     /* unpinning not required - inner map is not pinned by this tool*/
 
     err = NO_ERROR;
 
 clean_up:
-    if (prev_key_mask != NULL)
+    if (prev_key_mask != NULL) {
         free(prev_key_mask);
-    if (prev_value_mask != NULL)
+    }
+    if (prev_value_mask != NULL) {
         free(prev_value_mask);
-    if (value_mask != NULL)
+    }
+    if (value_mask != NULL) {
         free(value_mask);
+    }
 
     return err;
 }
 
 static int post_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, const char *key_mask)
 {
-    if (ctx->is_ternary == false || ctx->table.fd < 0)
+    if (ctx->is_ternary == false || ctx->table.fd < 0) {
         return NO_ERROR;
-    if (key_mask == NULL)
+    }
+    if (key_mask == NULL) {
         return ENODATA;
+    }
 
     int err = NO_ERROR;
     char *tuple_next_key = malloc(ctx->table.key_size);
@@ -2155,8 +2341,9 @@ static int post_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, const char *
     }
 
 clean_up:
-    if (tuple_next_key != NULL)
+    if (tuple_next_key != NULL) {
         free(tuple_next_key);
+    }
 
     close_object_fd(&(ctx->table.fd));
     return err;
@@ -2168,8 +2355,9 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     char *key_mask_buffer = NULL;
     int return_code = NO_ERROR;
 
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return EINVAL;
+    }
 
     if (ctx->is_ternary) {
         return_code = prepare_ternary_table_delete(ctx, entry, &key_mask_buffer);
@@ -2177,8 +2365,9 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
             fprintf(stderr, "failed to prepare ternary table for delete\n");
             goto clean_up;
         }
-        if (entry->n_keys == 0)
+        if (entry->n_keys == 0) {
             goto clean_up;
+        }
     }
 
     if (ctx->table.fd < 0) {
@@ -2192,8 +2381,9 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 
     /* remove all entries from table if key is not present */
     if (entry->n_keys == 0) {
-        if (ctx->table.type == BPF_MAP_TYPE_ARRAY)
+        if (ctx->table.type == BPF_MAP_TYPE_ARRAY) {
             fprintf(stderr, "removing entries from array map may take a while\n");
+        }
         return_code = delete_all_map_entries(&ctx->table);
         if (return_code == NO_ERROR) {
             return_code = clear_table_cache(&ctx->cache);
@@ -2219,8 +2409,9 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         goto clean_up;
     }
 
-    if (ctx->is_ternary == true && key_mask_buffer != NULL)
+    if (ctx->is_ternary == true && key_mask_buffer != NULL) {
         mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->table.key_size);
+    }
 
     /* delete pointed entry */
     return_code = bpf_map_delete_elem(ctx->table.fd, key_buffer);
@@ -2236,13 +2427,16 @@ int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 
 clean_up:
     /* cleanup ternary table */
-    if (ctx->is_ternary)
+    if (ctx->is_ternary) {
         post_ternary_table_delete(ctx, key_mask_buffer);
+    }
 
-    if (key_buffer != NULL)
+    if (key_buffer != NULL) {
         free(key_buffer);
-    if (key_mask_buffer != NULL)
+    }
+    if (key_mask_buffer != NULL) {
         free(key_mask_buffer);
+    }
 
     return return_code;
 }
@@ -2254,8 +2448,9 @@ int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
 
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return EINVAL;
+    }
 
     if (ctx->default_entry.fd < 0) {
         fprintf(stderr, "can't add default entry: table not opened or table has no default entry\n");
@@ -2306,8 +2501,9 @@ int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
     }
 
 clean_up:
-    if (value_buffer != NULL)
+    if (value_buffer != NULL) {
         free(value_buffer);
+    }
 
     return return_code;
 }
@@ -2341,8 +2537,9 @@ static int parse_table_value_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     /* Action data, without BTF we can only return binary blob */
     if (buffer_size > 0) {
         entry->action->params = malloc(sizeof(psabpf_action_param_t));
-        if (entry->action->params == NULL)
+        if (entry->action->params == NULL) {
             return ENOMEM;
+        }
         entry->action->n_params = 1;
         return psabpf_action_param_create(&entry->action->params[0], value, buffer_size);
     }
@@ -2355,51 +2552,62 @@ static int parse_table_value_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_
 {
     /* Get action ID */
     psabtf_struct_member_md_t action_id_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_id_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_id_md) != NO_ERROR) {
         return ENOENT;
+    }
     size_t action_id_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, action_id_md.effective_type_id);
-    if (action_id_size > sizeof(entry->action->action_id))
+    if (action_id_size > sizeof(entry->action->action_id)) {
         return EINVAL;
+    }
     entry->action->action_id = 0;
     memcpy(&entry->action->action_id, value + action_id_md.bit_offset / 8, action_id_size);
 
     /* Get action params */
     psabtf_struct_member_md_t union_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &union_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &union_md) != NO_ERROR) {
         return EINVAL;
+    }
     psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, entry->action->action_id, &action_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, entry->action->action_id, &action_md) != NO_ERROR) {
         return EINVAL;
+    }
 
     const struct btf_type *action_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, action_md.effective_type_id);
-    if (action_type == NULL)
+    if (action_type == NULL) {
         return EINVAL;
-    if (!btf_is_struct(action_type))
+    }
+    if (!btf_is_struct(action_type)) {
         return EINVAL;
+    }
 
     const unsigned number_of_params = btf_vlen(action_type);
-    if (number_of_params == 0)
+    if (number_of_params == 0) {
         return NO_ERROR;
+    }
     entry->action->params = malloc(number_of_params * sizeof(psabpf_action_param_t));
-    if (entry->action->params == NULL)
+    if (entry->action->params == NULL) {
         return ENOMEM;
+    }
     entry->action->n_params = number_of_params;
 
     const size_t base_offset = (union_md.bit_offset + action_md.bit_offset) / 8;
     const struct btf_member *member = btf_members(action_type);
     for (unsigned i = 0; i < number_of_params; i++, member++) {
         psabtf_struct_member_md_t param_md = {};
-        if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, action_md.effective_type_id, i, &param_md) != NO_ERROR)
+        if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, action_md.effective_type_id, i, &param_md) != NO_ERROR) {
             return EINVAL;
+        }
 
         size_t offset = base_offset + param_md.bit_offset / 8;
         size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, param_md.effective_type_id);
-        if (size + offset > ctx->table.value_size)
+        if (size + offset > ctx->table.value_size) {
             return EINVAL;
+        }
         int ret = psabpf_action_param_create(&entry->action->params[i], value + offset, size);
         entry->action->params[i].param_id = i;
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
     }
 
     return NO_ERROR;
@@ -2408,15 +2616,18 @@ static int parse_table_value_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_
 static int parse_table_value_priority(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
                                       const char *value, uint32_t value_type_id)
 {
-    if (ctx->is_ternary == false)
+    if (ctx->is_ternary == false) {
         return NO_ERROR;
+    }
 
     psabtf_struct_member_md_t priority_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "priority", &priority_md) != NO_ERROR)
+    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "priority", &priority_md) != NO_ERROR) {
         return ENOENT;
+    }
     size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, priority_md.effective_type_id);
-    if (size > sizeof(entry->priority))
+    if (size > sizeof(entry->priority)) {
         return EINVAL;
+    }
     entry->priority = 0;
     memcpy(&entry->priority, value + priority_md.bit_offset / 8, size);
 
@@ -2425,12 +2636,14 @@ static int parse_table_value_priority(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
 
 static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
-    if (ctx->n_direct_counters == 0)
+    if (ctx->n_direct_counters == 0) {
         return NO_ERROR;
+    }
 
     entry->direct_counters = malloc(ctx->n_direct_counters * sizeof(psabpf_direct_counter_entry_t));
-    if (entry->direct_counters == NULL)
+    if (entry->direct_counters == NULL) {
         return ENOMEM;
+    }
 
     for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
         psabpf_counter_entry_init(&entry->direct_counters[i].counter);
@@ -2447,12 +2660,14 @@ static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabp
 
 static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
-    if (ctx->n_direct_meters == 0)
+    if (ctx->n_direct_meters == 0) {
         return NO_ERROR;
+    }
 
     entry->direct_meters = malloc(ctx->n_direct_meters * sizeof(psabpf_direct_meter_entry_t));
-    if (entry->direct_meters == NULL)
+    if (entry->direct_meters == NULL) {
         return ENOMEM;
+    }
 
     for (unsigned i = 0; i < ctx->n_direct_meters; i++) {
         psabpf_meter_entry_init(&entry->direct_meters[i].meter);
@@ -2468,12 +2683,14 @@ static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_
 static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     int ret = parse_table_value_direct_counter(ctx, entry, value);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     ret = parse_table_value_direct_meter(ctx, entry, value);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     return NO_ERROR;
 }
@@ -2481,12 +2698,14 @@ static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabp
 static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     unsigned number_of_implementations = ctx->table_implementations.n_fields;
-    if (number_of_implementations < 1)
+    if (number_of_implementations < 1) {
         return NO_ERROR;
+    }
 
     entry->action->params = malloc(number_of_implementations * sizeof(psabpf_action_param_t));
-    if (entry->action->params == NULL)
+    if (entry->action->params == NULL) {
         return ENOMEM;
+    }
     entry->action->n_params = number_of_implementations;
 
     for (unsigned i = 0; i < number_of_implementations; i++) {
@@ -2498,8 +2717,9 @@ static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_ta
         if (ctx->table_implementation_group_marks.fields[i].type == PSABPF_STRUCT_FIELD_TYPE_DATA) {
             /* Has group mark */
             const uint32_t *is_group = (uint32_t *) (value + ctx->table_implementation_group_marks.fields[i].data_offset);
-            if (*is_group != 0)
+            if (*is_group != 0) {
                 entry->action->params[i].is_group_reference = true;
+            }
         }
     }
 
@@ -2510,26 +2730,31 @@ static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
 {
     int ret;
     uint32_t value_type_id = ctx->table.value_type_id;
-    if (value_type_id == 0)
+    if (value_type_id == 0) {
         return ENOENT;
+    }
 
     if (ctx->is_indirect == false) {
         ret = parse_table_value_action(ctx, entry, value, value_type_id);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
     } else {
         ret = parse_table_value_references(ctx, entry, value);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
     }
 
     ret = parse_table_value_priority(ctx, entry, value, value_type_id);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     ret = parse_table_value_direct_objects(ctx, entry, value);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     return NO_ERROR;
 }
@@ -2537,8 +2762,9 @@ static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
 static int parse_table_value(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
     entry->action = malloc(sizeof(psabpf_action_t));
-    if (entry->action == NULL)
+    if (entry->action == NULL) {
         return ENOMEM;
+    }
     psabpf_action_init(entry->action);
 
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
@@ -2555,8 +2781,9 @@ int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
 
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return EINVAL;
+    }
 
     if (entry->n_keys == 0 || entry->match_keys == NULL) {
         fprintf(stderr, "can't get entry: missing key\n");
@@ -2565,8 +2792,9 @@ int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 
     if (ctx->is_ternary) {
         return_code = ternary_table_open_tuple(ctx, entry, &key_mask_buffer, BPF_EXIST);
-        if (return_code != NO_ERROR)
+        if (return_code != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     if (ctx->table.fd < 0) {
@@ -2605,8 +2833,9 @@ int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
         fprintf(stderr, "failed to construct key\n");
         goto clean_up;
     }
-    if (ctx->is_ternary == true && key_mask_buffer != NULL)
+    if (ctx->is_ternary == true && key_mask_buffer != NULL) {
         mem_bitwise_and((uint32_t *) key_buffer, (uint32_t *) key_mask_buffer, ctx->table.key_size);
+    }
 
     return_code = bpf_map_lookup_elem(ctx->table.fd, key_buffer, value_buffer);
     if (return_code != 0) {
@@ -2619,19 +2848,24 @@ int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
 
     /* Parse value */
     return_code = parse_table_value(ctx, entry, value_buffer);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to parse entry: %s\n", strerror(return_code));
+    }
 
 clean_up:
-    if (key_buffer != NULL)
+    if (key_buffer != NULL) {
         free(key_buffer);
-    if (key_mask_buffer != NULL)
+    }
+    if (key_mask_buffer != NULL) {
         free(key_mask_buffer);
-    if (value_buffer != NULL)
+    }
+    if (value_buffer != NULL) {
         free(value_buffer);
+    }
 
-    if (ctx->is_ternary)
+    if (ctx->is_ternary) {
         ternary_table_close_tuple(ctx);
+    }
 
     return return_code;
 }
@@ -2670,13 +2904,15 @@ static enum psabpf_matchkind_t decode_key_field_type_btf_info(psabpf_table_entry
     if (ctx->is_ternary) {
         /* LPM is not distinguishable from ternary field. Exact can be detected when mask has all-set bits. */
         for (size_t i = 0; i < field_len; ++i) {
-            if (*((uint8_t *)(field_mask + i)) != 0xFF)
+            if (*((uint8_t *)(field_mask + i)) != 0xFF) {
                 return PSABPF_TERNARY;
+            }
         }
     } else if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
         /* Last field is lpm, others are exact. */
-        if (field_id + 1 == type_fields)
+        if (field_id + 1 == type_fields) {
             return PSABPF_LPM;
+        }
     }
 
     return PSABPF_EXACT;
@@ -2685,9 +2921,9 @@ static enum psabpf_matchkind_t decode_key_field_type_btf_info(psabpf_table_entry
 static int parse_table_key_add_key_field(psabpf_table_entry_t *entry, int field_type, const char *field_data,
                                          const char *field_mask, uint32_t prefix, size_t field_len)
 {
-    if (field_len < 1)
+    if (field_len < 1) {
         return ENODATA;
-
+    }
     psabpf_match_key_t mk;
     psabpf_matchkey_init(&mk);
 
@@ -2716,11 +2952,13 @@ static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_
                                     const char *key, const char *key_mask)
 {
     uint32_t key_type_id = ctx->table.key_type_id;
-    if (key_type_id == 0)
+    if (key_type_id == 0) {
         return EINVAL;
+    }
     const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, key_type_id);
-    if (key_type == NULL)
+    if (key_type == NULL) {
         return EINVAL;
+    }
 
     if (btf_kind(key_type) == BTF_KIND_INT) {
         int field_type = decode_key_field_type_btf_info(ctx, key_mask, ctx->table.key_size, 1, 0);
@@ -2732,8 +2970,9 @@ static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         return parse_table_key_add_key_field(entry, field_type, key, key_mask, prefix, ctx->table.key_size);
     }
 
-    if (btf_kind(key_type) != BTF_KIND_STRUCT)
+    if (btf_kind(key_type) != BTF_KIND_STRUCT) {
         return EINVAL;
+    }
 
     const struct btf_member *member = btf_members(key_type);
     unsigned entries = btf_vlen(key_type);
@@ -2744,8 +2983,9 @@ static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_
             global_prefix = *((uint32_t *) key);
             continue;
         }
-        if (is_table_dummy_key(ctx, key_type, key_type_id))
+        if (is_table_dummy_key(ctx, key_type, key_type_id)) {
             continue;
+        }
 
         /* assume that every field is byte aligned */
         unsigned offset = btf_member_bit_offset(key_type, member_idx) / 8;
@@ -2754,8 +2994,9 @@ static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         uint32_t prefix = global_prefix + 32 - offset * 8;
 
         int ret = parse_table_key_add_key_field(entry, field_type, key + offset, key_mask + offset, prefix, member_size);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
     }
 
     return NO_ERROR;
@@ -2781,15 +3022,17 @@ static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
     uint32_t inner_map_id;
     struct ternary_table_prefix_metadata prefix_md;
 
-    if ((ret_code = get_ternary_table_prefix_md(ctx, &prefix_md)) != NO_ERROR)
+    if ((ret_code = get_ternary_table_prefix_md(ctx, &prefix_md)) != NO_ERROR) {
         return ret_code;
+    }
 
     prefix_value = malloc(ctx->prefixes.value_size);
     next_key = malloc(ctx->table.key_size);
 
     /* Iterate in order assumed by data plane algorithm */
-    if (ctx->current_raw_key_mask == NULL)
+    if (ctx->current_raw_key_mask == NULL) {
         ctx->current_raw_key_mask = calloc(1, ctx->prefixes.key_size);
+    }
 
     if (prefix_value == NULL || next_key == NULL || ctx->current_raw_key_mask == NULL) {
         ret_code = ENOMEM;
@@ -2799,8 +3042,9 @@ static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
     for (unsigned i = 0; i < ctx->prefixes.max_entries; ++i) {
         /* Let's see if current mask has next key entry. */
         if (ctx->table.fd >= 0) {
-            if (bpf_map_get_next_key(ctx->table.fd, ctx->current_raw_key, next_key) == 0)
+            if (bpf_map_get_next_key(ctx->table.fd, ctx->current_raw_key, next_key) == 0) {
                 break;
+            }
         }
 
         /* No next key, get current mask metadata. */
@@ -2810,12 +3054,14 @@ static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
         }
         has_next_mask = *((uint8_t *) (prefix_value + prefix_md.has_next_offset));
 
-        if (has_next_mask == 0)
+        if (has_next_mask == 0) {
             break;
+        }
 
         /* Restart get next key for next tuple. */
-        if (ctx->current_raw_key != NULL)
+        if (ctx->current_raw_key != NULL) {
             free(ctx->current_raw_key);
+        }
         ctx->current_raw_key = NULL;
 
         /* Go to the next tuple. */
@@ -2834,10 +3080,12 @@ static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
     }
 
 clean_up:
-    if (prefix_value != NULL)
+    if (prefix_value != NULL) {
         free(prefix_value);
-    if (next_key != NULL)
+    }
+    if (next_key != NULL) {
         free(next_key);
+    }
 
     if (ret_code != NO_ERROR && ctx->current_raw_key_mask != NULL) {
         free(ctx->current_raw_key_mask);
@@ -2850,13 +3098,15 @@ clean_up:
 int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
     void *next_key = NULL; /* do not free */
 
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return ENODATA;
+    }
 
     if (ctx->is_ternary) {
         if (get_next_ternary_table_key_mask(ctx) != NO_ERROR) {
-            if (ctx->table.fd < 0)
+            if (ctx->table.fd < 0) {
                 return NO_ERROR;  /* Silently ignore error when table is empty */
+            }
             fprintf(stderr, "failed to iterate over table key masks\n");
             return ENODATA;
         }
@@ -2879,20 +3129,24 @@ int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
 
     if (bpf_map_get_next_key(ctx->table.fd, ctx->current_raw_key, next_key) != 0) {
         /* restart iteration */
-        if (ctx->is_ternary)
+        if (ctx->is_ternary) {
             ternary_table_close_tuple(ctx);
-        if (ctx->current_raw_key != NULL)
+        }
+        if (ctx->current_raw_key != NULL) {
             free(ctx->current_raw_key);
+        }
         ctx->current_raw_key = NULL;
-        if (ctx->current_raw_key_mask != NULL)
+        if (ctx->current_raw_key_mask != NULL) {
             free(ctx->current_raw_key_mask);
+        }
         ctx->current_raw_key_mask = NULL;
 
         return ENODATA;
     }
 
-    if (ctx->current_raw_key != NULL)
+    if (ctx->current_raw_key != NULL) {
         free(ctx->current_raw_key);
+    }
     ctx->current_raw_key = next_key;
 
     return NO_ERROR;
@@ -2903,8 +3157,9 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
     psabpf_table_entry_t *ret_instance = NULL;
     char *value_buffer = NULL;
 
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return NULL;
+    }
 
     if (psabpf_table_entry_goto_next_key(ctx) != NO_ERROR) {
         /* Error or no next key */
@@ -2944,8 +3199,9 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
     ret_instance = &ctx->current_entry;
 
 clean_up:
-    if (value_buffer)
+    if (value_buffer) {
         free(value_buffer);
+    }
 
     return ret_instance;
 }
@@ -2956,8 +3212,9 @@ int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
 
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return EINVAL;
+    }
 
     if (ctx->default_entry.fd < 0) {
         fprintf(stderr, "can't get default entry: table not opened or not exists\n");
@@ -2989,12 +3246,14 @@ int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
 
     /* Parse value */
     return_code = parse_table_value(ctx, entry, value_buffer);
-    if (return_code != NO_ERROR)
+    if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to parse default entry: %s\n", strerror(return_code));
+    }
 
 clean_up:
-    if (value_buffer != NULL)
+    if (value_buffer != NULL) {
         free(value_buffer);
+    }
 
     return return_code;
 }
