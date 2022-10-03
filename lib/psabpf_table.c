@@ -899,6 +899,7 @@ const char *psabpf_action_param_get_name(psabpf_table_entry_ctx_t *ctx, psabpf_t
 {
     if (ctx == NULL || entry == NULL || param == NULL) {
         return NULL;
+    }
     if (entry->action == NULL || ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         return NULL;
     }
@@ -985,6 +986,7 @@ uint32_t psabpf_table_get_action_id_by_name(psabpf_table_entry_ctx_t *ctx, const
 {
     if (ctx == NULL || name == NULL) {
         return PSABPF_INVALID_ACTION_ID;
+    }
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0 || ctx->is_indirect) {
         return PSABPF_INVALID_ACTION_ID;
     }
@@ -1061,6 +1063,7 @@ const char *psabpf_action_get_name(psabpf_table_entry_ctx_t *ctx, uint32_t actio
 {
     if (ctx == NULL) {
         return NULL;
+    }
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         return NULL;
     }
@@ -1211,7 +1214,7 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
         const struct btf_member *member = btf_members(key_type);
         unsigned entries = btf_vlen(key_type);
         unsigned expected_entries = entries;
-        psabtf_struct_member_md_t prefix_md; /* For LPM trie map only */
+        psabtf_struct_member_md_t prefix_md = { 0 }; /* For LPM trie map only */
 
         if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
             /* Omit prefix length */
