@@ -22,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt install -y cppcheck make cmake gcc git libelf-dev zlib1g-dev
+          sudo apt install -y cppcheck make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev
           git submodule update --init libbpf
           ./build_libbpf.sh
 
