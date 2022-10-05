@@ -1,0 +1,25 @@
+name: static checks
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+
+concurrency:
+  # if workflow for PR or push is already running stop it, and start new one
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Run C linter
+        working-directory: ${{github.workspace}}/build
+        run: make clint
