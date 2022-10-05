@@ -29,7 +29,8 @@
 #include "common.h"
 #include "psabpf_table.h"
 
-void psabpf_value_set_context_init(psabpf_value_set_context_t *ctx) {
+void psabpf_value_set_context_init(psabpf_value_set_context_t *ctx)
+{
     if (ctx == NULL) {
         return;
     }
@@ -38,7 +39,8 @@ void psabpf_value_set_context_init(psabpf_value_set_context_t *ctx) {
     init_btf(&ctx->btf_metadata);
 }
 
-void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx) {
+void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx)
+{
     if (ctx == NULL) {
         return;
     }
@@ -101,7 +103,8 @@ int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set
     return NO_ERROR;
 }
 
-psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t *ctx) {
+psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t *ctx)
+{
     psabpf_table_entry_t * new_entry = NULL;
     psabpf_table_entry_ctx_t tec = {
             .table = ctx->set_map,
@@ -151,7 +154,8 @@ clean_up:
     return new_entry;
 }
 
-int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry) {
+int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry)
+{
     char *key_buffer = NULL;
     char *value_buffer = NULL;
     int return_code = NO_ERROR;
@@ -203,8 +207,8 @@ clean_up:
     return return_code;
 }
 
-int psabpf_value_set_delete(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry) {
-
+int psabpf_value_set_delete(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry)
+{
     psabpf_table_entry_ctx_t tec = {
             .table = ctx->set_map,
             .btf_metadata = ctx->btf_metadata,
