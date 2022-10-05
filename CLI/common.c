@@ -195,7 +195,6 @@ static int update_context(const char *data, size_t len, void *ctx, enum destinat
     return EPERM;
 }
 
-/* TODO: Is there any ready to use function for this purpose? */
 static bool is_valid_mac_address(const char * data)
 {
     if (strlen(data) != 2*6+5)  /* 11:22:33:44:55:66 */{
@@ -205,9 +204,9 @@ static bool is_valid_mac_address(const char * data)
     unsigned digits = 0;
     unsigned separators = 0;
     unsigned pos = 0;
-    unsigned separator_pos[] = {2, 5, 8, 11, 14};
+    const unsigned separator_pos[] = {2, 5, 8, 11, 14};
     while (*data) {
-        if (pos == separator_pos[separators]) {
+        if (separators < 5 && pos == separator_pos[separators]) {
             if ((*data != ':') && (*data != '-')) {
                 return false;
             }
@@ -217,12 +216,10 @@ static bool is_valid_mac_address(const char * data)
         } else {
             return false;
         }
-        if (separators > 5 || digits > 12) {
-            return false;
-        }
         data++; pos++;
     }
-    return true;
+
+    return separators == 5 && digits == 12;
 }
 
 static int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
