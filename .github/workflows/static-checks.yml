@@ -7,15 +7,21 @@ on:
 
 concurrency:
   # if workflow for PR or push is already running stop it, and start new one
-  group: build-${{ github.ref }}
+  group: static-checks-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DEBIAN_FRONTEND: noninteractive
+
 jobs:
-  build:
+  linter:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: sudo apt install -y cppcheck
 
       - name: Configure
         run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
