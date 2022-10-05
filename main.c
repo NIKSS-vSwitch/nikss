@@ -181,7 +181,7 @@ int main(int argc, char **argv)
 {
     program_name = argv[0];
 
-    // TODO(osinstom): parse program options
+    /* TODO: parse program options */
 
     argc -= optind;
     argv += optind;
