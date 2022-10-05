@@ -53,6 +53,10 @@ set(PSABPFCTL_SRCS
         CLI/value_set.c
         main.c)
 
+# Use newer version of POSIX - 1995
+add_compile_definitions(_XOPEN_SOURCE=500)
+add_compile_definitions(_GNU_SOURCE)
+
 if (BUILD_SHARED)
   add_library(psabpf SHARED ${PSABPFLIB_SRCS})
   target_link_libraries(psabpf ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
@@ -72,6 +76,12 @@ target_link_libraries(psabpf-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/l
 install(TARGETS psabpf-ctl RUNTIME DESTINATION bin)
 
 # linter
+set(C_LANG_OPTIONS_CHECK
+        -I./include
+        -I./install/usr/include
+        -D_XOPEN_SOURCE=500
+        -D_GNU_SOURCE
+        )
 set(CPPCHECK_CONFIG
         --quiet
         --language=c
@@ -88,6 +98,7 @@ set(CPPCHECK_CHECKS
         )
 set(CLANG_TIDY_CONFIG
         --quiet
+        --extra-arg=-std=c11
         )
 set(CLANG_TIDY_CHECKS
         -checks='*,
@@ -105,8 +116,8 @@ set(CLANG_TIDY_CHECKS
         )
 add_custom_target(clint
         COMMAND echo Running cppcheck
-        COMMAND cppcheck ${CPPCHECK_CONFIG} ${CPPCHECK_CHECKS} -I./include -I./install/usr/include ./CLI ./include ./lib main.c
+        COMMAND cppcheck ${CPPCHECK_CONFIG} ${CPPCHECK_CHECKS} ${C_LANG_OPTIONS_CHECK} ./CLI ./include ./lib main.c
         COMMAND echo Running clang-tidy
-        COMMAND clang-tidy ${CLANG_TIDY_CONFIG} ${CLANG_TIDY_CHECKS} ${PSABPFLIB_SRCS} ${PSABPFCTL_SRCS} -- -I./include -I./install/usr/include
+        COMMAND clang-tidy ${CLANG_TIDY_CONFIG} ${CLANG_TIDY_CHECKS} ${PSABPFLIB_SRCS} ${PSABPFCTL_SRCS} -- ${C_LANG_OPTIONS_CHECK}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "C static checks")

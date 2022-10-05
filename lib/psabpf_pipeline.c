@@ -15,11 +15,6 @@
  * limitations under the License.
  */
 
-/* For ftw.h - use newer function from POSIX 1995. Other functions might be affected
- * if behaviour was changed between this release and default one */
-#define _XOPEN_SOURCE 500
-#define _GNU_SOURCE
-
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <dirent.h>
