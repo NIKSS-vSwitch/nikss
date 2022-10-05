@@ -41,7 +41,8 @@
 
 static char *program_pin_name(struct bpf_program *prog)
 {
-    char *name, *p;
+    char *name = NULL;
+    char *p = NULL;
 
     name = p = strdup(bpf_program__section_name(prog));
     while ((p = strchr(p, '/'))) {
@@ -53,7 +54,8 @@ static char *program_pin_name(struct bpf_program *prog)
 
 static int do_initialize_maps(int prog_fd)
 {
-    char in[128], out[128];
+    char in[128];
+    char out[128];
     /* error in errno (sys call) */
     return bpf_prog_test_run(prog_fd, 1, &in[0], 128,
                              out, NULL, NULL, NULL);
@@ -137,8 +139,8 @@ static int tc_create_hook_and_attach_progs(psabpf_context_t *ctx, int ifindex, c
 
 static int xdp_attach_prog_to_port(int *fd, psabpf_context_t *ctx, int ifindex, const char *prog)
 {
-    __u32 flags;
-    int ret;
+    __u32 flags = 0;
+    int ret = 0;
 
     *fd = open_prog_by_name(ctx, prog);
     if (*fd < 0) {
@@ -201,8 +203,9 @@ static int update_prog_devmap(psabpf_bpf_map_descriptor_t *devmap, int ifindex, 
 
 static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
 {
-    int ret;
-    int ig_prog_fd, eg_prog_fd;
+    int ret = NO_ERROR;
+    int ig_prog_fd = 0;
+    int eg_prog_fd = 0;
 
     /* TODO: Should we attach ingress pipeline at the end of whole procedure?
      *  For short time packets will be served only in ingress but not in egress pipeline. */
@@ -261,7 +264,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
 
 static int tc_port_add(psabpf_context_t *ctx, const char *interface, int ifindex)
 {
-    int xdp_helper_fd;
+    int xdp_helper_fd = -1;
 
     int ret = xdp_attach_prog_to_port(&xdp_helper_fd, ctx, ifindex, XDP_HELPER_PROG);
     if (ret != NO_ERROR) {
@@ -285,12 +288,13 @@ bool psabpf_pipeline_exists(psabpf_context_t *ctx)
     return access(mounted_path, F_OK) == 0;
 }
 
-static int extract_tuple_id_from_tuple(const char *tuple_name, uint32_t *tuple_id) {
-    char *elem;
+static int extract_tuple_id_from_tuple(const char *tuple_name, uint32_t *tuple_id)
+{
+    char *elem = NULL;
     elem = strrchr(tuple_name, '_');
     elem++;
     if (tuple_id != NULL) {
-        char *end;
+        char *end = NULL;
         *tuple_id = (uint32_t)strtol(elem, &end, 10);
         if (elem == end) {
             return ENODATA;
@@ -348,10 +352,11 @@ static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_n
 
 int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 {
-    struct bpf_object *obj;
-    int ret, fd;
+    struct bpf_object *obj = NULL;
+    int ret = 0;
+    int fd = -1;
     char pinned_file[256];
-    struct bpf_program *pos;
+    struct bpf_program *pos = NULL;
 
     ret = bpf_prog_load(file, BPF_PROG_TYPE_UNSPEC, &obj, &fd);
     /* Do not close fd obtained from above call, it is maintained by obj */
@@ -363,9 +368,11 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
 
     bpf_object__for_each_program(pos, obj) {
         const char *sec_name = bpf_program__section_name(pos);
+        char *pin_name = program_pin_name(pos);
 
         build_ebpf_prog_filename(pinned_file, sizeof(pinned_file),
-                                 ctx, program_pin_name(pos));
+                                 ctx, pin_name);
+        free(pin_name);
 
         ret = bpf_program__pin(pos, pinned_file);
         if (ret < 0) {
@@ -375,7 +382,7 @@ int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
         }
     }
 
-    struct bpf_map *map;
+    struct bpf_map *map = NULL;
     bpf_object__for_each_map(map, obj) {
         if (bpf_map__is_pinned(map)) {
             ret = bpf_map__unpin(map, NULL);
@@ -495,7 +502,7 @@ int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
 {
     (void) ctx;
     __u32 flags = 0;
-    int ifindex;
+    int ifindex = 0;
 
     ifindex = (int) if_nametoindex(interface);
     if (!ifindex) {
@@ -670,13 +677,14 @@ uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx)
     double load_time = (double) prog_info.load_time / 1e9;
 
     double uptime = 0;
-    FILE *uptime_file = fopen("/proc/uptime", "r");
+    /* Add O_CLOEXEC option to not propagate file descriptor to children processes when library used in forking server */
+    FILE *uptime_file = fopen("/proc/uptime", "re");
     if (uptime_file != NULL) {
         char buf[BUFSIZ];
         char *b = fgets(buf, BUFSIZ, uptime_file);
         fclose(uptime_file);
 
-        char *end_ptr;
+        char *end_ptr = NULL;
         if (b == buf) {
             uptime = strtod(buf, &end_ptr);
         } else {
@@ -842,7 +850,7 @@ psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_p
     };
     const unsigned no_allowed_suffixes = sizeof(allowed_suffixes) / sizeof(allowed_suffixes[0]);
 
-    struct dirent *file;
+    struct dirent *file = NULL;
     while ((file = readdir(list->directory)) != NULL) {
         if (file->d_type != DT_REG) {
             continue;

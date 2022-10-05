@@ -142,7 +142,7 @@ static int get_and_print_register_json(psabpf_register_context_t *ctx, psabpf_re
         ret = build_entry(ctx, entry, json_entry);
         json_array_append_new(entries, json_entry);
     } else {
-        psabpf_register_entry_t *iter;
+        psabpf_register_entry_t *iter = NULL;
         while ((iter = psabpf_register_get_next(ctx)) != NULL) {
             json_t *json_entry = json_object();
             ret = build_entry(ctx, iter, json_entry);

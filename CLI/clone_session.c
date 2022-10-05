@@ -28,7 +28,7 @@
 
 static int clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
 {
-    int error;
+    int error = 0;
     psabpf_clone_session_ctx_t session;
 
     psabpf_clone_session_context_init(&session);
@@ -53,7 +53,7 @@ err:
 
 static int clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_id_t clone_session_id)
 {
-    int error;
+    int error = 0;
     psabpf_clone_session_ctx_t session;
 
     psabpf_clone_session_context_init(&session);
@@ -84,7 +84,7 @@ static int clone_session_add_member(psabpf_context_t *ctx,
                                     bool      truncate,
                                     uint16_t  packet_length_bytes)
 {
-    int error;
+    int error = 0;
     psabpf_clone_session_ctx_t session;
     psabpf_clone_session_entry_t entry;
 
@@ -123,7 +123,7 @@ static int clone_session_del_member(psabpf_context_t *ctx,
                                     uint32_t  egress_port,
                                     uint16_t  instance)
 {
-    int error;
+    int error = 0;
     psabpf_clone_session_ctx_t session;
     psabpf_clone_session_entry_t entry;
 
@@ -162,7 +162,7 @@ int do_clone_session_create(int argc, char **argv)
         goto err;
     }
 
-    uint32_t session_id;
+    uint32_t session_id = 0;
     parser_keyword_value_pair_t kv[] = {
             {"id", &session_id, sizeof(session_id), true, "session id"},
             { 0 },
@@ -195,7 +195,7 @@ int do_clone_session_delete(int argc, char **argv)
         goto err;
     }
 
-    uint32_t session_id;
+    uint32_t session_id = 0;
     parser_keyword_value_pair_t kv[] = {
             {"id", &session_id, sizeof(session_id), true, "session id"},
             { 0 },
@@ -228,8 +228,10 @@ int do_clone_session_add_member(int argc, char **argv)
         goto err;
     }
 
-    uint32_t session_id, egress_port;
-    uint16_t instance, plen_bytes;
+    uint32_t session_id = 0;
+    uint32_t egress_port = 0;
+    uint16_t instance = 0;
+    uint16_t plen_bytes = 0;
     uint8_t cos = 0;
     bool truncate = false;
     parser_keyword_value_pair_t kv[] = {
@@ -279,8 +281,9 @@ int do_clone_session_del_member(int argc, char **argv)
         goto err;
     }
 
-    uint32_t session_id, egress_port;
-    uint16_t instance;
+    uint32_t session_id = 0;
+    uint32_t egress_port = 0;
+    uint16_t instance = 0;
     parser_keyword_value_pair_t kv[] = {
             {"id",          &session_id,  sizeof(session_id),  true, "session id"},
             {"egress-port", &egress_port, sizeof(egress_port), true, "egress port"},
@@ -318,7 +321,7 @@ static json_t *create_json_single_session(psabpf_context_t *ctx, psabpf_clone_se
     json_object_set_new(root, "id", json_integer(psabpf_clone_session_get_id(session)));
     json_object_set_new(root, "entries", all_sessions);
 
-    psabpf_clone_session_entry_t *entry;
+    psabpf_clone_session_entry_t *entry = NULL;
     while ((entry = psabpf_clone_session_get_next_entry(ctx, session)) != NULL) {
         json_t *session_root = json_object();
         if (session_root == NULL) {
@@ -349,7 +352,7 @@ static int print_clone_session(psabpf_context_t *ctx, psabpf_clone_session_ctx_t
     int ret = ENOMEM;
     json_t *root = json_object();
     json_t *groups = json_array();
-    json_t *session_json;
+    json_t *session_json = NULL;
 
     if (root == NULL || groups == NULL) {
         goto clean_up;
@@ -396,7 +399,7 @@ int do_clone_session_get(int argc, char **argv)
     psabpf_context_t ctx;
     psabpf_clone_session_ctx_t session;
     bool session_id_specified = false;
-    int ret;
+    int ret = NO_ERROR;
 
     psabpf_context_init(&ctx);
     psabpf_clone_session_context_init(&session);
@@ -408,7 +411,7 @@ int do_clone_session_get(int argc, char **argv)
     if (argc > 0) {
         session_id_specified = true;
 
-        psabpf_clone_session_id_t session_id;
+        psabpf_clone_session_id_t session_id = 0;
         parser_keyword_value_pair_t kv[] = {
                 {"id", &session_id, sizeof(session_id), true, "clone session id"},
                 { 0 },

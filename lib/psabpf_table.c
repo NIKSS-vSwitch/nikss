@@ -155,7 +155,7 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
         return NO_ERROR;
     }
 
-    const struct btf_type *value_type;
+    const struct btf_type *value_type = NULL;
     int ret = get_value_type(ctx, &value_type);
     if (ret != NO_ERROR) {
         return ret;
@@ -225,7 +225,7 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
         return NO_ERROR;
     }
 
-    const struct btf_type *value_type;
+    const struct btf_type *value_type = NULL;
     int ret = get_value_type(ctx, &value_type);
     if (ret != NO_ERROR) {
         return ret;
@@ -354,7 +354,7 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
 
 int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
 {
-    int ret;
+    int ret = NO_ERROR;
     char derived_name[256];
 
     snprintf(derived_name, sizeof(derived_name), "%s_prefixes", name);
@@ -1242,7 +1242,8 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
             /* assume that every field is byte aligned */
             unsigned offset = btf_member_bit_offset(key_type, member_idx) / 8;
             psabpf_match_key_t *mk = entry->match_keys[key_idx];
-            int ret = 0, flags = WRITE_HOST_ORDER;
+            int ret = 0;
+            int flags = WRITE_HOST_ORDER;
 
             if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
                 flags = WRITE_NETWORK_ORDER;
@@ -1363,15 +1364,13 @@ static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx,
 static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx,
                             psabpf_table_entry_t *entry, uint32_t value_type_id)
 {
-    size_t base_offset;
-
     /* find union with action data */
     psabtf_struct_member_md_t action_union_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &action_union_md) != NO_ERROR) {
         fprintf(stderr, "actions data structure not found\n");
         return ENOENT;
     }
-    base_offset = action_union_md.bit_offset / 8;
+    size_t base_offset = action_union_md.bit_offset / 8;
 
     /* find action data structure in the union */
     psabtf_struct_member_md_t action_data_md = {};
@@ -1408,10 +1407,13 @@ static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx,
 static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
                                   psabpf_table_entry_t *entry, const struct btf_type *value_type)
 {
-    int entries = btf_vlen(value_type), ret;
+    int entries = btf_vlen(value_type);
+    int ret = 0;
     const struct btf_member *member = btf_members(value_type);
-    size_t used_params = 0, offset;
+    size_t used_params = 0;
+    size_t offset = 0;
     psabpf_action_param_t * current_data = &(entry->action->params[0]);
+    /* Flag to properly calculate number of filled references */
     bool entry_ref_used = false;
 
     for (int i = 0; i < entries; i++, member++) {
@@ -1442,7 +1444,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
             continue;
         }
         if (entry_ref_used) {
-            entry_ref_used = false;
+            entry_ref_used = false;  /* NOLINT(clang-analyzer-deadcode.DeadStores) */
             current_data++; used_params++;
             if (used_params >= entry->action->n_params) {
                 fprintf(stderr, "not enough member/group references\n");
@@ -1472,7 +1474,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
 
 static int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    int ret;
+    int ret = NO_ERROR;
 
     uint32_t value_type_id = ctx->table.value_type_id;
     if (value_type_id == 0) {
@@ -1908,7 +1910,7 @@ clean_up:
 
 static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const uint32_t tuple_id)
 {
-    int err;
+    int err = NO_ERROR;
 
     struct bpf_create_map_attr attr = {
             .key_size = ctx->table.key_size,
@@ -2006,7 +2008,7 @@ static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         goto clean_up;
     }
     uint32_t tuple_id = *((uint32_t *) (value_mask + prefix_md.tuple_id_offset));
-    uint32_t inner_map_id;
+    uint32_t inner_map_id = 0;
 
     err = bpf_map_lookup_elem(ctx->tuple_map.fd, &tuple_id, &inner_map_id);
     if (err == 0) {
@@ -2731,7 +2733,7 @@ static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_ta
 
 static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
 {
-    int ret;
+    int ret = NO_ERROR;
     uint32_t value_type_id = ctx->table.value_type_id;
     if (value_type_id == 0) {
         return ENOENT;
@@ -3020,9 +3022,9 @@ static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
     int ret_code = NO_ERROR;
     char *prefix_value = NULL;
     char *next_key = NULL;
-    uint8_t has_next_mask;
-    uint32_t tuple_id;
-    uint32_t inner_map_id;
+    uint8_t has_next_mask = 0;
+    uint32_t tuple_id = 0;
+    uint32_t inner_map_id = 0;
     struct ternary_table_prefix_metadata prefix_md;
 
     if ((ret_code = get_ternary_table_prefix_md(ctx, &prefix_md)) != NO_ERROR) {

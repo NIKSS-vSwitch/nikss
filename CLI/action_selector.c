@@ -60,7 +60,7 @@ static int parse_action_selector_action(int *argc, char ***argv, psabpf_action_s
 
     if (is_keyword(**argv, "id")) {
         NEXT_ARGP_RET();
-        char *ptr;
+        char *ptr = NULL;
         psabpf_action_set_id(action, strtoul(**argv, &ptr, 0));
         if (*ptr) {
             fprintf(stderr, "%s: unable to parse as an action id\n", **argv);
@@ -113,7 +113,7 @@ static int parse_action_data(int *argc, char ***argv, psabpf_action_t *action)
 static int parse_member_reference(int *argc, char ***argv,
                                   psabpf_action_selector_member_context_t *member, bool is_last)
 {
-    char *ptr;
+    char *ptr = NULL;
     psabpf_action_selector_set_member_reference(member, strtoul(**argv, &ptr, 0));
     if (*ptr) {
         fprintf(stderr, "%s: unable to parse as a member reference\n", **argv);
@@ -131,7 +131,7 @@ static int parse_member_reference(int *argc, char ***argv,
 
 static int parse_group_reference(int *argc, char ***argv, psabpf_action_selector_group_context_t *group)
 {
-    char *ptr;
+    char *ptr = NULL;
     psabpf_action_selector_set_group_reference(group, strtoul(**argv, &ptr, 0));
     if (*ptr) {
         fprintf(stderr, "%s: unable to parse as a member reference\n", **argv);
@@ -184,7 +184,7 @@ static int parse_get_options(int *argc, char ***argv, get_mode_t *mode, uint32_t
         }
         NEXT_ARGP_RET();
 
-        char *ptr;
+        char *ptr = NULL;
         *reference = strtoul(**argv, &ptr, 0);
         if (*ptr) {
             fprintf(stderr, "%s: unable to parse as a member reference\n", **argv);
@@ -284,7 +284,7 @@ json_t *create_json_all_members(psabpf_action_selector_context_t *ctx)
         return NULL;
     }
 
-    psabpf_action_selector_member_context_t *member;
+    psabpf_action_selector_member_context_t *member = NULL;
     while ((member = psabpf_action_selector_get_next_member(ctx)) != NULL) {
         json_t *member_json = create_json_member_entry(ctx, member);
         psabpf_action_selector_member_free(member);
@@ -308,7 +308,7 @@ json_t *create_json_group_entry(psabpf_action_selector_context_t *ctx, psabpf_ac
         return NULL;
     }
 
-    psabpf_action_selector_member_context_t *current_member;
+    psabpf_action_selector_member_context_t *current_member = NULL;
     while ((current_member = psabpf_action_selector_get_next_group_member(ctx, group)) != NULL) {
         json_array_append_new(members, json_integer(psabpf_action_selector_get_member_reference(current_member)));
         if (member_refs != NULL) {
@@ -331,7 +331,7 @@ json_t *create_json_all_groups(psabpf_action_selector_context_t *ctx)
         return NULL;
     }
 
-    psabpf_action_selector_group_context_t *group;
+    psabpf_action_selector_group_context_t *group = NULL;
     while ((group = psabpf_action_selector_get_next_group(ctx)) != NULL) {
         json_t *group_entry = create_json_group_entry(ctx, group, NULL);
         psabpf_action_selector_group_free(group);
@@ -480,7 +480,7 @@ clean_up:
 int do_action_selector_add_member(int argc, char **argv)
 {
     int error_code = EPERM;
-    const char *instance_name;
+    const char *instance_name = NULL;
     psabpf_context_t psabpf_ctx;
     psabpf_action_selector_context_t ctx;
     psabpf_action_t action;
@@ -647,7 +647,7 @@ clean_up:
 int do_action_selector_create_group(int argc, char **argv)
 {
     int error_code = EPERM;
-    const char *instance_name;
+    const char *instance_name = NULL;
     psabpf_context_t psabpf_ctx;
     psabpf_action_selector_context_t ctx;
     psabpf_action_selector_group_context_t group;
@@ -868,7 +868,7 @@ clean_up:
 int do_action_selector_get(int argc, char **argv)
 {
     int error_code = EPERM;
-    const char *instance_name;
+    const char *instance_name = NULL;
     psabpf_context_t psabpf_ctx;
     psabpf_action_selector_context_t ctx;
 
@@ -891,7 +891,7 @@ int do_action_selector_get(int argc, char **argv)
     }
 
     /* 2. Try to get specific mode */
-    get_mode_t mode;
+    get_mode_t mode = 0;
     uint32_t reference = 0;
     if (parse_get_options(&argc, &argv, &mode, &reference, &ctx) != NO_ERROR) {
         goto clean_up;

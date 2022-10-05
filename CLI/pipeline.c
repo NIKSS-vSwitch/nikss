@@ -71,7 +71,7 @@ static int print_pipeline_json(psabpf_context_t *ctx)
     psabpf_port_list_t list;
     psabpf_port_list_init(&list, ctx);
 
-    psabpf_port_spec_t *port;
+    psabpf_port_spec_t *port = NULL;
     while ((port = psabpf_port_list_get_next_port(&list)) != NULL) {
         json_t *entry = json_port_entry(psabpf_port_spec_get_name(port), (int) psabpf_port_sepc_get_id(port));
         json_array_append(ports_root, entry);
@@ -83,7 +83,7 @@ static int print_pipeline_json(psabpf_context_t *ctx)
     psabpf_pipeline_objects_list_t objs;
     psabpf_pipeline_objects_list_init(&objs, ctx);
 
-    psabpf_pipeline_object_t *obj;
+    psabpf_pipeline_object_t *obj = NULL;
     while ((obj = psabpf_pipeline_objects_list_get_next_object(&objs)) != NULL) {
         json_array_append(objects_root, json_string(psabpf_pipeline_object_get_name(obj)));
         psabpf_pipeline_object_free(obj);
@@ -103,7 +103,7 @@ static int parse_pipeline_id_without_pipe_keyword(int *argc, char ***argv, uint3
         return EINVAL;
     }
     NEXT_ARGP_RET();
-    char *endptr;
+    char *endptr = NULL;
     *id = strtoul(**argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", **argv);
@@ -124,7 +124,8 @@ int do_pipeline_load(int argc, char **argv)
     if (argc < 1) {
         fprintf(stderr, "expected path to the ELF file\n");
         return EINVAL;
-    } else if (argc > 1) {
+    }
+    if (argc > 1) {
         fprintf(stderr, "too many arguments\n");
         return EINVAL;
     }
@@ -207,8 +208,8 @@ static int parse_interface(int *argc, char ***argv, const char **interface)
 
 int do_pipeline_port_add(int argc, char **argv)
 {
-    int ret;
-    const char *intf;
+    int ret = NO_ERROR;
+    const char *intf = NULL;
     psabpf_context_t ctx;
     psabpf_context_init(&ctx);
 
@@ -241,8 +242,8 @@ err:
 
 int do_pipeline_port_del(int argc, char **argv)
 {
-    int ret;
-    const char *intf;
+    int ret = NO_ERROR;
+    const char *intf = NULL;
     psabpf_context_t ctx;
     psabpf_context_init(&ctx);
 

@@ -134,7 +134,7 @@ psabpf_struct_field_t * psabpf_digest_get_next_field(psabpf_digest_context_t *ct
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd;
+    psabpf_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->fds, digest->current_field_id);
     if (fd == NULL) {
         digest->current_field_id = 0;

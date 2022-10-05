@@ -299,7 +299,9 @@ int parse_struct_type(psabpf_btf_t *btf_md, uint32_t type_id, size_t data_size, 
     }
 
     fds->n_fields = count_total_fields(btf_md, type_id);
-    fds->fields = calloc(fds->n_fields, sizeof(psabpf_struct_field_descriptor_t));
+    if (fds->n_fields != 0) {
+        fds->fields = calloc(fds->n_fields, sizeof(psabpf_struct_field_descriptor_t));
+    }
     if (fds->n_fields == 0 || fds->fields == NULL) {
         fprintf(stderr, "failed to count fields\n");
         return EINVAL;

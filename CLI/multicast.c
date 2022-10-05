@@ -31,7 +31,7 @@ static int parse_group(int *argc, char ***argv, psabpf_context_t *ctx, psabpf_mc
         return ret;
     }
 
-    psabpf_mcast_grp_id_t group_id;
+    psabpf_mcast_grp_id_t group_id = 0;
     parser_keyword_value_pair_t kv[] = {
             {"id", &group_id, sizeof(group_id), true, "multicast group id"},
             { 0 },
@@ -121,8 +121,8 @@ static int parse_group_and_member(int *argc, char ***argv, psabpf_context_t *ctx
         return ret;
     }
 
-    uint32_t egress_port;
-    uint16_t instance;
+    uint32_t egress_port = 0;
+    uint16_t instance = 0;
     parser_keyword_value_pair_t kv[] = {
             {"egress-port", &egress_port, sizeof(egress_port), true, "egress port"},
             {"instance",    &instance,    sizeof(instance),    true, "egress port instance"},
@@ -225,7 +225,7 @@ static json_t *create_json_single_group(psabpf_context_t *ctx, psabpf_mcast_grp_
     json_object_set_new(root, "id", json_integer(psabpf_mcast_grp_get_id(group)));
     json_object_set_new(root, "members", all_members);
 
-    psabpf_mcast_grp_member_t *member;
+    psabpf_mcast_grp_member_t *member = NULL;
     while ((member = psabpf_mcast_grp_get_next_member(ctx, group)) != NULL) {
         json_t *member_root = json_object();
         if (member_root == NULL) {
@@ -249,7 +249,7 @@ static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *grou
     int ret = ENOMEM;
     json_t *root = json_object();
     json_t *groups = json_array();
-    json_t *group_json;
+    json_t *group_json = NULL;
 
     if (root == NULL || groups == NULL) {
         goto clean_up;
@@ -296,7 +296,7 @@ int do_multicast_get(int argc, char **argv)
     psabpf_context_t ctx;
     psabpf_mcast_grp_ctx_t group;
     bool group_id_specified = false;
-    int ret;
+    int ret = NO_ERROR;
 
     psabpf_context_init(&ctx);
     psabpf_mcast_grp_context_init(&group);
@@ -308,7 +308,7 @@ int do_multicast_get(int argc, char **argv)
     if (argc > 0) {
         group_id_specified = true;
 
-        psabpf_mcast_grp_id_t group_id;
+        psabpf_mcast_grp_id_t group_id = 0;
         parser_keyword_value_pair_t kv[] = {
                 {"id", &group_id, sizeof(group_id), true, "multicast group id"},
                 { 0 },

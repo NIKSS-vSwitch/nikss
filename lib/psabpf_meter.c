@@ -47,12 +47,12 @@ static void convert_rate(const psabpf_meter_value_t *rate, psabpf_meter_value_t 
         return;
     }
 
-    *period = (NS_IN_S) / ((psabpf_meter_value_t) *rate);
+    *period = ((psabpf_meter_value_t) (NS_IN_S)) / (*rate);
 
     if (*period >= METER_PERIOD_MIN) {
         *unit_per_period = 1;
     } else {
-        *unit_per_period = (uint64_t) ceil(METER_PERIOD_MIN / *period);
+        *unit_per_period = (uint64_t) ceil(METER_PERIOD_MIN / ((double) (*period)));
         *period = (NS_IN_S * (*unit_per_period)) / *rate;
     }
 }
@@ -187,7 +187,7 @@ psabpf_struct_field_t * psabpf_meter_entry_get_next_index_field(psabpf_meter_ctx
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd;
+    psabpf_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->index_fds, entry->current_index_field_id);
     if (fd == NULL) {
         entry->current_index_field_id = 0;

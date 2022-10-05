@@ -180,7 +180,7 @@ psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_con
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd;
+    psabpf_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->value_fds, entry->current_field_id);
     if (fd == NULL) {
         entry->current_field_id = 0;
@@ -203,7 +203,7 @@ psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_con
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd;
+    psabpf_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->key_fds, entry->current_field_id);
     if (fd == NULL) {
         entry->current_field_id = 0;

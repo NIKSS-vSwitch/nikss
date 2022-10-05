@@ -64,7 +64,7 @@ static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t 
 
         if (is_keyword(**argv, "id")) {
             NEXT_ARGP_RET();
-            char *ptr;
+            char *ptr = NULL;
             psabpf_action_set_id(action, strtoul(**argv, &ptr, 0));
             if (*ptr) {
                 fprintf(stderr, "%s: unable to parse as an action id\n", **argv);
@@ -207,7 +207,9 @@ static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *
                 }
 
                 continue;
-            } else if (is_keyword(**argv, "meter")) {
+            }
+
+            if (is_keyword(**argv, "meter")) {
                 psabpf_direct_meter_context_t dm;
                 psabpf_meter_entry_t meter;
 
@@ -251,7 +253,7 @@ static int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *e
     }
     NEXT_ARGP_RET();
 
-    char *ptr;
+    char *ptr = NULL;
     psabpf_table_entry_priority(entry, strtoul(**argv, &ptr, 0));
     if (*ptr) {
         fprintf(stderr, "%s: unable to parse priority\n", **argv);
@@ -379,7 +381,7 @@ static json_t *create_json_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, p
         return NULL;
     }
 
-    psabpf_direct_counter_context_t *dc_ctx;
+    psabpf_direct_counter_context_t *dc_ctx = NULL;
     while ((dc_ctx = psabpf_direct_counter_get_next_ctx(ctx, entry)) != NULL) {
         psabpf_counter_entry_t counter;
         int ret = psabpf_direct_counter_get_entry(dc_ctx, entry, &counter);
@@ -424,7 +426,7 @@ static json_t *create_json_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psa
         return NULL;
     }
 
-    psabpf_direct_meter_context_t *dm_ctx;
+    psabpf_direct_meter_context_t *dm_ctx = NULL;
     while ((dm_ctx = psabpf_direct_meter_get_next_ctx(ctx, entry)) != NULL) {
         psabpf_meter_entry_t meter;
         const char *name = psabpf_direct_meter_get_name(dm_ctx);
@@ -520,7 +522,7 @@ static int build_json_table_metadata(psabpf_table_entry_ctx_t *ctx, json_t *pare
         return ENOMEM;
     }
 
-    psabpf_direct_counter_context_t *dc_ctx;
+    psabpf_direct_counter_context_t *dc_ctx = NULL;
     psabpf_table_entry_t entry;
     psabpf_table_entry_init(&entry);
     while ((dc_ctx = psabpf_direct_counter_get_next_ctx(ctx, &entry)) != NULL) {
@@ -584,7 +586,7 @@ static int print_json_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t 
     }
 
     if (mode == PRINT_WHOLE_TABLE) {
-        psabpf_table_entry_t *current_entry;
+        psabpf_table_entry_t *current_entry = NULL;
         while ((current_entry = psabpf_table_entry_get_next(ctx)) != NULL) {
             json_t *parsed_entry = create_json_entry(ctx, current_entry, false);
             if (parsed_entry == NULL) {
@@ -812,15 +814,16 @@ int do_table_default(int argc, char **argv)
     if (is_keyword(*argv, "set")) {
         NEXT_ARG();
         return do_table_write(argc, argv, TABLE_SET_DEFAULT_ENTRY);
-    } if (is_keyword(*argv, "get")) {
+    }
+    if (is_keyword(*argv, "get")) {
         NEXT_ARG_RET();
         return do_table_default_get(argc, argv);
-    } else {
-        if (*argv != NULL) {
-            fprintf(stderr, "%s: unknown keyword\n", *argv);
-        }
-        return do_table_help(argc, argv);
     }
+
+    if (*argv != NULL) {
+        fprintf(stderr, "%s: unknown keyword\n", *argv);
+    }
+    return do_table_help(argc, argv);
 }
 
 int do_table_get(int argc, char **argv)

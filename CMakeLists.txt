@@ -61,8 +61,7 @@ if (BUILD_SHARED)
 else ()
   add_executable(psabpf-ctl ${PSABPFLIB_SRCS} ${PSABPFCTL_SRCS})
 endif ()
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/install/usr/include)
+include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/include)
 if (BUILD_SHARED)
   link_directories(${CMAKE_CURRENT_BINARY_DIR})
   target_link_libraries(psabpf-ctl psabpf z elf gmp m jansson)
@@ -87,7 +86,25 @@ set(CPPCHECK_CHECKS
         --library=std
         --library=posix
         )
+set(CLANG_TIDY_CONFIG
+        --quiet
+        )
+set(CLANG_TIDY_CHECKS
+        -checks='*,
+                 # allow use of memcpy and memset
+                 -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+                 # recommended to disable, see https://stackoverflow.com/questions/50399090
+                 -hicpp-signed-bitwise,
+                 # allow hardcoded values (most of them are related to architecture, so can't be changed)
+                 -cppcoreguidelines-avoid-magic-numbers,
+                 -readability-magic-numbers,
+                '
+        -warnings-as-errors='*'
+        )
 add_custom_target(clint
+        COMMAND echo Running cppcheck
         COMMAND cppcheck ${CPPCHECK_CONFIG} ${CPPCHECK_CHECKS} -I./include -I./install/usr/include ./CLI ./include ./lib main.c
+        COMMAND echo Running clang-tidy
+        COMMAND clang-tidy ${CLANG_TIDY_CONFIG} ${CLANG_TIDY_CHECKS} ${PSABPFLIB_SRCS} ${PSABPFCTL_SRCS} -- -I./include -I./install/usr/include
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "C linter")
+        COMMENT "C static checks")

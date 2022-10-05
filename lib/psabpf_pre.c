@@ -77,6 +77,8 @@ static int open_session_map(psabpf_bpf_map_descriptor_t *pr_map,
                             psabpf_bpf_map_descriptor_t *session_map, uint32_t session)
 {
     session_map->fd = -1;
+    session_map->key_size = 0;
+    session_map->value_size = 0;
 
     if (pr_map->fd < 0) {
         fprintf(stderr, "map not opened\n");
@@ -87,7 +89,7 @@ static int open_session_map(psabpf_bpf_map_descriptor_t *pr_map,
         return EINVAL;
     }
 
-    uint32_t inner_map_id;
+    uint32_t inner_map_id = 0;
     int ret = bpf_map_lookup_elem(pr_map->fd, &session, &inner_map_id);
     if (ret != 0) {
         ret = errno;
@@ -118,7 +120,7 @@ static int open_session_map(psabpf_bpf_map_descriptor_t *pr_map,
 static int do_create_pre_session(psabpf_bpf_map_descriptor_t *pr_map,
                                  psabpf_bpf_map_descriptor_t *session_template, uint32_t session, psabpf_btf_t *btf)
 {
-    int error_code;
+    int error_code = 0;
     if (pr_map->fd < 0 || session_template->fd < 0) {
         fprintf(stderr, "maps not opened\n");
         return EBADF;
@@ -184,7 +186,8 @@ static int create_pre_session(psabpf_context_t *ctx, const char *pr_map, const c
         return EINVAL;
     }
 
-    psabpf_bpf_map_descriptor_t outer_map, inner_map;
+    psabpf_bpf_map_descriptor_t outer_map;
+    psabpf_bpf_map_descriptor_t inner_map;
     psabpf_btf_t btf;
     init_btf(&btf);
 
@@ -263,7 +266,7 @@ static bool pre_session_exists(psabpf_context_t *ctx, const char *pr_map_name, u
         return false;
     }
 
-    uint32_t inner_map_id;
+    uint32_t inner_map_id = 0;
     ret = bpf_map_lookup_elem(pr_map.fd, &session, &inner_map_id);
     close_object_fd(&pr_map.fd);
 
@@ -285,8 +288,9 @@ static int pre_session_insert_entry(psabpf_context_t *ctx, const char *pr_map_na
         return EINVAL;
     }
 
-    psabpf_bpf_map_descriptor_t session_map, pr_map;
-    int ret;
+    psabpf_bpf_map_descriptor_t session_map;
+    psabpf_bpf_map_descriptor_t pr_map;
+    int ret = NO_ERROR;
 
     ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
     if (ret != 0) {
@@ -364,8 +368,9 @@ static int pre_session_del_entry(psabpf_context_t *ctx, const char *pr_map_name,
         return EINVAL;
     }
 
-    psabpf_bpf_map_descriptor_t session_map, pr_map;
-    int ret;
+    psabpf_bpf_map_descriptor_t session_map;
+    psabpf_bpf_map_descriptor_t pr_map;
+    int ret = NO_ERROR;
 
     ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
     if (ret != 0) {
@@ -526,7 +531,7 @@ static int pre_get_next_session(psabpf_bpf_map_descriptor_t *pr_map, uint32_t *c
      *       could be used to get list of groups and gain performance.
      *       See this commit: https://github.com/torvalds/linux/commit/9263dddc7b6f816fdd327eee435cc54ba51dd095
      *       To check kernel version at runtime see: https://stackoverflow.com/a/46282013 */
-    uint32_t value;
+    uint32_t value = 0;
     while (true) {
         *current_session_id += 1;
         if (*current_session_id >= pr_map->max_entries) {

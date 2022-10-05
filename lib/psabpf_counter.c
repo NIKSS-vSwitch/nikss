@@ -204,7 +204,7 @@ psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd;
+    psabpf_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->key_fds, entry->current_key_id);
     if (fd == NULL) {
         entry->current_key_id = 0;
@@ -396,7 +396,7 @@ static int set_all_counters(psabpf_counter_context_t *ctx, void *encoded_value, 
     char * key = malloc(ctx->counter.key_size);
     char * next_key = malloc(ctx->counter.key_size);
     int error_code = NO_ERROR;
-    int ret;
+    int ret = 0;
     bool can_remove_entries = is_zero_counter_value(encoded_value, ctx->counter.value_size);
 
     if (ctx->counter.type == BPF_MAP_TYPE_ARRAY || !remove_entry_allowed) {

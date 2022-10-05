@@ -104,25 +104,25 @@ int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry)
         return EINVAL;
     }
 
-    psabpf_meter_value_t pir;
+    psabpf_meter_value_t pir = 0;
     error_code = convert_str_to_meter_value(pir_str, &pir);
     if (error_code != NO_ERROR) {
         return error_code;
     }
 
-    psabpf_meter_value_t pbs;
+    psabpf_meter_value_t pbs = 0;
     error_code = convert_str_to_meter_value(pbs_str, &pbs);
     if (error_code != NO_ERROR) {
         return error_code;
     }
 
-    psabpf_meter_value_t cir;
+    psabpf_meter_value_t cir = 0;
     error_code = convert_str_to_meter_value(cir_str, &cir);
     if (error_code != NO_ERROR) {
         return error_code;
     }
 
-    psabpf_meter_value_t cbs;
+    psabpf_meter_value_t cbs = 0;
     error_code = convert_str_to_meter_value(cbs_str, &cbs);
     if (error_code != NO_ERROR) {
         return error_code;
@@ -142,7 +142,7 @@ void *create_json_meter_config(psabpf_meter_entry_t *meter)
         return NULL;
     }
 
-    psabpf_meter_value_t pir, cir, pbs, cbs;
+    psabpf_meter_value_t pir, cir, pbs, cbs;  /* NOLINT */
     psabpf_meter_entry_get_data(meter, &pir, &pbs, &cir, &cbs);
     /* json_int_t is signed type, so if we expect values larger than 2^63
      * they should be converted to string in such case */
@@ -214,7 +214,7 @@ int print_meter(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry, const char
         }
         json_array_append_new(entries, parsed_entry);
     } else {
-        psabpf_meter_entry_t *current_entry;
+        psabpf_meter_entry_t *current_entry = NULL;
         while ((current_entry = psabpf_meter_get_next(ctx)) != NULL) {
             json_t *parsed_entry = create_json_meter_entry(ctx, current_entry);
             if (parsed_entry == NULL) {
@@ -247,7 +247,7 @@ int do_meter_get(int argc, char **argv)
     psabpf_meter_ctx_t meter_ctx;
     psabpf_context_t psabpf_ctx;
     int error_code = EPERM;
-    const char *meter_name;
+    const char *meter_name = NULL;
 
     psabpf_meter_entry_init(&entry);
     psabpf_meter_ctx_init(&meter_ctx);

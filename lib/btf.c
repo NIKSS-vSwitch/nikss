@@ -305,7 +305,7 @@ void free_btf(psabpf_btf_t *btf)
 int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *btf, psabpf_bpf_map_descriptor_t *md)
 {
     char buffer[256];
-    int errno_val;
+    int errno_val = NO_ERROR;
 
     if (md == NULL) {
         return EPERM;

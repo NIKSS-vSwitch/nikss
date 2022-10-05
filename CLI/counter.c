@@ -127,7 +127,7 @@ static int parse_counter_value(int *argc, char ***argv,
 
 static int build_json_counter_key(json_t *parent, psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
 {
-    psabpf_struct_field_t *key;
+    psabpf_struct_field_t *key = NULL;
     while ((key = psabpf_counter_entry_get_next_key(ctx, entry)) != NULL) {
         if (psabpf_struct_get_field_type(key) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_START) {
             json_t *sub_struct = json_object();
@@ -277,7 +277,7 @@ static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entr
         ret = build_json_counter_entry(current_obj, ctx, entry);
         json_array_append_new(entries, current_obj);
     } else {
-        psabpf_counter_entry_t *iter;
+        psabpf_counter_entry_t *iter = NULL;
         while ((iter = psabpf_counter_get_next(ctx)) != NULL) {
             json_t *current_obj = json_object();
             ret = build_json_counter_entry(current_obj, ctx, iter);
