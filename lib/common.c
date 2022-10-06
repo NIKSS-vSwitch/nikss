@@ -136,6 +136,7 @@ static int setup_struct_field_descriptor_set_no_btf(psabpf_struct_field_descript
 }
 
 /* no memory allocation */
+/* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to count all the fields in any data structure */
 static size_t count_total_fields(psabpf_btf_t *btf_md, uint32_t type_id)
 {
     const struct btf_type *type = psabtf_get_type_by_id(btf_md->btf, type_id);
@@ -186,6 +187,7 @@ static size_t count_total_fields(psabpf_btf_t *btf_md, uint32_t type_id)
     return total_entries;
 }
 
+/* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to build nested metadata tree for any data structure */
 static int setup_struct_field_descriptor_set_btf(psabpf_btf_t *btf_md, psabpf_struct_field_descriptor_set_t *fds,
                                                  uint32_t type_id, unsigned *field_idx, const size_t base_offset)
 {

@@ -110,6 +110,7 @@ int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair
  * JSON related functions
  *****************************************************************************/
 
+/* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to build JSON tree */
 int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_func_t get_next_field)
 {
     psabpf_struct_field_t *field = NULL;

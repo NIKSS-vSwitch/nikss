@@ -30,7 +30,8 @@
 #include "CLI/table.h"
 #include "CLI/value_set.h"
 
-const char *program_name;
+/* Removing this line will require too much effort or result in strange C construct (assign to const value) */
+const char *program_name;  /* NOLINT(cppcoreguidelines-avoid-non-const-global-variables) */
 
 int cmd_select(const struct cmd *cmds, int argc, char **argv,
                int (*help)(int, char **))

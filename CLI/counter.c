@@ -125,53 +125,6 @@ static int parse_counter_value(int *argc, char ***argv,
     return ret;
 }
 
-static int build_json_counter_key(json_t *parent, psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
-{
-    psabpf_struct_field_t *key = NULL;
-    while ((key = psabpf_counter_entry_get_next_key(ctx, entry)) != NULL) {
-        if (psabpf_struct_get_field_type(key) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_START) {
-            json_t *sub_struct = json_object();
-            if (sub_struct == NULL) {
-                return ENOMEM;
-            }
-            if (json_object_set(parent, psabpf_struct_get_field_name(key), sub_struct)) {
-                json_decref(sub_struct);
-                return EPERM;
-            }
-
-            int ret = build_json_counter_key(sub_struct, ctx, entry);
-            json_decref(sub_struct);
-            if (ret != NO_ERROR) {
-                return ret;
-            }
-
-            continue;
-        }
-
-        if (psabpf_struct_get_field_type(key) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_END) {
-            return NO_ERROR;
-        }
-
-        if (psabpf_struct_get_field_type(key) != PSABPF_STRUCT_FIELD_TYPE_DATA) {
-            continue;
-        }
-
-        const char *field_name = psabpf_struct_get_field_name(key);
-        if (field_name == NULL) {
-            continue;
-        }
-        char *data = convert_bin_data_to_hexstr(psabpf_struct_get_field_data(key), psabpf_struct_get_field_data_len(key));
-        if (data == NULL) {
-            continue;
-        }
-
-        json_object_set_new(parent, field_name, json_string(data));
-        free(data);
-    }
-
-    return NO_ERROR;
-}
-
 int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf_counter_type_t type)
 {
     /* For counter values we cannot use built-in JSON integer type because
@@ -213,7 +166,7 @@ static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ct
     }
     json_object_set(parent, "key", json_key);
 
-    if (build_json_counter_key(json_key, ctx, entry) != NO_ERROR) {
+    if (build_struct_json(json_key, ctx, entry, (get_next_field_func_t) psabpf_counter_entry_get_next_key) != NO_ERROR) {
         json_decref(json_key);
         return ENOMEM;
     }

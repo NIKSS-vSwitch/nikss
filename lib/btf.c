@@ -195,6 +195,7 @@ static uint32_t get_member_type_id_by_name(struct btf *btf, uint32_t type_id, co
     return md.effective_type_id;
 }
 
+/* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to get size of any data structure */
 size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
 {
     const struct btf_type *type = psabtf_get_type_by_id(btf, type_id);
