@@ -14,10 +14,12 @@ OBJECT := { clone-session |
             del-port |
             table |
             action-selector |
+            action-profile |
             meter |
             digest |
             counter |
-            register }
+            register |
+            value-set }
 OPTIONS := {}
 ```
 
@@ -93,6 +95,18 @@ psabpf-ctl action-selector add-to-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF 
 psabpf-ctl action-selector delete-from-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF
 psabpf-ctl action-selector empty-group-action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
 psabpf-ctl action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | empty-group-action]
+
+ACTION := { id ACTION_ID | name ACTION_NAME }
+ACTION_PARAMS := { DATA }
+```
+
+# Action Profile
+
+```shell
+psabpf-ctl action-profile add-member pipe ID ACTION_PROFILE_NAME action ACTION [data ACTION_PARAMS]
+psabpf-ctl action-profile delete-member pipe ID ACTION_PROFILE_NAME MEMBER_REF
+psabpf-ctl action-profile update-member pipe ID ACTION_PROFILE_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]
+psabpf-ctl action-profile get pipe ID ACTION_PROFILE_NAME [member MEMBER_REF]
 
 ACTION := { id ACTION_ID | name ACTION_NAME }
 ACTION_PARAMS := { DATA }
