@@ -44,15 +44,15 @@ static void print_port(const char *intf, int ifindex) {
     json_decref(root);
 }
 
-static int print_pipeline_json(psabpf_context_t *ctx)
+static int print_pipeline_json(nikss_context_t *ctx)
 {
     char date_buf[256];
-    uint64_t load_timestamp = psabpf_pipeline_get_load_timestamp(ctx);
+    uint64_t load_timestamp = nikss_pipeline_get_load_timestamp(ctx);
     struct tm date;
     /* format timestamp into ISO 8601 date */
     strftime(date_buf, sizeof(date_buf), "%Y-%m-%dT%H:%M:%S%z", localtime_r((time_t *) &load_timestamp, &date));
 
-    const char *hook_point_name = psabpf_pipeline_is_TC_based(ctx) ? "TC" : "XDP";
+    const char *hook_point_name = nikss_pipeline_is_TC_based(ctx) ? "TC" : "XDP";
 
     json_t *root = json_object();
     json_t *pipeline = json_object();
@@ -60,35 +60,35 @@ static int print_pipeline_json(psabpf_context_t *ctx)
     json_t *objects_root = json_array();
 
     json_object_set_new(root, "pipeline", pipeline);
-    json_object_set_new(pipeline, "id", json_integer(psabpf_context_get_pipeline(ctx)));
+    json_object_set_new(pipeline, "id", json_integer(nikss_context_get_pipeline(ctx)));
     json_object_set_new(pipeline, "load_time", json_string(date_buf));
     json_object_set_new(pipeline, "bpf_hook", json_string(hook_point_name));
-    json_object_set_new(pipeline, "has_egress_program", json_boolean(psabpf_pipeline_has_egress_program(ctx)));
+    json_object_set_new(pipeline, "has_egress_program", json_boolean(nikss_pipeline_has_egress_program(ctx)));
     json_object_set_new(pipeline, "ports", ports_root);
     json_object_set_new(pipeline, "objects", objects_root);
 
     /* List ports */
-    psabpf_port_list_t list;
-    psabpf_port_list_init(&list, ctx);
+    nikss_port_list_t list;
+    nikss_port_list_init(&list, ctx);
 
-    psabpf_port_spec_t *port = NULL;
-    while ((port = psabpf_port_list_get_next_port(&list)) != NULL) {
-        json_t *entry = json_port_entry(psabpf_port_spec_get_name(port), (int) psabpf_port_sepc_get_id(port));
+    nikss_port_spec_t *port = NULL;
+    while ((port = nikss_port_list_get_next_port(&list)) != NULL) {
+        json_t *entry = json_port_entry(nikss_port_spec_get_name(port), (int) nikss_port_sepc_get_id(port));
         json_array_append(ports_root, entry);
-        psabpf_port_spec_free(port);
+        nikss_port_spec_free(port);
     }
-    psabpf_port_list_free(&list);
+    nikss_port_list_free(&list);
 
     /* List objects */
-    psabpf_pipeline_objects_list_t objs;
-    psabpf_pipeline_objects_list_init(&objs, ctx);
+    nikss_pipeline_objects_list_t objs;
+    nikss_pipeline_objects_list_init(&objs, ctx);
 
-    psabpf_pipeline_object_t *obj = NULL;
-    while ((obj = psabpf_pipeline_objects_list_get_next_object(&objs)) != NULL) {
-        json_array_append(objects_root, json_string(psabpf_pipeline_object_get_name(obj)));
-        psabpf_pipeline_object_free(obj);
+    nikss_pipeline_object_t *obj = NULL;
+    while ((obj = nikss_pipeline_objects_list_get_next_object(&objs)) != NULL) {
+        json_array_append(objects_root, json_string(nikss_pipeline_object_get_name(obj)));
+        nikss_pipeline_object_free(obj);
     }
-    psabpf_pipeline_objects_list_free(&objs);
+    nikss_pipeline_objects_list_free(&objs);
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);
     json_decref(root);
@@ -132,25 +132,25 @@ int do_pipeline_load(int argc, char **argv)
 
     char *file = *argv;
 
-    psabpf_context_t ctx;
-    psabpf_context_init(&ctx);
-    psabpf_context_set_pipeline(&ctx, id);
+    nikss_context_t ctx;
+    nikss_context_init(&ctx);
+    nikss_context_set_pipeline(&ctx, id);
 
-    if (psabpf_pipeline_exists(&ctx)) {
+    if (nikss_pipeline_exists(&ctx)) {
         fprintf(stderr, "pipeline id %u already exists\n", id);
-        psabpf_context_free(&ctx);
+        nikss_context_free(&ctx);
         return EEXIST;
     }
 
-    int ret = psabpf_pipeline_load(&ctx, file);
+    int ret = nikss_pipeline_load(&ctx, file);
     if (ret) {
         fprintf(stdout, "An error occurred during pipeline load id %u\n", id);
-        psabpf_context_free(&ctx);
+        nikss_context_free(&ctx);
         return ret;
     }
 
     fprintf(stdout, "Pipeline id %u successfully loaded!\n", id);
-    psabpf_context_free(&ctx);
+    nikss_context_free(&ctx);
     return NO_ERROR;
 }
 
@@ -168,17 +168,17 @@ int do_pipeline_unload(int argc, char **argv)
         return EINVAL;
     }
 
-    psabpf_context_t ctx;
-    psabpf_context_init(&ctx);
-    psabpf_context_set_pipeline(&ctx, id);
+    nikss_context_t ctx;
+    nikss_context_init(&ctx);
+    nikss_context_set_pipeline(&ctx, id);
 
-    if (!psabpf_pipeline_exists(&ctx)) {
+    if (!nikss_pipeline_exists(&ctx)) {
         fprintf(stderr, "pipeline with given id %u does not exist\n", id);
         error = ENOENT;
         goto err;
     }
 
-    error = psabpf_pipeline_unload(&ctx);
+    error = nikss_pipeline_unload(&ctx);
     if (error) {
         fprintf(stdout, "An error occurred during pipeline unload id %u\n", id);
         goto err;
@@ -186,7 +186,7 @@ int do_pipeline_unload(int argc, char **argv)
 
     fprintf(stdout, "Pipeline id %u successfully unloaded!\n", id);
 err:
-    psabpf_context_free(&ctx);
+    nikss_context_free(&ctx);
     return error;
 }
 
@@ -210,8 +210,8 @@ int do_pipeline_port_add(int argc, char **argv)
 {
     int ret = NO_ERROR;
     const char *intf = NULL;
-    psabpf_context_t ctx;
-    psabpf_context_init(&ctx);
+    nikss_context_t ctx;
+    nikss_context_init(&ctx);
 
     if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR) {
         goto err;
@@ -228,7 +228,7 @@ int do_pipeline_port_add(int argc, char **argv)
     }
 
     int ifindex = 0;
-    ret = psabpf_pipeline_add_port(&ctx, intf, &ifindex);
+    ret = nikss_pipeline_add_port(&ctx, intf, &ifindex);
     if (ret) {
         fprintf(stderr, "failed to add port: %s\n", strerror(ret));
     } else {
@@ -236,7 +236,7 @@ int do_pipeline_port_add(int argc, char **argv)
     }
 
 err:
-    psabpf_context_free(&ctx);
+    nikss_context_free(&ctx);
     return ret;
 }
 
@@ -244,8 +244,8 @@ int do_pipeline_port_del(int argc, char **argv)
 {
     int ret = NO_ERROR;
     const char *intf = NULL;
-    psabpf_context_t ctx;
-    psabpf_context_init(&ctx);
+    nikss_context_t ctx;
+    nikss_context_init(&ctx);
 
     if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR) {
         goto err;
@@ -261,19 +261,19 @@ int do_pipeline_port_del(int argc, char **argv)
         goto err;
     }
 
-    ret = psabpf_pipeline_del_port(&ctx, intf);
+    ret = nikss_pipeline_del_port(&ctx, intf);
     if (ret) {
         fprintf(stderr, "failed to delete port: %s\n", strerror(ret));
     }
 
 err:
-    psabpf_context_free(&ctx);
+    nikss_context_free(&ctx);
     return ret;
 }
 
 int do_pipeline_show(int argc, char **argv)
 {
-    psabpf_context_t ctx;
+    nikss_context_t ctx;
     int ret_code = EINVAL;
     uint32_t id = 0;
 
@@ -286,18 +286,18 @@ int do_pipeline_show(int argc, char **argv)
         return EINVAL;
     }
 
-    psabpf_context_init(&ctx);
-    psabpf_context_set_pipeline(&ctx, id);
+    nikss_context_init(&ctx);
+    nikss_context_set_pipeline(&ctx, id);
 
-    if (!psabpf_pipeline_exists(&ctx)) {
+    if (!nikss_pipeline_exists(&ctx)) {
         fprintf(stderr, "pipeline with given id %u does not exist or is inaccessible\n", id);
-        psabpf_context_free(&ctx);
+        nikss_context_free(&ctx);
         return ENOENT;
     }
 
     ret_code = print_pipeline_json(&ctx);
 
-    psabpf_context_free(&ctx);
+    nikss_context_free(&ctx);
     return ret_code;
 }
 

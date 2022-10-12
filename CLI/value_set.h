@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PRECTL_VALUE_SET_H_
-#define __PRECTL_VALUE_SET_H_
+#ifndef __NIKSSCTL_VALUE_SET_H_
+#define __NIKSSCTL_VALUE_SET_H_
 
 #include "common.h"
 
@@ -33,4 +33,4 @@ static const struct cmd value_set_cmds[] = {
         {0}
 };
 
-#endif /* __PRECTL_VALUE_SET_H_ */
+#endif /* __NIKSSCTL_VALUE_SET_H_ */

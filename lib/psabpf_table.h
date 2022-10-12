@@ -15,25 +15,25 @@
  * limitations under the License.
  */
 
-#ifndef P4C_PSABPF_TABLE_H
-#define P4C_PSABPF_TABLE_H
+#ifndef __NIKSS_TABLE_H
+#define __NIKSS_TABLE_H
 
-#include "psabpf.h"
+#include <psabpf.h>
 
-typedef struct psabpf_bpf_map_descriptor psabpf_bpf_map_descriptor_t;
-int clear_table_cache(psabpf_bpf_map_descriptor_t *map);
+typedef struct nikss_bpf_map_descriptor nikss_bpf_map_descriptor_t;
+int clear_table_cache(nikss_bpf_map_descriptor_t *map);
 
-void move_action(psabpf_action_t *dst, psabpf_action_t *src);
-int delete_all_map_entries(psabpf_bpf_map_descriptor_t *map);
+void move_action(nikss_action_t *dst, nikss_action_t *src);
+int delete_all_map_entries(nikss_bpf_map_descriptor_t *map);
 int construct_buffer(char * buffer, size_t buffer_len,
-                     psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                     int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
-                     int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *));
-int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
-int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry);
-int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+                     nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
+                     int (*btf_info_func)(char *, nikss_table_entry_ctx_t *, nikss_table_entry_t *),
+                     int (*byte_by_byte_func)(char *, nikss_table_entry_ctx_t *, nikss_table_entry_t *));
+int fill_key_btf_info(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry);
+int fill_key_byte_by_byte(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry);
+int parse_table_key(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
                     const char *key, const char *key_mask);
-int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name);
-int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx);
+int open_ternary_table(nikss_context_t *nikss_ctx, nikss_table_entry_ctx_t *ctx, const char *name);
+int nikss_table_entry_goto_next_key(nikss_table_entry_ctx_t *ctx);
 
-#endif  /* P4C_PSABPF_TABLE_H */
+#endif  /* __NIKSS_TABLE_H */

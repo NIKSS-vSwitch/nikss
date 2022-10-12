@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PRECTL_TABLE_H
-#define __PRECTL_TABLE_H
+#ifndef __NIKSSCTL_TABLE_H
+#define __NIKSSCTL_TABLE_H
 
 #include "common.h"
 
@@ -37,4 +37,4 @@ static const struct cmd table_cmds[] = {
         {0}
 };
 
-#endif  //__PRECTL_TABLE_H
+#endif  /* __NIKSSCTL_TABLE_H */

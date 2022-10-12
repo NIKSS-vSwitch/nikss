@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef P4C_BPF_DEFS_H
-#define P4C_BPF_DEFS_H
+#ifndef __NIKSS_BPF_DEFS_H
+#define __NIKSS_BPF_DEFS_H
 
 #define COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES  1
 #define COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES 2
@@ -102,4 +102,4 @@ static const char *MULTICAST_GROUP_TABLE_INNER = "multicast_grp_tbl_inner";
     #pragma GCC diagnostic pop
 #endif
 
-#endif  /* P4C_BPF_DEFS_H */
+#endif  /* __NIKSS_BPF_DEFS_H */

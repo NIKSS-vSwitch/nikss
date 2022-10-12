@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PRECTL_MULTICAST_H
-#define __PRECTL_MULTICAST_H
+#ifndef __NIKSSCTL_MULTICAST_H
+#define __NIKSSCTL_MULTICAST_H
 
 #include "common.h"
 
@@ -38,4 +38,4 @@ static const struct cmd multicast_cmds[] = {
         {0}
 };
 
-#endif  /* __PRECTL_MULTICAST_H */
+#endif  /* __NIKSSCTL_MULTICAST_H */

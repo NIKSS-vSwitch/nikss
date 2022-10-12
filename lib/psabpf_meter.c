@@ -38,8 +38,8 @@
  * @param period In nanoseconds
  * @param unit_per_period In byte or packet
  */
-static void convert_rate(const psabpf_meter_value_t *rate, psabpf_meter_value_t *period,
-                         psabpf_meter_value_t *unit_per_period)
+static void convert_rate(const nikss_meter_value_t *rate, nikss_meter_value_t *period,
+                         nikss_meter_value_t *unit_per_period)
 {
     if (*rate == 0) {
         *unit_per_period = 0;
@@ -47,7 +47,7 @@ static void convert_rate(const psabpf_meter_value_t *rate, psabpf_meter_value_t 
         return;
     }
 
-    *period = ((psabpf_meter_value_t) (NS_IN_S)) / (*rate);
+    *period = ((nikss_meter_value_t) (NS_IN_S)) / (*rate);
 
     if (*period >= METER_PERIOD_MIN) {
         *unit_per_period = 1;
@@ -57,14 +57,14 @@ static void convert_rate(const psabpf_meter_value_t *rate, psabpf_meter_value_t 
     }
 }
 
-int convert_meter_data_to_entry(const psabpf_meter_data_t *data, psabpf_meter_entry_t *entry)
+int convert_meter_data_to_entry(const nikss_meter_data_t *data, nikss_meter_entry_t *entry)
 {
     if (entry == NULL || data == NULL) {
         return ENODATA;
     }
 
-    psabpf_meter_value_t pir = 0;
-    psabpf_meter_value_t cir = 0;
+    nikss_meter_value_t pir = 0;
+    nikss_meter_value_t cir = 0;
 
     if (data->pir_period != 0) {
         pir = (NS_IN_S / data->pir_period) * data->pir_unit_per_period;
@@ -81,7 +81,7 @@ int convert_meter_data_to_entry(const psabpf_meter_data_t *data, psabpf_meter_en
     return NO_ERROR;
 }
 
-int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_data_t *data)
+int convert_meter_entry_to_data(const nikss_meter_entry_t *entry, nikss_meter_data_t *data)
 {
     if (entry == NULL || data == NULL) {
         return ENODATA;
@@ -98,16 +98,16 @@ int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_
     return NO_ERROR;
 }
 
-void psabpf_meter_entry_init(psabpf_meter_entry_t *entry)
+void nikss_meter_entry_init(nikss_meter_entry_t *entry)
 {
     if (entry == NULL) {
         return;
     }
 
-    memset(entry, 0, sizeof(psabpf_meter_entry_t));
+    memset(entry, 0, sizeof(nikss_meter_entry_t));
 }
 
-void psabpf_meter_entry_free(psabpf_meter_entry_t *entry)
+void nikss_meter_entry_free(nikss_meter_entry_t *entry)
 {
     if (entry == NULL) {
         return;
@@ -120,10 +120,10 @@ void psabpf_meter_entry_free(psabpf_meter_entry_t *entry)
 
     free_struct_field_set(&entry->index_sfs);
 
-    memset(entry, 0, sizeof(psabpf_meter_entry_t));
+    memset(entry, 0, sizeof(nikss_meter_entry_t));
 }
 
-int psabpf_meter_entry_index(psabpf_meter_entry_t *entry, const char *data, size_t size)
+int nikss_meter_entry_index(nikss_meter_entry_t *entry, const char *data, size_t size)
 {
     if (entry == NULL || data == NULL || size < 1) {
         return ENODATA;
@@ -137,11 +137,11 @@ int psabpf_meter_entry_index(psabpf_meter_entry_t *entry, const char *data, size
     return ret;
 }
 
-int psabpf_meter_entry_data(psabpf_meter_entry_t *entry,
-                            psabpf_meter_value_t pir,
-                            psabpf_meter_value_t pbs,
-                            psabpf_meter_value_t cir,
-                            psabpf_meter_value_t cbs)
+int nikss_meter_entry_data(nikss_meter_entry_t *entry,
+                           nikss_meter_value_t pir,
+                           nikss_meter_value_t pbs,
+                           nikss_meter_value_t cir,
+                           nikss_meter_value_t cbs)
 {
     if (entry == NULL) {
         return ENODATA;
@@ -155,11 +155,11 @@ int psabpf_meter_entry_data(psabpf_meter_entry_t *entry,
     return NO_ERROR;
 }
 
-int psabpf_meter_entry_get_data(psabpf_meter_entry_t *entry,
-                                psabpf_meter_value_t *pir,
-                                psabpf_meter_value_t *pbs,
-                                psabpf_meter_value_t *cir,
-                                psabpf_meter_value_t *cbs)
+int nikss_meter_entry_get_data(nikss_meter_entry_t *entry,
+                               nikss_meter_value_t *pir,
+                               nikss_meter_value_t *pbs,
+                               nikss_meter_value_t *cir,
+                               nikss_meter_value_t *cbs)
 {
     if (entry == NULL) {
         return ENODATA;
@@ -181,13 +181,13 @@ int psabpf_meter_entry_get_data(psabpf_meter_entry_t *entry,
     return NO_ERROR;
 }
 
-psabpf_struct_field_t * psabpf_meter_entry_get_next_index_field(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
+nikss_struct_field_t * nikss_meter_entry_get_next_index_field(nikss_meter_ctx_t *ctx, nikss_meter_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd = NULL;
+    nikss_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->index_fds, entry->current_index_field_id);
     if (fd == NULL) {
         entry->current_index_field_id = 0;
@@ -204,26 +204,26 @@ psabpf_struct_field_t * psabpf_meter_entry_get_next_index_field(psabpf_meter_ctx
     return &entry->current_index_field;
 }
 
-void psabpf_meter_ctx_init(psabpf_meter_ctx_t *ctx)
+void nikss_meter_ctx_init(nikss_meter_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
 
-    memset(ctx, 0, sizeof(psabpf_meter_ctx_t));
+    memset(ctx, 0, sizeof(nikss_meter_ctx_t));
 
-    psabpf_meter_entry_init(&ctx->current_entry);
+    nikss_meter_entry_init(&ctx->current_entry);
     ctx->meter.fd = -1;
     init_btf(&ctx->btf_metadata);
 }
 
-void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx)
+void nikss_meter_ctx_free(nikss_meter_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
 
-    psabpf_meter_entry_free(&ctx->current_entry);
+    nikss_meter_entry_free(&ctx->current_entry);
     free_btf(&ctx->btf_metadata);
     free_struct_field_descriptor_set(&ctx->index_fds);
     close_object_fd(&ctx->meter.fd);
@@ -234,27 +234,27 @@ void psabpf_meter_ctx_free(psabpf_meter_ctx_t *ctx)
     ctx->previous_index = NULL;
 }
 
-int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx, const char *name)
+int nikss_meter_ctx_name(nikss_meter_ctx_t *ctx, nikss_context_t *nikss_ctx, const char *name)
 {
-    if (ctx == NULL || psabpf_ctx == NULL || name == NULL) {
+    if (ctx == NULL || nikss_ctx == NULL || name == NULL) {
         return EPERM;
     }
 
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
+    if (load_btf(nikss_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "couldn't find a BTF info\n");
     }
 
-    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->meter);
+    int ret = open_bpf_map(nikss_ctx, name, &ctx->btf_metadata, &ctx->meter);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open meter %s: %s\n", name, strerror(ret));
         return ret;
     }
 
-    if (sizeof(psabpf_meter_data_t) > ctx->meter.value_size) {
+    if (sizeof(nikss_meter_data_t) > ctx->meter.value_size) {
         /* cppcheck-suppress invalidPrintfArgType_uint ; cppcheck failed to recognize a real type of size_t */
         fprintf(stderr, "Meter data has bigger size "
                         "(%lu) than meter definition value size (%u)!\n",
-                sizeof(psabpf_meter_data_t), ctx->meter.value_size);
+                sizeof(nikss_meter_data_t), ctx->meter.value_size);
         return EINVAL;
     }
 
@@ -268,7 +268,7 @@ int psabpf_meter_ctx_name(psabpf_meter_ctx_t *ctx, psabpf_context_t *psabpf_ctx,
     return NO_ERROR;
 }
 
-int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
+int nikss_meter_entry_get(nikss_meter_ctx_t *ctx, nikss_meter_entry_t *entry)
 {
     int return_code = NO_ERROR;
     uint64_t bpf_flags = BPF_F_LOCK;
@@ -306,7 +306,7 @@ int psabpf_meter_entry_get(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
         goto clean_up;
     }
 
-    psabpf_meter_data_t data;
+    nikss_meter_data_t data;
     memcpy(&data, value_buffer, sizeof(data));
     return_code = convert_meter_data_to_entry(&data, entry);
 
@@ -315,9 +315,9 @@ clean_up:
     return return_code;
 }
 
-psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx)
+nikss_meter_entry_t *nikss_meter_get_next(nikss_meter_ctx_t *ctx)
 {
-    psabpf_meter_entry_t *ret_instance = NULL;
+    nikss_meter_entry_t *ret_instance = NULL;
     void *next_key = NULL;
     void *value_buffer = NULL;
 
@@ -364,7 +364,7 @@ psabpf_meter_entry_t *psabpf_meter_get_next(psabpf_meter_ctx_t *ctx)
         goto clean_up;
     }
 
-    psabpf_meter_data_t data;
+    nikss_meter_data_t data;
     memcpy(&data, value_buffer, sizeof(data));
     return_code = convert_meter_data_to_entry(&data, &ctx->current_entry);
     if (return_code != NO_ERROR) {
@@ -384,12 +384,12 @@ clean_up:
     return ret_instance;
 }
 
-int psabpf_meter_entry_update(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
+int nikss_meter_entry_update(nikss_meter_ctx_t *ctx, nikss_meter_entry_t *entry)
 {
     int return_code = NO_ERROR;
     uint64_t bpf_flags = BPF_F_LOCK;
     char *value_buffer = NULL;
-    psabpf_meter_data_t data;
+    nikss_meter_data_t data;
 
     if (ctx == NULL || entry == NULL) {
         return EINVAL;
@@ -434,23 +434,23 @@ clean_up:
     return return_code;
 }
 
-int psabpf_meter_entry_reset(psabpf_meter_ctx_t *ctx, psabpf_meter_entry_t *entry)
+int nikss_meter_entry_reset(nikss_meter_ctx_t *ctx, nikss_meter_entry_t *entry)
 {
     if (ctx == NULL) {
         return EINVAL;
     }
 
-    /* Remove all entries if psabpf_meter_entry_index were not executed on meter entry. */
+    /* Remove all entries if nikss_meter_entry_index were not executed on meter entry. */
     if (entry == NULL || entry->index_sfs.n_fields < 1) {
         return delete_all_map_entries(&ctx->meter);
     }
 
     if (ctx->meter.type == BPF_MAP_TYPE_ARRAY) {
-        int return_code = psabpf_meter_entry_data(entry, 0, 0, 0, 0);
+        int return_code = nikss_meter_entry_data(entry, 0, 0, 0, 0);
         if (return_code != NO_ERROR) {
             return return_code;
         }
-        return psabpf_meter_entry_update(ctx, entry);
+        return nikss_meter_entry_update(ctx, entry);
     }
 
     void *key_buffer = malloc(ctx->meter.key_size);

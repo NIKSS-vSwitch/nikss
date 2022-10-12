@@ -226,13 +226,13 @@ size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
     return 0;
 }
 
-void init_btf(psabpf_btf_t *btf)
+void init_btf(nikss_btf_t *btf)
 {
     btf->btf = NULL;
     btf->btf_fd = -1;
 }
 
-static int try_load_btf(psabpf_btf_t *btf, const char *program_name)
+static int try_load_btf(nikss_btf_t *btf, const char *program_name)
 {
     /* BTF metadata are associated with eBPF program, eBPF map may do not own BTF */
     int associated_prog = bpf_obj_get(program_name);
@@ -266,7 +266,7 @@ free_btf:
     return ENOENT;
 }
 
-int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
+int load_btf(nikss_context_t *nikss_ctx, nikss_btf_t *btf)
 {
     if (btf->btf != NULL) {
         return NO_ERROR;
@@ -278,7 +278,7 @@ int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
 
     for (int i = 0; i < number_of_programs; i++) {
         snprintf(program_file_name, sizeof(program_file_name), "%s/%s%u/%s",
-                 BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx), programs_to_search[i]);
+                 BPF_FS, PIPELINE_PREFIX, nikss_context_get_pipeline(nikss_ctx), programs_to_search[i]);
         if (try_load_btf(btf, program_file_name) == NO_ERROR) {
             break;
         }
@@ -290,7 +290,7 @@ int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
     return NO_ERROR;
 }
 
-void free_btf(psabpf_btf_t *btf)
+void free_btf(nikss_btf_t *btf)
 {
     if (btf == NULL) {
         return;
@@ -303,7 +303,7 @@ void free_btf(psabpf_btf_t *btf)
     close_object_fd(&btf->btf_fd);
 }
 
-int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *btf, psabpf_bpf_map_descriptor_t *md)
+int open_bpf_map(nikss_context_t *nikss_ctx, const char *name, nikss_btf_t *btf, nikss_bpf_map_descriptor_t *md)
 {
     char buffer[256];
     int errno_val = NO_ERROR;
@@ -312,7 +312,7 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
         return EPERM;
     }
 
-    build_ebpf_map_filename(buffer, sizeof(buffer), psabpf_ctx, name);
+    build_ebpf_map_filename(buffer, sizeof(buffer), nikss_ctx, name);
     md->fd = bpf_obj_get(buffer);
     if (md->fd < 0) {
         return errno;
@@ -349,7 +349,7 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
     return NO_ERROR;
 }
 
-int update_map_info(psabpf_bpf_map_descriptor_t *md)
+int update_map_info(nikss_bpf_map_descriptor_t *md)
 {
     if (md == NULL) {
         return EINVAL;

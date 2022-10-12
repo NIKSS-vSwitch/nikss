@@ -32,18 +32,18 @@
 #define MAX_COUNTER_VALUE_SIZE_SINGLE_FIELD 8
 #define MAX_COUNTER_VALUE_SIZE_BOTH_FIELDS  MAX_COUNTER_VALUE_SIZE
 
-void psabpf_counter_ctx_init(psabpf_counter_context_t *ctx)
+void nikss_counter_ctx_init(nikss_counter_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
 
-    memset(ctx, 0, sizeof(psabpf_counter_context_t));
+    memset(ctx, 0, sizeof(nikss_counter_context_t));
     ctx->counter.fd = -1;
     init_btf(&ctx->btf_metadata);
 }
 
-void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx)
+void nikss_counter_ctx_free(nikss_counter_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -52,7 +52,7 @@ void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx)
     free_btf(&ctx->btf_metadata);
     close_object_fd(&(ctx->counter.fd));
     free_struct_field_descriptor_set(&ctx->key_fds);
-    psabpf_counter_entry_free(&ctx->current_entry);
+    nikss_counter_entry_free(&ctx->current_entry);
 
     if (ctx->prev_entry_key != NULL) {
         free(ctx->prev_entry_key);
@@ -60,17 +60,17 @@ void psabpf_counter_ctx_free(psabpf_counter_context_t *ctx)
     ctx->prev_entry_key= NULL;
 }
 
-psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id)
+nikss_counter_type_t get_counter_type(nikss_btf_t *btf, uint32_t type_id)
 {
     const struct btf_type *type = psabtf_get_type_by_id(btf->btf, type_id);
     if (btf_kind(type) != BTF_KIND_STRUCT) {
-        return PSABPF_COUNTER_TYPE_UNKNOWN;
+        return NIKSS_COUNTER_TYPE_UNKNOWN;
     }
 
     unsigned value_entries = btf_vlen(type);
     if (value_entries != COUNTER_PACKETS_OR_BYTES_STRUCT_ENTRIES &&
         value_entries != COUNTER_PACKETS_AND_BYTES_STRUCT_ENTRIES) {
-        return PSABPF_COUNTER_TYPE_UNKNOWN;
+        return NIKSS_COUNTER_TYPE_UNKNOWN;
     }
 
     /* Allowed field names: "packets", "bytes" */
@@ -80,7 +80,7 @@ psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id)
     for (unsigned i = 0; i < value_entries; i++, m++) {
         const char *field_name = btf__name_by_offset(btf->btf, m->name_off);
         if (field_name == NULL) {
-            return PSABPF_COUNTER_TYPE_UNKNOWN;
+            return NIKSS_COUNTER_TYPE_UNKNOWN;
         }
 
         if (strcmp(field_name, "bytes") == 0) {
@@ -88,34 +88,34 @@ psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id)
         } else if (strcmp(field_name, "packets") == 0) {
             has_packets = true;
         } else {
-            return PSABPF_COUNTER_TYPE_UNKNOWN;
+            return NIKSS_COUNTER_TYPE_UNKNOWN;
         }
     }
 
     /* Decode counter type */
-    psabpf_counter_type_t counter_type = PSABPF_COUNTER_TYPE_UNKNOWN;
+    nikss_counter_type_t counter_type = NIKSS_COUNTER_TYPE_UNKNOWN;
     if (has_bytes == true && has_packets == true) {
-        counter_type = PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS;
+        counter_type = NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS;
     } else if (has_bytes == true && has_packets == false) {
-        counter_type = PSABPF_COUNTER_TYPE_BYTES;
+        counter_type = NIKSS_COUNTER_TYPE_BYTES;
     } else if (has_bytes == false && has_packets == true) {
-        counter_type = PSABPF_COUNTER_TYPE_PACKETS;
+        counter_type = NIKSS_COUNTER_TYPE_PACKETS;
     }
 
     return counter_type;
 }
 
-static int parse_counter_value(psabpf_counter_context_t *ctx)
+static int parse_counter_value(nikss_counter_context_t *ctx)
 {
     ctx->counter_type = get_counter_type(&ctx->btf_metadata, ctx->counter.value_type_id);
-    if (ctx->counter_type == PSABPF_COUNTER_TYPE_UNKNOWN) {
+    if (ctx->counter_type == NIKSS_COUNTER_TYPE_UNKNOWN) {
         return EINVAL;
     }
 
     /* Validate counter size - up to 64 bits per counter*/
-    if ((ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS &&
+    if ((ctx->counter_type == NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS &&
             ctx->counter.value_size > MAX_COUNTER_VALUE_SIZE_BOTH_FIELDS) ||
-        (ctx->counter_type != PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS &&
+        (ctx->counter_type != NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS &&
             ctx->counter.value_size > MAX_COUNTER_VALUE_SIZE_SINGLE_FIELD)) {
         return ENOTSUP;
     }
@@ -123,24 +123,24 @@ static int parse_counter_value(psabpf_counter_context_t *ctx)
     return NO_ERROR;
 }
 
-static int parse_counter_key(psabpf_counter_context_t *ctx)
+static int parse_counter_key(nikss_counter_context_t *ctx)
 {
     return parse_struct_type(&ctx->btf_metadata, ctx->counter.key_type_id, ctx->counter.key_size, &ctx->key_fds);
 }
 
-int psabpf_counter_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx, const char *name)
+int nikss_counter_ctx_name(nikss_context_t *nikss_ctx, nikss_counter_context_t *ctx, const char *name)
 {
-    if (psabpf_ctx == NULL || ctx == NULL || name == NULL) {
+    if (nikss_ctx == NULL || ctx == NULL || name == NULL) {
         return EINVAL;
     }
 
     /* get the BTF, will not work without it because there is too many possible configurations */
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
+    if (load_btf(nikss_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "couldn't find BTF info\n");
         return ENOTSUP;
     }
 
-    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->counter);
+    int ret = open_bpf_map(nikss_ctx, name, &ctx->btf_metadata, &ctx->counter);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open counter %s\n", name);
         return ret;
@@ -155,16 +155,16 @@ int psabpf_counter_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_counter_context
     return parse_counter_key(ctx);
 }
 
-void psabpf_counter_entry_init(psabpf_counter_entry_t *entry)
+void nikss_counter_entry_init(nikss_counter_entry_t *entry)
 {
     if (entry == NULL) {
         return;
     }
 
-    memset(entry, 0, sizeof(psabpf_counter_entry_t));
+    memset(entry, 0, sizeof(nikss_counter_entry_t));
 }
 
-void psabpf_counter_entry_free(psabpf_counter_entry_t *entry)
+void nikss_counter_entry_free(nikss_counter_entry_t *entry)
 {
     if (entry == NULL) {
         return;
@@ -178,7 +178,7 @@ void psabpf_counter_entry_free(psabpf_counter_entry_t *entry)
     entry->raw_key = NULL;
 }
 
-int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, const void *data, size_t data_len)
+int nikss_counter_entry_set_key(nikss_counter_entry_t *entry, const void *data, size_t data_len)
 {
     if (entry == NULL) {
         return EINVAL;
@@ -194,7 +194,7 @@ int psabpf_counter_entry_set_key(psabpf_counter_entry_t *entry, const void *data
     return ret;
 }
 
-psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+nikss_struct_field_t *nikss_counter_entry_get_next_key(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return NULL;
@@ -204,7 +204,7 @@ psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd = NULL;
+    nikss_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->key_fds, entry->current_key_id);
     if (fd == NULL) {
         entry->current_key_id = 0;
@@ -221,16 +221,16 @@ psabpf_struct_field_t *psabpf_counter_entry_get_next_key(psabpf_counter_context_
     return &entry->current_field;
 }
 
-psabpf_counter_type_t psabpf_counter_get_type(psabpf_counter_context_t *ctx)
+nikss_counter_type_t nikss_counter_get_type(nikss_counter_context_t *ctx)
 {
     if (ctx == NULL) {
-        return PSABPF_COUNTER_TYPE_UNKNOWN;
+        return NIKSS_COUNTER_TYPE_UNKNOWN;
     }
 
     return ctx->counter_type;
 }
 
-void psabpf_counter_entry_set_packets(psabpf_counter_entry_t *entry, psabpf_counter_value_t packets)
+void nikss_counter_entry_set_packets(nikss_counter_entry_t *entry, nikss_counter_value_t packets)
 {
     if (entry == NULL) {
         return;
@@ -238,7 +238,7 @@ void psabpf_counter_entry_set_packets(psabpf_counter_entry_t *entry, psabpf_coun
     entry->packets = packets;
 }
 
-void psabpf_counter_entry_set_bytes(psabpf_counter_entry_t *entry, psabpf_counter_value_t bytes)
+void nikss_counter_entry_set_bytes(nikss_counter_entry_t *entry, nikss_counter_value_t bytes)
 {
     if (entry == NULL) {
         return;
@@ -246,7 +246,7 @@ void psabpf_counter_entry_set_bytes(psabpf_counter_entry_t *entry, psabpf_counte
     entry->bytes = bytes;
 }
 
-psabpf_counter_value_t psabpf_counter_entry_get_packets(psabpf_counter_entry_t *entry)
+nikss_counter_value_t nikss_counter_entry_get_packets(nikss_counter_entry_t *entry)
 {
     if (entry == NULL) {
         return 0;
@@ -254,7 +254,7 @@ psabpf_counter_value_t psabpf_counter_entry_get_packets(psabpf_counter_entry_t *
     return entry->packets;
 }
 
-psabpf_counter_value_t psabpf_counter_entry_get_bytes(psabpf_counter_entry_t *entry)
+nikss_counter_value_t nikss_counter_entry_get_bytes(nikss_counter_entry_t *entry)
 {
     if (entry == NULL) {
         return 0;
@@ -262,7 +262,7 @@ psabpf_counter_value_t psabpf_counter_entry_get_bytes(psabpf_counter_entry_t *en
     return entry->bytes;
 }
 
-static void *allocate_key_buffer(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+static void *allocate_key_buffer(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry)
 {
     if (entry->raw_key != NULL) {
         return entry->raw_key;  /* already allocated */
@@ -277,16 +277,16 @@ static void *allocate_key_buffer(psabpf_counter_context_t *ctx, psabpf_counter_e
 }
 
 int convert_counter_data_to_entry(const char *data, size_t counter_size,
-                                  psabpf_counter_type_t counter_type, psabpf_counter_entry_t *entry)
+                                  nikss_counter_type_t counter_type, nikss_counter_entry_t *entry)
 {
     entry->bytes = 0;
     entry->packets = 0;
 
-    if (counter_type == PSABPF_COUNTER_TYPE_BYTES) {
+    if (counter_type == NIKSS_COUNTER_TYPE_BYTES) {
         memcpy(&entry->bytes, &data[0], counter_size);
-    } else if (counter_type == PSABPF_COUNTER_TYPE_PACKETS) {
+    } else if (counter_type == NIKSS_COUNTER_TYPE_PACKETS) {
         memcpy(&entry->packets, &data[0], counter_size);
-    } else if (counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+    } else if (counter_type == NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS) {
         counter_size = counter_size / 2;
         memcpy(&entry->bytes, &data[0], counter_size);
         memcpy(&entry->packets, &data[counter_size], counter_size);
@@ -295,7 +295,7 @@ int convert_counter_data_to_entry(const char *data, size_t counter_size,
     return NO_ERROR;
 }
 
-static int read_and_parse_counter_value(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+static int read_and_parse_counter_value(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry)
 {
     char value[MAX_COUNTER_VALUE_SIZE];
     int ret = bpf_map_lookup_elem(ctx->counter.fd, entry->raw_key, &value[0]);
@@ -308,7 +308,7 @@ static int read_and_parse_counter_value(psabpf_counter_context_t *ctx, psabpf_co
     return convert_counter_data_to_entry(value, ctx->counter.value_size, ctx->counter_type, entry);
 }
 
-int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+int nikss_counter_get(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return EINVAL;
@@ -326,7 +326,7 @@ int psabpf_counter_get(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *en
     return read_and_parse_counter_value(ctx, entry);
 }
 
-psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx)
+nikss_counter_entry_t *nikss_counter_get_next(nikss_counter_context_t *ctx)
 {
     if (ctx == NULL) {
         return NULL;
@@ -363,14 +363,14 @@ psabpf_counter_entry_t *psabpf_counter_get_next(psabpf_counter_context_t *ctx)
     return &ctx->current_entry;
 }
 
-int convert_counter_entry_to_data(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, char *buffer)
+int convert_counter_entry_to_data(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry, char *buffer)
 {
     size_t counter_size = ctx->counter.value_size;
-    if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES) {
+    if (ctx->counter_type == NIKSS_COUNTER_TYPE_BYTES) {
         memcpy(buffer, &entry->bytes, counter_size);
-    } else if (ctx->counter_type == PSABPF_COUNTER_TYPE_PACKETS) {
+    } else if (ctx->counter_type == NIKSS_COUNTER_TYPE_PACKETS) {
         memcpy(buffer, &entry->packets, counter_size);
-    } else if (ctx->counter_type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+    } else if (ctx->counter_type == NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS) {
         counter_size = counter_size / 2;
         memcpy(buffer, &entry->bytes, counter_size);
         memcpy(buffer + counter_size, &entry->packets, counter_size);
@@ -391,7 +391,7 @@ static bool is_zero_counter_value(const char *buffer, size_t buffer_len)
     return true;
 }
 
-static int set_all_counters(psabpf_counter_context_t *ctx, void *encoded_value, bool remove_entry_allowed)
+static int set_all_counters(nikss_counter_context_t *ctx, void *encoded_value, bool remove_entry_allowed)
 {
     char * key = malloc(ctx->counter.key_size);
     char * next_key = malloc(ctx->counter.key_size);
@@ -443,7 +443,7 @@ clean_up:
     return error_code;
 }
 
-static int do_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, bool remove_entry_allowed)
+static int do_counter_set(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry, bool remove_entry_allowed)
 {
     if (ctx == NULL || entry == NULL) {
         return EINVAL;
@@ -482,12 +482,12 @@ static int do_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t 
     return ret;
 }
 
-int psabpf_counter_set(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+int nikss_counter_set(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry)
 {
     return do_counter_set(ctx, entry, false);
 }
 
-int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+int nikss_counter_reset(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return EINVAL;

@@ -27,7 +27,7 @@
 #include "value_set.h"
 
 static int parse_dst_value_set(int *argc, char ***argv, const char **value_set_name,
-                               psabpf_context_t *psabpf_ctx, psabpf_value_set_context_t *ctx)
+                               nikss_context_t *nikss_ctx, nikss_value_set_context_t *ctx)
 {
     if (*argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -37,7 +37,7 @@ static int parse_dst_value_set(int *argc, char ***argv, const char **value_set_n
     if (value_set_name != NULL) {
         *value_set_name = **argv;
     }
-    int error_code = psabpf_value_set_context_name(psabpf_ctx, ctx, **argv);
+    int error_code = nikss_value_set_context_name(nikss_ctx, ctx, **argv);
     if (error_code != NO_ERROR) {
         return error_code;
     }
@@ -46,7 +46,7 @@ static int parse_dst_value_set(int *argc, char ***argv, const char **value_set_n
     return NO_ERROR;
 }
 
-static int parse_value_set_value(int *argc, char ***argv, psabpf_table_entry_t *entry)
+static int parse_value_set_value(int *argc, char ***argv, nikss_table_entry_t *entry)
 {
     if (!is_keyword(**argv, "value")) {
         fprintf(stderr, "expected \'value\' keyword\n");
@@ -56,7 +56,7 @@ static int parse_value_set_value(int *argc, char ***argv, psabpf_table_entry_t *
     return parse_key_data(argc, argv, entry);
 }
 
-static int get_and_print_value_set_json(psabpf_value_set_context_t *ctx,
+static int get_and_print_value_set_json(nikss_value_set_context_t *ctx,
                                         const char *value_set_name)
 {
     int ret = NO_ERROR;
@@ -70,8 +70,8 @@ static int get_and_print_value_set_json(psabpf_value_set_context_t *ctx,
 
     json_object_set(root, value_set_name, entries);
 
-    psabpf_table_entry_t *current_entry = NULL;
-    while ((current_entry = psabpf_value_set_get_next_entry(ctx)) != NULL) {
+    nikss_table_entry_t *current_entry = NULL;
+    while ((current_entry = nikss_value_set_get_next_entry(ctx)) != NULL) {
         json_t *json_entry = json_object();
         json_t *key = create_json_entry_key(current_entry);
         if (key == NULL) {
@@ -81,7 +81,7 @@ static int get_and_print_value_set_json(psabpf_value_set_context_t *ctx,
         }
         json_object_set_new(json_entry, "value", key);
         json_array_append_new(entries, json_entry);
-        psabpf_table_entry_free(current_entry);
+        nikss_table_entry_free(current_entry);
     }
 
     if (ret != NO_ERROR) {
@@ -104,19 +104,19 @@ int do_value_set_delete(int argc, char **argv)
 {
     int ret = EINVAL;
     const char *value_set_name = NULL;
-    psabpf_context_t psabpf_ctx;
-    psabpf_value_set_context_t ctx;
-    psabpf_table_entry_t entry;
+    nikss_context_t nikss_ctx;
+    nikss_value_set_context_t ctx;
+    nikss_table_entry_t entry;
 
-    psabpf_context_init(&psabpf_ctx);
-    psabpf_value_set_context_init(&ctx);
-    psabpf_table_entry_init(&entry);
+    nikss_context_init(&nikss_ctx);
+    nikss_value_set_context_init(&ctx);
+    nikss_table_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
+    if (parse_pipeline_id(&argc, &argv, &nikss_ctx) != NO_ERROR) {
         goto clean_up;
     }
 
-    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR) {
+    if (parse_dst_value_set(&argc, &argv, &value_set_name, &nikss_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
     }
 
@@ -129,12 +129,12 @@ int do_value_set_delete(int argc, char **argv)
         goto clean_up;
     }
 
-    ret = psabpf_value_set_delete(&ctx, &entry);
+    ret = nikss_value_set_delete(&ctx, &entry);
 
 clean_up:
-    psabpf_table_entry_free(&entry);
-    psabpf_value_set_context_free(&ctx);
-    psabpf_context_free(&psabpf_ctx);
+    nikss_table_entry_free(&entry);
+    nikss_value_set_context_free(&ctx);
+    nikss_context_free(&nikss_ctx);
 
     return ret;
 }
@@ -143,19 +143,19 @@ int do_value_set_insert(int argc, char **argv)
 {
     int ret = EINVAL;
     const char *value_set_name = NULL;
-    psabpf_context_t psabpf_ctx;
-    psabpf_value_set_context_t ctx;
-    psabpf_table_entry_t entry;
+    nikss_context_t nikss_ctx;
+    nikss_value_set_context_t ctx;
+    nikss_table_entry_t entry;
 
-    psabpf_context_init(&psabpf_ctx);
-    psabpf_value_set_context_init(&ctx);
-    psabpf_table_entry_init(&entry);
+    nikss_context_init(&nikss_ctx);
+    nikss_value_set_context_init(&ctx);
+    nikss_table_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
+    if (parse_pipeline_id(&argc, &argv, &nikss_ctx) != NO_ERROR) {
         goto clean_up;
     }
 
-    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR) {
+    if (parse_dst_value_set(&argc, &argv, &value_set_name, &nikss_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
     }
 
@@ -168,12 +168,12 @@ int do_value_set_insert(int argc, char **argv)
         goto clean_up;
     }
 
-    ret = psabpf_value_set_insert(&ctx, &entry);
+    ret = nikss_value_set_insert(&ctx, &entry);
 
 clean_up:
-    psabpf_table_entry_free(&entry);
-    psabpf_value_set_context_free(&ctx);
-    psabpf_context_free(&psabpf_ctx);
+    nikss_table_entry_free(&entry);
+    nikss_value_set_context_free(&ctx);
+    nikss_context_free(&nikss_ctx);
 
     return ret;
 }
@@ -182,19 +182,19 @@ int do_value_set_get(int argc, char **argv)
 {
     int ret = EINVAL;
     const char *value_set_name = NULL;
-    psabpf_context_t psabpf_ctx;
-    psabpf_value_set_context_t ctx;
-    psabpf_table_entry_t entry;
+    nikss_context_t nikss_ctx;
+    nikss_value_set_context_t ctx;
+    nikss_table_entry_t entry;
 
-    psabpf_context_init(&psabpf_ctx);
-    psabpf_value_set_context_init(&ctx);
-    psabpf_table_entry_init(&entry);
+    nikss_context_init(&nikss_ctx);
+    nikss_value_set_context_init(&ctx);
+    nikss_table_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
+    if (parse_pipeline_id(&argc, &argv, &nikss_ctx) != NO_ERROR) {
         goto clean_up;
     }
 
-    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR) {
+    if (parse_dst_value_set(&argc, &argv, &value_set_name, &nikss_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
     }
 
@@ -206,9 +206,9 @@ int do_value_set_get(int argc, char **argv)
     ret = get_and_print_value_set_json(&ctx, value_set_name);
 
 clean_up:
-    psabpf_table_entry_free(&entry);
-    psabpf_value_set_context_free(&ctx);
-    psabpf_context_free(&psabpf_ctx);
+    nikss_table_entry_free(&entry);
+    nikss_value_set_context_free(&ctx);
+    nikss_context_free(&nikss_ctx);
 
     return ret;
 }

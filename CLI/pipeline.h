@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PSABPFCTL_PIPELINE_H
-#define __PSABPFCTL_PIPELINE_H
+#ifndef __NIKSSCTL_PIPELINE_H
+#define __NIKSSCTL_PIPELINE_H
 
 #include "common.h"
 
@@ -35,4 +35,4 @@ static const struct cmd pipeline_cmds[] = {
         {0}
 };
 
-#endif // __PSABPFCTL_PIPELINE_H
+#endif /* __NIKSSCTL_PIPELINE_H */

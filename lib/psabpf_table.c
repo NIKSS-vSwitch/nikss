@@ -32,12 +32,12 @@
 #include "psabpf_meter.h"
 #include "psabpf_table.h"
 
-void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
+void nikss_table_entry_ctx_init(nikss_table_entry_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
-    memset(ctx, 0, sizeof(psabpf_table_entry_ctx_t));
+    memset(ctx, 0, sizeof(nikss_table_entry_ctx_t));
 
     init_btf(&ctx->btf_metadata);
 
@@ -48,10 +48,10 @@ void psabpf_table_entry_ctx_init(psabpf_table_entry_ctx_t *ctx)
     ctx->tuple_map.fd = -1;
     ctx->cache.fd = -1;
 
-    psabpf_table_entry_init(&ctx->current_entry);
+    nikss_table_entry_init(&ctx->current_entry);
 }
 
-void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
+void nikss_table_entry_ctx_free(nikss_table_entry_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -67,7 +67,7 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
 
     if (ctx->direct_counters_ctx != NULL) {
         for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
-            psabpf_direct_counter_ctx_free(&ctx->direct_counters_ctx[i]);
+            nikss_direct_counter_ctx_free(&ctx->direct_counters_ctx[i]);
         }
         free(ctx->direct_counters_ctx);
         ctx->direct_counters_ctx = NULL;
@@ -76,7 +76,7 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
 
     if (ctx->direct_meters_ctx != NULL) {
         for (unsigned i = 0; i < ctx->n_direct_meters; i++) {
-            psabpf_direct_meter_ctx_free(&ctx->direct_meters_ctx[i]);
+            nikss_direct_meter_ctx_free(&ctx->direct_meters_ctx[i]);
         }
         free(ctx->direct_meters_ctx);
         ctx->direct_meters_ctx = NULL;
@@ -91,10 +91,10 @@ void psabpf_table_entry_ctx_free(psabpf_table_entry_ctx_t *ctx)
     }
     ctx->current_raw_key = NULL;
 
-    psabpf_table_entry_free(&ctx->current_entry);
+    nikss_table_entry_free(&ctx->current_entry);
 }
 
-static int get_value_type(psabpf_table_entry_ctx_t *ctx, const struct btf_type **value_type)
+static int get_value_type(nikss_table_entry_ctx_t *ctx, const struct btf_type **value_type)
 {
     if (ctx->table.value_type_id == 0) {
         return ENOENT;
@@ -112,7 +112,7 @@ static int get_value_type(psabpf_table_entry_ctx_t *ctx, const struct btf_type *
     return NO_ERROR;
 }
 
-static bool member_is_direct_or_implementation_object(psabpf_btf_t *btf, const struct btf_member *member,
+static bool member_is_direct_or_implementation_object(nikss_btf_t *btf, const struct btf_member *member,
                                                       const char **name, const char **type_name)
 {
     *name = btf__name_by_offset(btf->btf, member->name_off);
@@ -149,7 +149,7 @@ static bool member_is_direct_or_implementation_object(psabpf_btf_t *btf, const s
     return true;
 }
 
-static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
+static int count_direct_objects(nikss_table_entry_ctx_t *ctx)
 {
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         return NO_ERROR;
@@ -171,8 +171,8 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
         }
 
         size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
-        psabpf_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
-        if (counter_type != PSABPF_COUNTER_TYPE_UNKNOWN) {
+        nikss_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
+        if (counter_type != NIKSS_COUNTER_TYPE_UNKNOWN) {
             /* DirectCounter */
             ctx->n_direct_counters += 1;
         } else if (strcmp(member_type_name, "meter_value") == 0 && member_size == DIRECT_METER_SIZE) {
@@ -193,7 +193,7 @@ static int count_direct_objects(psabpf_table_entry_ctx_t *ctx)
     return NO_ERROR;
 }
 
-static void try_find_group_mark_for_table_impl(psabpf_table_entry_ctx_t *ctx, unsigned table_impl_id)
+static void try_find_group_mark_for_table_impl(nikss_table_entry_ctx_t *ctx, unsigned table_impl_id)
 {
     char expected_name[256];
     psabtf_struct_member_md_t md;
@@ -214,12 +214,12 @@ static void try_find_group_mark_for_table_impl(psabpf_table_entry_ctx_t *ctx, un
     }
 
     ctx->table_implementation_group_marks.fields[table_impl_id].name = NULL;
-    ctx->table_implementation_group_marks.fields[table_impl_id].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
+    ctx->table_implementation_group_marks.fields[table_impl_id].type = NIKSS_STRUCT_FIELD_TYPE_DATA;
     ctx->table_implementation_group_marks.fields[table_impl_id].data_offset = md.bit_offset / 8;
     ctx->table_implementation_group_marks.fields[table_impl_id].data_len = size;
 }
 
-static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
+static int init_direct_objects_context(nikss_table_entry_ctx_t *ctx)
 {
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         return NO_ERROR;
@@ -245,10 +245,10 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
 
         size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
         size_t member_offset = btf_member_bit_offset(value_type, i) / 8;
-        psabpf_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
+        nikss_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
 
-        if (counter_type != PSABPF_COUNTER_TYPE_UNKNOWN) {
-            psabpf_direct_counter_ctx_init(&ctx->direct_counters_ctx[current_counter]);
+        if (counter_type != NIKSS_COUNTER_TYPE_UNKNOWN) {
+            nikss_direct_counter_ctx_init(&ctx->direct_counters_ctx[current_counter]);
 
             ctx->direct_counters_ctx[current_counter].name = strdup(member_name);
             ctx->direct_counters_ctx[current_counter].counter_type = counter_type;
@@ -261,7 +261,7 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
 
             ++current_counter;
         } else if (strcmp(member_type_name, "meter_value") == 0 && member_size == DIRECT_METER_SIZE) {
-            psabpf_direct_meter_ctx_init(&ctx->direct_meters_ctx[current_meter]);
+            nikss_direct_meter_ctx_init(&ctx->direct_meters_ctx[current_meter]);
 
             ctx->direct_meters_ctx[current_meter].name = strdup(member_name);
             ctx->direct_meters_ctx[current_meter].meter_offset = member_offset;
@@ -277,7 +277,7 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
                 char *tbl_impl_name = strdup(member_name);
                 ctx->table_implementations.fields[current_table_impl].data_offset = member_offset;
                 ctx->table_implementations.fields[current_table_impl].data_len = member_size;
-                ctx->table_implementations.fields[current_table_impl].type = PSABPF_STRUCT_FIELD_TYPE_DATA;
+                ctx->table_implementations.fields[current_table_impl].type = NIKSS_STRUCT_FIELD_TYPE_DATA;
                 if (tbl_impl_name == NULL) {
                     return ENOMEM;
                 }
@@ -297,7 +297,7 @@ static int init_direct_objects_context(psabpf_table_entry_ctx_t *ctx)
     return NO_ERROR;
 }
 
-static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
+static int init_direct_objects(nikss_table_entry_ctx_t *ctx)
 {
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         fprintf(stderr, "unable to handle direct objects; resetting them if exist\n");
@@ -310,14 +310,14 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
     }
 
     if (ctx->n_direct_counters > 0) {
-        ctx->direct_counters_ctx = malloc(ctx->n_direct_counters * sizeof(psabpf_direct_counter_context_t));
+        ctx->direct_counters_ctx = malloc(ctx->n_direct_counters * sizeof(nikss_direct_counter_context_t));
         if (ctx->direct_counters_ctx == NULL) {
             return ENOMEM;
         }
     }
 
     if (ctx->n_direct_meters > 0) {
-        ctx->direct_meters_ctx = malloc(ctx->n_direct_meters * sizeof(psabpf_direct_meter_context_t));
+        ctx->direct_meters_ctx = malloc(ctx->n_direct_meters * sizeof(nikss_direct_meter_context_t));
         if (ctx->direct_meters_ctx == NULL) {
             /* Avoid memory corruption */
             if (ctx->direct_counters_ctx != NULL) {
@@ -331,10 +331,10 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
     if (ctx->table_implementations.n_fields > 0) {
         /* TODO: here mark table as indirect instead of finding union 'u'? */
         ctx->table_implementations.fields = calloc(ctx->table_implementations.n_fields,
-                                                   sizeof(psabpf_struct_field_descriptor_t));
+                                                   sizeof(nikss_struct_field_descriptor_t));
         ctx->table_implementation_group_marks.n_fields = ctx->table_implementations.n_fields;
         ctx->table_implementation_group_marks.fields = calloc(ctx->table_implementation_group_marks.n_fields,
-                                                              sizeof(psabpf_struct_field_descriptor_t));
+                                                              sizeof(nikss_struct_field_descriptor_t));
 
         if (ctx->table_implementations.fields == NULL || ctx->table_implementation_group_marks.fields == NULL) {
             if (ctx->direct_counters_ctx != NULL) {
@@ -352,27 +352,27 @@ static int init_direct_objects(psabpf_table_entry_ctx_t *ctx)
     return init_direct_objects_context(ctx);
 }
 
-int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
+int open_ternary_table(nikss_context_t *nikss_ctx, nikss_table_entry_ctx_t *ctx, const char *name)
 {
     int ret = NO_ERROR;
     char derived_name[256];
 
     snprintf(derived_name, sizeof(derived_name), "%s_prefixes", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf_metadata, &ctx->prefixes);
+    ret = open_bpf_map(nikss_ctx, derived_name, &ctx->btf_metadata, &ctx->prefixes);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuples_map", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf_metadata, &ctx->tuple_map);
+    ret = open_bpf_map(nikss_ctx, derived_name, &ctx->btf_metadata, &ctx->tuple_map);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_tuple", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf_metadata, &ctx->table);
+    ret = open_bpf_map(nikss_ctx, derived_name, &ctx->btf_metadata, &ctx->table);
     close_object_fd(&(ctx->table.fd));  /* We need only metadata from this map */
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
@@ -384,22 +384,22 @@ int open_ternary_table(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *c
     return NO_ERROR;
 }
 
-int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_entry_ctx_t *ctx, const char *name)
+int nikss_table_entry_ctx_tblname(nikss_context_t *nikss_ctx, nikss_table_entry_ctx_t *ctx, const char *name)
 {
-    if (ctx == NULL || psabpf_ctx == NULL || name == NULL) {
+    if (ctx == NULL || nikss_ctx == NULL || name == NULL) {
         return EINVAL;
     }
 
     /* get the BTF, it is optional so print only warning */
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
+    if (load_btf(nikss_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "warning: couldn't find BTF info\n");
     }
 
-    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->table);
+    int ret = open_bpf_map(nikss_ctx, name, &ctx->btf_metadata, &ctx->table);
 
     /* if map does not exist, try the ternary table */
     if (ret == ENOENT) {
-        ret = open_ternary_table(psabpf_ctx, ctx, name);
+        ret = open_ternary_table(nikss_ctx, ctx, name);
     }
 
     if (ret != NO_ERROR) {
@@ -414,11 +414,11 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     /* Open map with default entry, ignore error(s), because map is optional */
     char map_name[256];
     snprintf(map_name, sizeof(map_name), "%s_defaultAction", name);
-    open_bpf_map(psabpf_ctx, map_name, &ctx->btf_metadata, &ctx->default_entry);
+    open_bpf_map(nikss_ctx, map_name, &ctx->btf_metadata, &ctx->default_entry);
 
     /* open cache table, this is optional feature for table*/
     snprintf(map_name, sizeof(map_name), "%s_cache", name);
-    ret = open_bpf_map(psabpf_ctx, map_name, &ctx->btf_metadata, &ctx->cache);
+    ret = open_bpf_map(nikss_ctx, map_name, &ctx->btf_metadata, &ctx->cache);
     if (ret == NO_ERROR) {
         fprintf(stderr, "found cache for table: %s\n", name);
     }
@@ -432,7 +432,7 @@ int psabpf_table_entry_ctx_tblname(psabpf_context_t *psabpf_ctx, psabpf_table_en
     return NO_ERROR;
 }
 
-void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx)
+void nikss_table_entry_ctx_mark_indirect(nikss_table_entry_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -440,7 +440,7 @@ void psabpf_table_entry_ctx_mark_indirect(psabpf_table_entry_ctx_t *ctx)
     ctx->is_indirect = true;
 }
 
-bool psabpf_table_entry_ctx_is_indirect(psabpf_table_entry_ctx_t *ctx)
+bool nikss_table_entry_ctx_is_indirect(nikss_table_entry_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return false;
@@ -448,7 +448,7 @@ bool psabpf_table_entry_ctx_is_indirect(psabpf_table_entry_ctx_t *ctx)
     return ctx->is_indirect;
 }
 
-bool psabpf_table_entry_ctx_has_priority(psabpf_table_entry_ctx_t *ctx)
+bool nikss_table_entry_ctx_has_priority(nikss_table_entry_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return false;
@@ -456,19 +456,19 @@ bool psabpf_table_entry_ctx_has_priority(psabpf_table_entry_ctx_t *ctx)
     return ctx->is_ternary;
 }
 
-void psabpf_table_entry_init(psabpf_table_entry_t *entry)
+void nikss_table_entry_init(nikss_table_entry_t *entry)
 {
     if (entry == NULL) {
         return;
     }
-    memset(entry, 0, sizeof(psabpf_table_entry_t));
+    memset(entry, 0, sizeof(nikss_table_entry_t));
 
-    psabpf_matchkey_init(&entry->current_match_key);
-    psabpf_direct_counter_ctx_init(&entry->current_direct_counter_ctx);
-    psabpf_direct_meter_ctx_init(&entry->current_direct_meter_ctx);
+    nikss_matchkey_init(&entry->current_match_key);
+    nikss_direct_counter_ctx_init(&entry->current_direct_counter_ctx);
+    nikss_direct_meter_ctx_init(&entry->current_direct_meter_ctx);
 }
 
-void psabpf_table_entry_free(psabpf_table_entry_t *entry)
+void nikss_table_entry_free(nikss_table_entry_t *entry)
 {
     if (entry == NULL) {
         return;
@@ -476,7 +476,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
 
     /* free match keys */
     for (size_t i = 0; i < entry->n_keys; i++) {
-        psabpf_matchkey_free(entry->match_keys[i]);
+        nikss_matchkey_free(entry->match_keys[i]);
     }
     if (entry->match_keys) {
         free(entry->match_keys);
@@ -486,7 +486,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
 
     /* free action data */
     if (entry->action != NULL) {
-        psabpf_action_free(entry->action);
+        nikss_action_free(entry->action);
         free(entry->action);
         entry->action = NULL;
     }
@@ -494,7 +494,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
     /* free DirectCounter instances */
     if (entry->direct_counters != NULL) {
         for (unsigned i = 0; i < entry->n_direct_counters; i++) {
-            psabpf_counter_entry_free(&entry->direct_counters[i].counter);
+            nikss_counter_entry_free(&entry->direct_counters[i].counter);
         }
         free(entry->direct_counters);
     }
@@ -504,7 +504,7 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
     /* free DirectMeter instances */
     if (entry->direct_meters != NULL) {
         for (unsigned i = 0; i < entry->n_direct_meters; i++) {
-            psabpf_meter_entry_free(&entry->direct_meters[i].meter);
+            nikss_meter_entry_free(&entry->direct_meters[i].meter);
         }
         free(entry->direct_meters);
     }
@@ -512,14 +512,14 @@ void psabpf_table_entry_free(psabpf_table_entry_t *entry)
     entry->n_direct_meters = 0;
 
     /* Iterators */
-    psabpf_matchkey_free(&entry->current_match_key);
-    psabpf_action_param_free(&entry->current_action_param);
-    psabpf_direct_counter_ctx_free(&entry->current_direct_counter_ctx);
-    psabpf_direct_meter_ctx_free(&entry->current_direct_meter_ctx);
+    nikss_matchkey_free(&entry->current_match_key);
+    nikss_action_param_free(&entry->current_action_param);
+    nikss_direct_counter_ctx_free(&entry->current_direct_counter_ctx);
+    nikss_direct_meter_ctx_free(&entry->current_direct_meter_ctx);
 }
 
 /* can be invoked multiple times */
-int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t *mk)
+int nikss_table_entry_matchkey(nikss_table_entry_t *entry, nikss_match_key_t *mk)
 {
     if (entry == NULL || mk == NULL) {
         return EINVAL;
@@ -528,18 +528,18 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
         return ENODATA;
     }
 
-    if (mk->type == PSABPF_LPM) {
+    if (mk->type == NIKSS_LPM) {
         for (size_t i = 0; i < entry->n_keys; ++i) {
-            if (entry->match_keys[i]->type == PSABPF_LPM) {
+            if (entry->match_keys[i]->type == NIKSS_LPM) {
                 fprintf(stderr, "only one LPM key is allowed\n");
                 return EPERM;
             }
         }
     }
 
-    size_t new_size = (entry->n_keys + 1) * sizeof(psabpf_match_key_t *);
-    psabpf_match_key_t ** tmp = malloc(new_size);
-    psabpf_match_key_t * new_mk = malloc(sizeof(psabpf_match_key_t));
+    size_t new_size = (entry->n_keys + 1) * sizeof(nikss_match_key_t *);
+    nikss_match_key_t ** tmp = malloc(new_size);
+    nikss_match_key_t * new_mk = malloc(sizeof(nikss_match_key_t));
 
     if (tmp == NULL || new_mk == NULL) {
         if (tmp != NULL) {
@@ -552,19 +552,19 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
     }
 
     if (entry->n_keys != 0) {
-        memcpy(tmp, entry->match_keys, (entry->n_keys) * sizeof(psabpf_match_key_t *));
+        memcpy(tmp, entry->match_keys, (entry->n_keys) * sizeof(nikss_match_key_t *));
     }
     if (entry->match_keys != NULL) {
         free(entry->match_keys);
     }
     entry->match_keys = tmp;
 
-    memcpy(new_mk, mk, sizeof(psabpf_match_key_t));
+    memcpy(new_mk, mk, sizeof(nikss_match_key_t));
     entry->match_keys[entry->n_keys] = new_mk;
 
     /* stole data from mk to new_mk */
     mk->data = NULL;
-    if (mk->type == PSABPF_TERNARY) {
+    if (mk->type == NIKSS_TERNARY) {
         mk->u.ternary.mask = NULL;
     }
 
@@ -573,7 +573,7 @@ int psabpf_table_entry_matchkey(psabpf_table_entry_t *entry, psabpf_match_key_t 
     return NO_ERROR;
 }
 
-psabpf_match_key_t *psabpf_table_entry_get_next_matchkey(psabpf_table_entry_t *entry)
+nikss_match_key_t *nikss_table_entry_get_next_matchkey(nikss_table_entry_t *entry)
 {
     if (entry == NULL) {
         return NULL;
@@ -584,26 +584,26 @@ psabpf_match_key_t *psabpf_table_entry_get_next_matchkey(psabpf_table_entry_t *e
         return NULL;
     }
 
-    memcpy(&entry->current_match_key, entry->match_keys[entry->current_match_key_id], sizeof(psabpf_match_key_t));
+    memcpy(&entry->current_match_key, entry->match_keys[entry->current_match_key_id], sizeof(nikss_match_key_t));
     entry->current_match_key.mem_can_be_freed = false;
     entry->current_match_key_id += 1;
 
     return &entry->current_match_key;
 }
 
-void move_action(psabpf_action_t *dst, psabpf_action_t *src)
+void move_action(nikss_action_t *dst, nikss_action_t *src)
 {
     if (dst == NULL || src == NULL) {
         return;
     }
 
     /* stole action data from src */
-    memcpy(dst, src, sizeof(psabpf_action_t));
+    memcpy(dst, src, sizeof(nikss_action_t));
     src->params = NULL;
     src->n_params = 0;
 }
 
-void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act)
+void nikss_table_entry_action(nikss_table_entry_t *entry, nikss_action_t *act)
 {
     if (entry == NULL || act == NULL) {
         return;
@@ -612,7 +612,7 @@ void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act
         return;
     }
 
-    entry->action = malloc(sizeof(psabpf_action_t));
+    entry->action = malloc(sizeof(nikss_action_t));
     if (entry->action == NULL) {
         return;
     }
@@ -620,7 +620,7 @@ void psabpf_table_entry_action(psabpf_table_entry_t *entry, psabpf_action_t *act
 }
 
 /* only for ternary */
-void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t priority)
+void nikss_table_entry_priority(nikss_table_entry_t *entry, const uint32_t priority)
 {
     if (entry == NULL) {
         return;
@@ -628,7 +628,7 @@ void psabpf_table_entry_priority(psabpf_table_entry_t *entry, const uint32_t pri
     entry->priority = priority;
 }
 
-uint32_t psabpf_table_entry_get_priority(psabpf_table_entry_t *entry)
+uint32_t nikss_table_entry_get_priority(nikss_table_entry_t *entry)
 {
     if (entry == NULL) {
         return 0;
@@ -636,16 +636,16 @@ uint32_t psabpf_table_entry_get_priority(psabpf_table_entry_t *entry)
     return entry->priority;
 }
 
-void psabpf_matchkey_init(psabpf_match_key_t *mk)
+void nikss_matchkey_init(nikss_match_key_t *mk)
 {
     if (mk == NULL) {
         return;
     }
-    memset(mk, 0, sizeof(psabpf_match_key_t));
+    memset(mk, 0, sizeof(nikss_match_key_t));
     mk->mem_can_be_freed = true;
 }
 
-void psabpf_matchkey_free(psabpf_match_key_t *mk)
+void nikss_matchkey_free(nikss_match_key_t *mk)
 {
     if (mk == NULL) {
         return;
@@ -656,7 +656,7 @@ void psabpf_matchkey_free(psabpf_match_key_t *mk)
     }
     mk->data = NULL;
 
-    if (mk->type == PSABPF_TERNARY) {
+    if (mk->type == NIKSS_TERNARY) {
         if (mk->u.ternary.mask != NULL && mk->mem_can_be_freed == true) {
             free(mk->u.ternary.mask);
         }
@@ -664,7 +664,7 @@ void psabpf_matchkey_free(psabpf_match_key_t *mk)
     }
 }
 
-void psabpf_matchkey_type(psabpf_match_key_t *mk, enum psabpf_matchkind_t type)
+void nikss_matchkey_type(nikss_match_key_t *mk, enum nikss_matchkind_t type)
 {
     if (mk == NULL) {
         return;
@@ -672,7 +672,7 @@ void psabpf_matchkey_type(psabpf_match_key_t *mk, enum psabpf_matchkind_t type)
     mk->type = type;
 }
 
-int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
+int nikss_matchkey_data(nikss_match_key_t *mk, const char *data, size_t size)
 {
     if (mk == NULL || data == NULL) {
         return EINVAL;
@@ -691,15 +691,15 @@ int psabpf_matchkey_data(psabpf_match_key_t *mk, const char *data, size_t size)
     return NO_ERROR;
 }
 
-enum psabpf_matchkind_t psabpf_matchkey_get_type(psabpf_match_key_t *mk)
+enum nikss_matchkind_t nikss_matchkey_get_type(nikss_match_key_t *mk)
 {
     if (mk == NULL) {
-        return PSABPF_EXACT;
+        return NIKSS_EXACT;
     }
     return mk->type;
 }
 
-const void *psabpf_matchkey_get_data(psabpf_match_key_t *mk)
+const void *nikss_matchkey_get_data(nikss_match_key_t *mk)
 {
     if (mk == NULL) {
         return NULL;
@@ -707,7 +707,7 @@ const void *psabpf_matchkey_get_data(psabpf_match_key_t *mk)
     return mk->data;
 }
 
-size_t psabpf_matchkey_get_data_size(psabpf_match_key_t *mk)
+size_t nikss_matchkey_get_data_size(nikss_match_key_t *mk)
 {
     if (mk == NULL) {
         return 0;
@@ -716,12 +716,12 @@ size_t psabpf_matchkey_get_data_size(psabpf_match_key_t *mk)
 }
 
 /* only for lpm */
-int psabpf_matchkey_prefix_len(psabpf_match_key_t *mk, uint32_t prefix)
+int nikss_matchkey_prefix_len(nikss_match_key_t *mk, uint32_t prefix)
 {
     if (mk == NULL) {
         return EINVAL;
     }
-    if (mk->type != PSABPF_LPM) {
+    if (mk->type != NIKSS_LPM) {
         return EINVAL;
     }
 
@@ -731,24 +731,24 @@ int psabpf_matchkey_prefix_len(psabpf_match_key_t *mk, uint32_t prefix)
 }
 
 /* only for lpm */
-uint32_t psabpf_matchkey_get_prefix_len(psabpf_match_key_t *mk)
+uint32_t nikss_matchkey_get_prefix_len(nikss_match_key_t *mk)
 {
     if (mk == NULL) {
         return 0;
     }
-    if (mk->type != PSABPF_LPM) {
+    if (mk->type != NIKSS_LPM) {
         return 0;
     }
     return mk->u.lpm.prefix_len;
 }
 
 /* only for ternary */
-int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size)
+int nikss_matchkey_mask(nikss_match_key_t *mk, const char *mask, size_t size)
 {
     if (mk == NULL || mask == NULL) {
         return EINVAL;
     }
-    if (mk->type != PSABPF_TERNARY) {
+    if (mk->type != NIKSS_TERNARY) {
         return EINVAL;
     }
     if (mk->u.ternary.mask != NULL) {
@@ -766,24 +766,24 @@ int psabpf_matchkey_mask(psabpf_match_key_t *mk, const char *mask, size_t size)
 }
 
 /* only for ternary */
-const void *psabpf_matchkey_get_mask(psabpf_match_key_t *mk)
+const void *nikss_matchkey_get_mask(nikss_match_key_t *mk)
 {
     if (mk == NULL) {
         return NULL;
     }
-    if (mk->type != PSABPF_TERNARY) {
+    if (mk->type != NIKSS_TERNARY) {
         return NULL;
     }
     return mk->u.ternary.mask;
 }
 
 /* only for ternary */
-size_t psabpf_matchkey_get_mask_size(psabpf_match_key_t *mk)
+size_t nikss_matchkey_get_mask_size(nikss_match_key_t *mk)
 {
     if (mk == NULL) {
         return 0;
     }
-    if (mk->type != PSABPF_TERNARY) {
+    if (mk->type != NIKSS_TERNARY) {
         return 0;
     }
     return mk->u.ternary.mask_size;
@@ -791,7 +791,7 @@ size_t psabpf_matchkey_get_mask_size(psabpf_match_key_t *mk)
 
 /* only for 'range' match */
 /* cppcheck-suppress unusedFunction ; public API call */
-int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start)
+int nikss_matchkey_start(nikss_match_key_t *mk, uint64_t start)
 {
     (void) mk; (void) start;
     return NO_ERROR;
@@ -799,13 +799,13 @@ int psabpf_matchkey_start(psabpf_match_key_t *mk, uint64_t start)
 
 /* only for 'range' match */
 /* cppcheck-suppress unusedFunction ; public API call */
-int psabpf_matchkey_end(psabpf_match_key_t *mk, uint64_t end)
+int nikss_matchkey_end(nikss_match_key_t *mk, uint64_t end)
 {
     (void) mk; (void) end;
     return NO_ERROR;
 }
 
-int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, size_t size)
+int nikss_action_param_create(nikss_action_param_t *param, const char *data, size_t size)
 {
     if (param == NULL || data == NULL) {
         return EINVAL;
@@ -828,7 +828,7 @@ int psabpf_action_param_create(psabpf_action_param_t *param, const char *data, s
     return NO_ERROR;
 }
 
-void psabpf_action_param_free(psabpf_action_param_t *param)
+void nikss_action_param_free(nikss_action_param_t *param)
 {
     if (param == NULL) {
         return;
@@ -839,7 +839,7 @@ void psabpf_action_param_free(psabpf_action_param_t *param)
     param->data = NULL;
 }
 
-void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param)
+void nikss_action_param_mark_group_reference(nikss_action_param_t *param)
 {
     if (param == NULL) {
         return;
@@ -847,7 +847,7 @@ void psabpf_action_param_mark_group_reference(psabpf_action_param_t *param)
     param->is_group_reference = true;
 }
 
-bool psabpf_action_param_is_group_reference(psabpf_action_param_t *param)
+bool nikss_action_param_is_group_reference(nikss_action_param_t *param)
 {
     if (param == NULL) {
         return false;
@@ -855,7 +855,7 @@ bool psabpf_action_param_is_group_reference(psabpf_action_param_t *param)
     return param->is_group_reference;
 }
 
-psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry)
+nikss_action_param_t *nikss_action_param_get_next(nikss_table_entry_t *entry)
 {
     if (entry == NULL) {
         return NULL;
@@ -871,7 +871,7 @@ psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry)
 
     memcpy(&entry->current_action_param,
            &entry->action->params[entry->current_action_param_id],
-           sizeof(psabpf_action_param_t));
+           sizeof(nikss_action_param_t));
     entry->current_action_param.mem_can_be_freed = false;
 
     entry->current_action_param_id += 1;
@@ -879,7 +879,7 @@ psabpf_action_param_t *psabpf_action_param_get_next(psabpf_table_entry_t *entry)
     return &entry->current_action_param;
 }
 
-void *psabpf_action_param_get_data(psabpf_action_param_t *param)
+void *nikss_action_param_get_data(nikss_action_param_t *param)
 {
     if (param == NULL) {
         return NULL;
@@ -887,7 +887,7 @@ void *psabpf_action_param_get_data(psabpf_action_param_t *param)
     return param->data;
 }
 
-size_t psabpf_action_param_get_data_len(psabpf_action_param_t *param)
+size_t nikss_action_param_get_data_len(nikss_action_param_t *param)
 {
     if (param == NULL) {
         return 0;
@@ -895,7 +895,7 @@ size_t psabpf_action_param_get_data_len(psabpf_action_param_t *param)
     return param->len;
 }
 
-const char *psabpf_action_param_get_name(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, psabpf_action_param_t *param)
+const char *nikss_action_param_get_name(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, nikss_action_param_t *param)
 {
     if (ctx == NULL || entry == NULL || param == NULL) {
         return NULL;
@@ -950,22 +950,22 @@ const char *psabpf_action_param_get_name(psabpf_table_entry_ctx_t *ctx, psabpf_t
     return type_name;
 }
 
-void psabpf_action_init(psabpf_action_t *action)
+void nikss_action_init(nikss_action_t *action)
 {
     if (action == NULL) {
         return;
     }
-    memset(action, 0, sizeof(psabpf_action_t));
+    memset(action, 0, sizeof(nikss_action_t));
 }
 
-void psabpf_action_free(psabpf_action_t *action)
+void nikss_action_free(nikss_action_t *action)
 {
     if (action == NULL) {
         return;
     }
 
     for (size_t i = 0; i < action->n_params; i++) {
-        psabpf_action_param_free(&(action->params[i]));
+        nikss_action_param_free(&(action->params[i]));
     }
     if (action->params != NULL) {
         free(action->params);
@@ -974,7 +974,7 @@ void psabpf_action_free(psabpf_action_t *action)
     action->n_params = 0;
 }
 
-void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id)
+void nikss_action_set_id(nikss_action_t *action, uint32_t action_id)
 {
     if (action == NULL) {
         return;
@@ -982,29 +982,29 @@ void psabpf_action_set_id(psabpf_action_t *action, uint32_t action_id)
     action->action_id = action_id;
 }
 
-uint32_t psabpf_table_get_action_id_by_name(psabpf_table_entry_ctx_t *ctx, const char *name)
+uint32_t nikss_table_get_action_id_by_name(nikss_table_entry_ctx_t *ctx, const char *name)
 {
     if (ctx == NULL || name == NULL) {
-        return PSABPF_INVALID_ACTION_ID;
+        return NIKSS_INVALID_ACTION_ID;
     }
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0 || ctx->is_indirect) {
-        return PSABPF_INVALID_ACTION_ID;
+        return NIKSS_INVALID_ACTION_ID;
     }
 
     psabtf_struct_member_md_t union_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, "u", &union_md) != NO_ERROR) {
-        return PSABPF_INVALID_ACTION_ID;
+        return NIKSS_INVALID_ACTION_ID;
     }
 
     psabtf_struct_member_md_t action_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, union_md.effective_type_id, name, &action_md) != NO_ERROR) {
-        return PSABPF_INVALID_ACTION_ID;
+        return NIKSS_INVALID_ACTION_ID;
     }
 
     return action_md.index;
 }
 
-int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
+int nikss_action_param(nikss_action_t *action, nikss_action_param_t *param)
 {
     if (action == NULL || param == NULL) {
         return EINVAL;
@@ -1017,8 +1017,8 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
         return NO_ERROR;
     }
 
-    size_t new_size = (action->n_params + 1) * sizeof(psabpf_action_param_t);
-    psabpf_action_param_t * tmp = malloc(new_size);
+    size_t new_size = (action->n_params + 1) * sizeof(nikss_action_param_t);
+    nikss_action_param_t * tmp = malloc(new_size);
 
     if (tmp == NULL) {
         if (param->data != NULL) {
@@ -1029,14 +1029,14 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
     }
 
     if (action->n_params != 0) {
-        memcpy(tmp, action->params, (action->n_params) * sizeof(psabpf_action_param_t));
+        memcpy(tmp, action->params, (action->n_params) * sizeof(nikss_action_param_t));
     }
     if (action->params != NULL) {
         free(action->params);
     }
     action->params = tmp;
 
-    memcpy(&(action->params[action->n_params]), param, sizeof(psabpf_action_param_t));
+    memcpy(&(action->params[action->n_params]), param, sizeof(nikss_action_param_t));
     action->params[action->n_params].param_id = action->n_params;
 
     /* stole data; TODO: check if data owner */
@@ -1047,7 +1047,7 @@ int psabpf_action_param(psabpf_action_t *action, psabpf_action_param_t *param)
     return NO_ERROR;
 }
 
-uint32_t psabpf_action_get_id(psabpf_table_entry_t *entry)
+uint32_t nikss_action_get_id(nikss_table_entry_t *entry)
 {
     if (entry == NULL) {
         return 0;
@@ -1059,7 +1059,7 @@ uint32_t psabpf_action_get_id(psabpf_table_entry_t *entry)
     return entry->action->action_id;
 }
 
-const char *psabpf_action_get_name(psabpf_table_entry_ctx_t *ctx, uint32_t action_id)
+const char *nikss_action_get_name(nikss_table_entry_ctx_t *ctx, uint32_t action_id)
 {
     if (ctx == NULL) {
         return NULL;
@@ -1092,7 +1092,7 @@ enum write_flags {
 };
 
 static int write_buffer_btf(char *buffer, size_t buffer_len, size_t offset,
-                            const void *data, size_t data_len, psabpf_table_entry_ctx_t *ctx,
+                            const void *data, size_t data_len, nikss_table_entry_ctx_t *ctx,
                             uint32_t dst_type_id, const char *dst_type, enum write_flags flags)
 {
     size_t data_type_len = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, dst_type_id);
@@ -1114,7 +1114,7 @@ static int write_buffer_btf(char *buffer, size_t buffer_len, size_t offset,
     return NO_ERROR;
 }
 
-int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int fill_key_byte_by_byte(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     size_t bytes_to_write = ctx->table.key_size;
     uint32_t *lpm_prefix = NULL;
@@ -1131,13 +1131,13 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     }
 
     for (size_t i = 0; i < entry->n_keys; i++) {
-        psabpf_match_key_t *mk = entry->match_keys[i];
+        nikss_match_key_t *mk = entry->match_keys[i];
         if (mk->key_size > bytes_to_write) {
             fprintf(stderr, "provided keys are too long\n");
             return EPERM;
         }
 
-        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
+        if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == NIKSS_LPM) {
             /* copy data in network byte order (in reverse order) */
             for (size_t k = 0; k < mk->key_size; ++k) {
                 buffer[k] = ((char *) (mk->data))[mk->key_size - k - 1];
@@ -1149,9 +1149,9 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
         /* Write prefix length for every field, so overwrite previous value */
         if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
             uint32_t prefix_len = mk->key_size * 8;
-            if (mk->type == PSABPF_LPM) {
+            if (mk->type == NIKSS_LPM) {
                 prefix_len = mk->u.lpm.prefix_len;
-            } else if (mk->type == PSABPF_TERNARY) {
+            } else if (mk->type == NIKSS_TERNARY) {
                 fprintf(stderr, "ternary key is not allowed for this table\n");
                 return EINVAL;
             }
@@ -1170,7 +1170,7 @@ int fill_key_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_t
     return NO_ERROR;
 }
 
-static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_type *key_type, uint32_t key_type_id)
+static bool is_table_dummy_key(nikss_table_entry_ctx_t *ctx, const struct btf_type *key_type, uint32_t key_type_id)
 {
     if (btf_kind(key_type) != BTF_KIND_STRUCT) {
         return false;
@@ -1189,7 +1189,7 @@ static bool is_table_dummy_key(psabpf_table_entry_ctx_t *ctx, const struct btf_t
     return false;
 }
 
-int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int fill_key_btf_info(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     uint32_t key_type_id = ctx->table.key_type_id;
     if (key_type_id == 0) {
@@ -1241,11 +1241,11 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
 
             /* assume that every field is byte aligned */
             unsigned offset = btf_member_bit_offset(key_type, member_idx) / 8;
-            psabpf_match_key_t *mk = entry->match_keys[key_idx];
+            nikss_match_key_t *mk = entry->match_keys[key_idx];
             int ret = 0;
             int flags = WRITE_HOST_ORDER;
 
-            if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == PSABPF_LPM) {
+            if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE && mk->type == NIKSS_LPM) {
                 flags = WRITE_NETWORK_ORDER;
             }
             ret = write_buffer_btf(buffer, ctx->table.key_size, offset, mk->data, mk->key_size,
@@ -1258,9 +1258,9 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
             if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
                 /* LPM field have to be last field in the key structure, so we can assume that whole key must match for other keys */
                 uint32_t prefix_value = ctx->table.key_size * 8 - 32;
-                if (mk->type == PSABPF_LPM) {
+                if (mk->type == NIKSS_LPM) {
                     prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
-                } else if (mk->type == PSABPF_TERNARY) {
+                } else if (mk->type == NIKSS_TERNARY) {
                     fprintf(stderr, "ternary key is not allowed for this table\n");
                     return EINVAL;
                 }
@@ -1282,7 +1282,7 @@ int fill_key_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table
     return NO_ERROR;
 }
 
-static int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static int fill_value_byte_by_byte(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     size_t bytes_to_write = ctx->table.value_size;
 
@@ -1313,7 +1313,7 @@ static int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx,
     }
 
     for (size_t i = 0; i < entry->action->n_params; i++) {
-        psabpf_action_param_t *param = &(entry->action->params[i]);
+        nikss_action_param_t *param = &(entry->action->params[i]);
         if (param->len > bytes_to_write) {
             fprintf(stderr, "provided values are too long\n");
             return EPERM;
@@ -1331,8 +1331,8 @@ static int fill_value_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx,
     return NO_ERROR;
 }
 
-static int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx,
-                          psabpf_table_entry_t *entry, uint32_t value_type_id)
+static int fill_action_id(char * buffer, nikss_table_entry_ctx_t *ctx,
+                          nikss_table_entry_t *entry, uint32_t value_type_id)
 {
     psabtf_struct_member_md_t action_md = {};
     if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_md) != NO_ERROR) {
@@ -1344,8 +1344,8 @@ static int fill_action_id(char * buffer, psabpf_table_entry_ctx_t *ctx,
                             ctx, action_md.effective_type_id, "action id", WRITE_HOST_ORDER);
 }
 
-static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx,
-                         psabpf_table_entry_t *entry, uint32_t value_type_id)
+static int fill_priority(char * buffer, nikss_table_entry_ctx_t *ctx,
+                         nikss_table_entry_t *entry, uint32_t value_type_id)
 {
     if (ctx->is_ternary == false) {
         return NO_ERROR;
@@ -1361,8 +1361,8 @@ static int fill_priority(char * buffer, psabpf_table_entry_ctx_t *ctx,
                             ctx, priority_md.effective_type_id, "priority", WRITE_HOST_ORDER);
 }
 
-static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx,
-                            psabpf_table_entry_t *entry, uint32_t value_type_id)
+static int fill_action_data(char * buffer, nikss_table_entry_ctx_t *ctx,
+                            nikss_table_entry_t *entry, uint32_t value_type_id)
 {
     /* find union with action data */
     psabtf_struct_member_md_t action_union_md = {};
@@ -1404,15 +1404,15 @@ static int fill_action_data(char * buffer, psabpf_table_entry_ctx_t *ctx,
     return NO_ERROR;
 }
 
-static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
-                                  psabpf_table_entry_t *entry, const struct btf_type *value_type)
+static int fill_action_references(char * buffer, nikss_table_entry_ctx_t *ctx,
+                                  nikss_table_entry_t *entry, const struct btf_type *value_type)
 {
     int entries = btf_vlen(value_type);
     int ret = 0;
     const struct btf_member *member = btf_members(value_type);
     size_t used_params = 0;
     size_t offset = 0;
-    psabpf_action_param_t * current_data = &(entry->action->params[0]);
+    nikss_action_param_t * current_data = &(entry->action->params[0]);
     /* Flag to properly calculate number of filled references */
     bool entry_ref_used = false;
 
@@ -1472,7 +1472,7 @@ static int fill_action_references(char * buffer, psabpf_table_entry_ctx_t *ctx,
     return NO_ERROR;
 }
 
-static int fill_value_btf_info(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static int fill_value_btf_info(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     int ret = NO_ERROR;
 
@@ -1537,26 +1537,26 @@ static int lpm_prefix_to_mask(char * buffer, size_t buffer_len, uint32_t prefix,
     return NO_ERROR;
 }
 
-static int fill_key_mask_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static int fill_key_mask_byte_by_byte(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     size_t bytes_to_write = ctx->prefixes.key_size;
     for (size_t i = 0; i < entry->n_keys; i++) {
-        psabpf_match_key_t *mk = entry->match_keys[i];
+        nikss_match_key_t *mk = entry->match_keys[i];
         size_t data_len = 0;
-        if (mk->type == PSABPF_EXACT) {
+        if (mk->type == NIKSS_EXACT) {
             if (mk->key_size > bytes_to_write) {
                 fprintf(stderr, "provided exact keys mask are too long\n");
                 return EPERM;
             }
             data_len = mk->key_size;
             memset(buffer, 0xFF, data_len);
-        } else if (mk->type == PSABPF_LPM) {
+        } else if (mk->type == NIKSS_LPM) {
             data_len = mk->key_size;
             int ret = lpm_prefix_to_mask(buffer, bytes_to_write, mk->u.lpm.prefix_len, data_len);
             if (ret != NO_ERROR) {
                 return ret;
             }
-        } else if (mk->type == PSABPF_TERNARY) {
+        } else if (mk->type == NIKSS_TERNARY) {
             if (mk->u.ternary.mask_size > bytes_to_write) {
                 fprintf(stderr, "provided ternary key mask is too long\n");
                 return EPERM;
@@ -1583,7 +1583,7 @@ static int fill_key_mask_byte_by_byte(char * buffer, psabpf_table_entry_ctx_t *c
     return NO_ERROR;
 }
 
-static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static int fill_key_mask_btf(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     /* Use key type to generate mask */
     if (ctx->table.key_type_id == 0) {
@@ -1613,20 +1613,20 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
 
     int ret = EAGAIN;
     for (unsigned i = 0; i < entries; i++, member++) {
-        psabpf_match_key_t *mk = entry->match_keys[i];
+        nikss_match_key_t *mk = entry->match_keys[i];
         unsigned offset = btf_member_bit_offset(key_type, i) / 8;
         size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
 
         ret = EAGAIN;
         memset(tmp_mask, 0, ctx->table.key_size);
-        if (mk->type == PSABPF_EXACT) {
+        if (mk->type == NIKSS_EXACT) {
             if (size > ctx->table.key_size) {
                 break;
             }
             memset(tmp_mask, 0xFF, size);
             ret = write_buffer_btf(buffer, ctx->prefixes.key_size, offset, tmp_mask, size,
                                    ctx, member->type, "exact mask key", WRITE_HOST_ORDER);
-        } else if (mk->type == PSABPF_LPM) {
+        } else if (mk->type == NIKSS_LPM) {
             ret = lpm_prefix_to_mask(tmp_mask, size, mk->u.lpm.prefix_len, size);
             if (ret != NO_ERROR) {
                 ret = EAGAIN;
@@ -1634,7 +1634,7 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
             }
             ret = write_buffer_btf(buffer, ctx->prefixes.key_size, offset, tmp_mask, size,
                                    ctx, member->type, "lpm mask key", WRITE_HOST_ORDER);
-        } else if (mk->type == PSABPF_TERNARY) {
+        } else if (mk->type == NIKSS_TERNARY) {
             ret = write_buffer_btf(buffer, ctx->prefixes.key_size, offset, mk->u.ternary.mask,
                                    mk->u.ternary.mask_size, ctx, member->type, "ternary mask key", WRITE_HOST_ORDER);
         } else {
@@ -1652,9 +1652,9 @@ static int fill_key_mask_btf(char * buffer, psabpf_table_entry_ctx_t *ctx, psabp
 
 /* Please use this function instead of using directly family of fill_*() functions */
 int construct_buffer(char * buffer, size_t buffer_len,
-                     psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
-                     int (*btf_info_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *),
-                     int (*byte_by_byte_func)(char *, psabpf_table_entry_ctx_t *, psabpf_table_entry_t *))
+                     nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
+                     int (*btf_info_func)(char *, nikss_table_entry_ctx_t *, nikss_table_entry_t *),
+                     int (*byte_by_byte_func)(char *, nikss_table_entry_ctx_t *, nikss_table_entry_t *))
 {
     /* When BTF info mode fails we can fallback to byte by byte mode */
     int return_code = EAGAIN;
@@ -1672,8 +1672,8 @@ int construct_buffer(char * buffer, size_t buffer_len,
     return return_code;
 }
 
-static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_map_descriptor_t *map,
-                                       psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
+static int handle_direct_counter_write(const char *key, char *value, nikss_bpf_map_descriptor_t *map,
+                                       nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, uint64_t bpf_flags)
 {
     /* 1. Entry provided - build counter based on it (on update and add)
      * 2. Entry not provided - init to zero on add (already done), on update copy old value */
@@ -1713,8 +1713,8 @@ static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_
         if (idx >= ctx->n_direct_counters) {
             return EINVAL;
         }
-        psabpf_direct_counter_context_t *dc_ctx = &ctx->direct_counters_ctx[idx];
-        psabpf_counter_context_t counter_ctx = {
+        nikss_direct_counter_context_t *dc_ctx = &ctx->direct_counters_ctx[idx];
+        nikss_counter_context_t counter_ctx = {
                 .counter_type = dc_ctx->counter_type,
                 .counter.value_size = dc_ctx->counter_size,
         };
@@ -1728,7 +1728,7 @@ static int handle_direct_counter_write(const char *key, char *value, psabpf_bpf_
     return NO_ERROR;
 }
 
-static int handle_direct_meter_write(char *value, psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+static int handle_direct_meter_write(char *value, nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     /* Configure meters only when provided, otherwise leave it uninitialized */
 
@@ -1737,20 +1737,20 @@ static int handle_direct_meter_write(char *value, psabpf_table_entry_ctx_t *ctx,
         if (idx >= ctx->n_direct_meters) {
             return EINVAL;
         }
-        psabpf_direct_meter_context_t *dm_ctx = &ctx->direct_meters_ctx[idx];
+        nikss_direct_meter_context_t *dm_ctx = &ctx->direct_meters_ctx[idx];
         if (dm_ctx->meter_size != DIRECT_METER_SIZE) {
             return EINVAL;
         }
 
         convert_meter_entry_to_data(&entry->direct_meters[i].meter,
-                                    (psabpf_meter_data_t *) (value + dm_ctx->meter_offset));
+                                    (nikss_meter_data_t *) (value + dm_ctx->meter_offset));
     }
 
     return NO_ERROR;
 }
 
-static int handle_direct_objects_write(const char *key, char *value, psabpf_bpf_map_descriptor_t *map,
-                                       psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
+static int handle_direct_objects_write(const char *key, char *value, nikss_bpf_map_descriptor_t *map,
+                                       nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, uint64_t bpf_flags)
 {
     if (ctx->is_indirect || ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         return NO_ERROR;
@@ -1773,7 +1773,7 @@ struct ternary_table_prefix_metadata {
     size_t has_next_size;
 };
 
-static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ternary_table_prefix_metadata *md)
+static int get_ternary_table_prefix_md(nikss_table_entry_ctx_t *ctx, struct ternary_table_prefix_metadata *md)
 {
     psabtf_struct_member_md_t member;
 
@@ -1828,7 +1828,7 @@ static int get_ternary_table_prefix_md(psabpf_table_entry_ctx_t *ctx, struct ter
 }
 
 static int add_ternary_table_prefix(char *new_prefix, char *prefix_value,
-                                    psabpf_table_entry_ctx_t *ctx)
+                                    nikss_table_entry_ctx_t *ctx)
 {
     int err = NO_ERROR;
     uint32_t tuple_id = 0;
@@ -1908,7 +1908,7 @@ clean_up:
     return err;
 }
 
-static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const uint32_t tuple_id)
+static int ternary_table_add_tuple_and_open(nikss_table_entry_ctx_t *ctx, const uint32_t tuple_id)
 {
     int err = NO_ERROR;
 
@@ -1939,7 +1939,7 @@ static int ternary_table_add_tuple_and_open(psabpf_table_entry_ctx_t *ctx, const
     return err;
 }
 
-static int ternary_table_open_tuple(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+static int ternary_table_open_tuple(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
                                     char **key_mask, uint64_t bpf_flags)
 {
     if (ctx->prefixes.fd < 0 || ctx->tuple_map.fd < 0 || ctx->table.fd >= 0) {
@@ -2031,7 +2031,7 @@ clean_up:
     return err;
 }
 
-static void ternary_table_close_tuple(psabpf_table_entry_ctx_t *ctx)
+static void ternary_table_close_tuple(nikss_table_entry_ctx_t *ctx)
 {
     /* Allow for reuse table context with the same table but other tuple (inner map). */
     if (ctx->is_ternary) {
@@ -2039,7 +2039,7 @@ static void ternary_table_close_tuple(psabpf_table_entry_ctx_t *ctx)
     }
 }
 
-int delete_all_map_entries(psabpf_bpf_map_descriptor_t *map)
+int delete_all_map_entries(nikss_bpf_map_descriptor_t *map)
 {
     fprintf(stderr, "removing all entries from table\n");
 
@@ -2087,7 +2087,7 @@ clean_up:
     return error_code;
 }
 
-int clear_table_cache(psabpf_bpf_map_descriptor_t *map)
+int clear_table_cache(nikss_bpf_map_descriptor_t *map)
 {
     if (map == NULL || map->fd < 0) {
         return NO_ERROR;
@@ -2097,7 +2097,7 @@ int clear_table_cache(psabpf_bpf_map_descriptor_t *map)
     return delete_all_map_entries(map);
 }
 
-static int psabpf_table_entry_write(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, uint64_t bpf_flags)
+static int nikss_table_entry_write(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, uint64_t bpf_flags)
 {
     char *key_buffer = NULL;
     char *key_mask_buffer = NULL;
@@ -2198,17 +2198,17 @@ clean_up:
     return return_code;
 }
 
-int psabpf_table_entry_add(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int nikss_table_entry_add(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
-    return psabpf_table_entry_write(ctx, entry, BPF_NOEXIST);
+    return nikss_table_entry_write(ctx, entry, BPF_NOEXIST);
 }
 
-int psabpf_table_entry_update(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int nikss_table_entry_update(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
-    return psabpf_table_entry_write(ctx, entry, BPF_EXIST);
+    return nikss_table_entry_write(ctx, entry, BPF_EXIST);
 }
 
-static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, char **key_mask)
+static int prepare_ternary_table_delete(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, char **key_mask)
 {
     if (entry->n_keys != 0) {
         return ternary_table_open_tuple(ctx, entry, key_mask, BPF_EXIST);
@@ -2224,7 +2224,7 @@ static int prepare_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     return NO_ERROR;
 }
 
-static int ternary_table_remove_prefix(psabpf_table_entry_ctx_t *ctx, const char *key_mask)
+static int ternary_table_remove_prefix(nikss_table_entry_ctx_t *ctx, const char *key_mask)
 {
     int err = NO_ERROR;
     char *prev_key_mask = malloc(ctx->prefixes.key_size);
@@ -2323,7 +2323,7 @@ clean_up:
     return err;
 }
 
-static int post_ternary_table_delete(psabpf_table_entry_ctx_t *ctx, const char *key_mask)
+static int post_ternary_table_delete(nikss_table_entry_ctx_t *ctx, const char *key_mask)
 {
     if (ctx->is_ternary == false || ctx->table.fd < 0) {
         return NO_ERROR;
@@ -2354,7 +2354,7 @@ clean_up:
     return err;
 }
 
-int psabpf_table_entry_del(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int nikss_table_entry_del(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     char *key_buffer = NULL;
     char *key_mask_buffer = NULL;
@@ -2446,7 +2446,7 @@ clean_up:
     return return_code;
 }
 
-int psabpf_table_entry_set_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int nikss_table_entry_set_default_entry(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     /* For default entry array map is used, it always has key 32-bit width and its value is assumed to be 0. */
     const uint32_t key = 0;
@@ -2513,7 +2513,7 @@ clean_up:
     return return_code;
 }
 
-static int parse_table_value_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
+static int parse_table_value_no_btf(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, const char *value)
 {
     size_t buffer_size = ctx->table.value_size;
 
@@ -2541,18 +2541,18 @@ static int parse_table_value_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_
 
     /* Action data, without BTF we can only return binary blob */
     if (buffer_size > 0) {
-        entry->action->params = malloc(sizeof(psabpf_action_param_t));
+        entry->action->params = malloc(sizeof(nikss_action_param_t));
         if (entry->action->params == NULL) {
             return ENOMEM;
         }
         entry->action->n_params = 1;
-        return psabpf_action_param_create(&entry->action->params[0], value, buffer_size);
+        return nikss_action_param_create(&entry->action->params[0], value, buffer_size);
     }
 
     return NO_ERROR;
 }
 
-static int parse_table_value_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+static int parse_table_value_action(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
                                     const char *value, uint32_t value_type_id)
 {
     /* Get action ID */
@@ -2589,7 +2589,7 @@ static int parse_table_value_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     if (number_of_params == 0) {
         return NO_ERROR;
     }
-    entry->action->params = malloc(number_of_params * sizeof(psabpf_action_param_t));
+    entry->action->params = malloc(number_of_params * sizeof(nikss_action_param_t));
     if (entry->action->params == NULL) {
         return ENOMEM;
     }
@@ -2608,7 +2608,7 @@ static int parse_table_value_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_
         if (size + offset > ctx->table.value_size) {
             return EINVAL;
         }
-        int ret = psabpf_action_param_create(&entry->action->params[i], value + offset, size);
+        int ret = nikss_action_param_create(&entry->action->params[i], value + offset, size);
         entry->action->params[i].param_id = i;
         if (ret != NO_ERROR) {
             return ret;
@@ -2618,7 +2618,7 @@ static int parse_table_value_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     return NO_ERROR;
 }
 
-static int parse_table_value_priority(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+static int parse_table_value_priority(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
                                       const char *value, uint32_t value_type_id)
 {
     if (ctx->is_ternary == false) {
@@ -2639,19 +2639,19 @@ static int parse_table_value_priority(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
     return NO_ERROR;
 }
 
-static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
+static int parse_table_value_direct_counter(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, const char *value)
 {
     if (ctx->n_direct_counters == 0) {
         return NO_ERROR;
     }
 
-    entry->direct_counters = malloc(ctx->n_direct_counters * sizeof(psabpf_direct_counter_entry_t));
+    entry->direct_counters = malloc(ctx->n_direct_counters * sizeof(nikss_direct_counter_entry_t));
     if (entry->direct_counters == NULL) {
         return ENOMEM;
     }
 
     for (unsigned i = 0; i < ctx->n_direct_counters; i++) {
-        psabpf_counter_entry_init(&entry->direct_counters[i].counter);
+        nikss_counter_entry_init(&entry->direct_counters[i].counter);
         entry->direct_counters[i].counter_idx = ctx->direct_counters_ctx[i].counter_idx;
         convert_counter_data_to_entry(value + ctx->direct_counters_ctx[i].counter_offset,
                                       ctx->direct_counters_ctx[i].counter_size,
@@ -2663,21 +2663,21 @@ static int parse_table_value_direct_counter(psabpf_table_entry_ctx_t *ctx, psabp
     return NO_ERROR;
 }
 
-static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
+static int parse_table_value_direct_meter(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, const char *value)
 {
     if (ctx->n_direct_meters == 0) {
         return NO_ERROR;
     }
 
-    entry->direct_meters = malloc(ctx->n_direct_meters * sizeof(psabpf_direct_meter_entry_t));
+    entry->direct_meters = malloc(ctx->n_direct_meters * sizeof(nikss_direct_meter_entry_t));
     if (entry->direct_meters == NULL) {
         return ENOMEM;
     }
 
     for (unsigned i = 0; i < ctx->n_direct_meters; i++) {
-        psabpf_meter_entry_init(&entry->direct_meters[i].meter);
+        nikss_meter_entry_init(&entry->direct_meters[i].meter);
         entry->direct_meters[i].meter_idx = ctx->direct_meters_ctx[i].meter_idx;
-        convert_meter_data_to_entry((const psabpf_meter_data_t *) (value + ctx->direct_meters_ctx[i].meter_offset),
+        convert_meter_data_to_entry((const nikss_meter_data_t *) (value + ctx->direct_meters_ctx[i].meter_offset),
                                     &entry->direct_meters[i].meter);
     }
     entry->n_direct_meters = ctx->n_direct_meters;
@@ -2685,7 +2685,7 @@ static int parse_table_value_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_
     return NO_ERROR;
 }
 
-static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
+static int parse_table_value_direct_objects(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, const char *value)
 {
     int ret = parse_table_value_direct_counter(ctx, entry, value);
     if (ret != NO_ERROR) {
@@ -2700,26 +2700,26 @@ static int parse_table_value_direct_objects(psabpf_table_entry_ctx_t *ctx, psabp
     return NO_ERROR;
 }
 
-static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
+static int parse_table_value_references(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, const char *value)
 {
     unsigned number_of_implementations = ctx->table_implementations.n_fields;
     if (number_of_implementations < 1) {
         return NO_ERROR;
     }
 
-    entry->action->params = malloc(number_of_implementations * sizeof(psabpf_action_param_t));
+    entry->action->params = malloc(number_of_implementations * sizeof(nikss_action_param_t));
     if (entry->action->params == NULL) {
         return ENOMEM;
     }
     entry->action->n_params = number_of_implementations;
 
     for (unsigned i = 0; i < number_of_implementations; i++) {
-        psabpf_action_param_create(&entry->action->params[i],
+        nikss_action_param_create(&entry->action->params[i],
                                    value + ctx->table_implementations.fields[i].data_offset,
                                    ctx->table_implementations.fields[i].data_len);
         entry->action->params[i].param_id = i;
 
-        if (ctx->table_implementation_group_marks.fields[i].type == PSABPF_STRUCT_FIELD_TYPE_DATA) {
+        if (ctx->table_implementation_group_marks.fields[i].type == NIKSS_STRUCT_FIELD_TYPE_DATA) {
             /* Has group mark */
             const uint32_t *is_group = (uint32_t *) (value + ctx->table_implementation_group_marks.fields[i].data_offset);
             if (*is_group != 0) {
@@ -2731,7 +2731,7 @@ static int parse_table_value_references(psabpf_table_entry_ctx_t *ctx, psabpf_ta
     return NO_ERROR;
 }
 
-static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
+static int parse_table_value_btf_info(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, const char *value)
 {
     int ret = NO_ERROR;
     uint32_t value_type_id = ctx->table.value_type_id;
@@ -2764,13 +2764,13 @@ static int parse_table_value_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_tabl
     return NO_ERROR;
 }
 
-static int parse_table_value(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, const char *value)
+static int parse_table_value(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry, const char *value)
 {
-    entry->action = malloc(sizeof(psabpf_action_t));
+    entry->action = malloc(sizeof(nikss_action_t));
     if (entry->action == NULL) {
         return ENOMEM;
     }
-    psabpf_action_init(entry->action);
+    nikss_action_init(entry->action);
 
     if (ctx->btf_metadata.btf == NULL || ctx->table.value_type_id == 0) {
         return parse_table_value_no_btf(ctx, entry, value);
@@ -2779,7 +2779,7 @@ static int parse_table_value(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t
     return parse_table_value_btf_info(ctx, entry, value);
 }
 
-int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int nikss_table_entry_get(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     char *key_buffer = NULL;
     char *key_mask_buffer = NULL;
@@ -2818,8 +2818,8 @@ int psabpf_table_entry_get(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *
     entry->n_keys = 0;
     void *tmp_keys = entry->match_keys;
     entry->match_keys = NULL;
-    psabpf_table_entry_free(entry);
-    psabpf_table_entry_init(entry);
+    nikss_table_entry_free(entry);
+    nikss_table_entry_init(entry);
     entry->n_keys = tmp_n_keys;
     entry->match_keys = tmp_keys;
 
@@ -2875,85 +2875,85 @@ clean_up:
     return return_code;
 }
 
-static int parse_table_key_no_btf(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+static int parse_table_key_no_btf(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
                                   const char *key, const char *key_mask)
 {
-    psabpf_match_key_t mk;
-    psabpf_matchkey_init(&mk);
+    nikss_match_key_t mk;
+    nikss_matchkey_init(&mk);
 
     if (ctx->is_ternary) {
-        psabpf_matchkey_type(&mk, PSABPF_TERNARY);
-        psabpf_matchkey_data(&mk, key, ctx->table.key_size);
-        psabpf_matchkey_mask(&mk, key_mask, ctx->table.key_size);
+        nikss_matchkey_type(&mk, NIKSS_TERNARY);
+        nikss_matchkey_data(&mk, key, ctx->table.key_size);
+        nikss_matchkey_mask(&mk, key_mask, ctx->table.key_size);
     } else if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
-        psabpf_matchkey_type(&mk, PSABPF_LPM);
+        nikss_matchkey_type(&mk, NIKSS_LPM);
         /* We should change byte order back to host order. It isn't doable because
          * there is no information how long is the last field - this is the only one
          * field in the network byte order. */
-        psabpf_matchkey_data(&mk, key + sizeof(uint32_t), ctx->table.key_size - sizeof(uint32_t));
-        psabpf_matchkey_prefix_len(&mk, *((uint32_t *) key));
+        nikss_matchkey_data(&mk, key + sizeof(uint32_t), ctx->table.key_size - sizeof(uint32_t));
+        nikss_matchkey_prefix_len(&mk, *((uint32_t *) key));
     } else {
-        psabpf_matchkey_type(&mk, PSABPF_EXACT);
-        psabpf_matchkey_data(&mk, key, ctx->table.key_size);
+        nikss_matchkey_type(&mk, NIKSS_EXACT);
+        nikss_matchkey_data(&mk, key, ctx->table.key_size);
     }
 
-    psabpf_table_entry_matchkey(entry, &mk);
-    psabpf_matchkey_free(&mk);
+    nikss_table_entry_matchkey(entry, &mk);
+    nikss_matchkey_free(&mk);
 
     return NO_ERROR;
 }
 
-static enum psabpf_matchkind_t decode_key_field_type_btf_info(psabpf_table_entry_ctx_t *ctx, const char *field_mask,
-                                                              size_t field_len, uint32_t type_fields, uint32_t field_id)
+static enum nikss_matchkind_t decode_key_field_type_btf_info(nikss_table_entry_ctx_t *ctx, const char *field_mask,
+                                                             size_t field_len, uint32_t type_fields, uint32_t field_id)
 {
     if (ctx->is_ternary) {
         /* LPM is not distinguishable from ternary field. Exact can be detected when mask has all-set bits. */
         for (size_t i = 0; i < field_len; ++i) {
             if (*((uint8_t *)(field_mask + i)) != 0xFF) {
-                return PSABPF_TERNARY;
+                return NIKSS_TERNARY;
             }
         }
     } else if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
         /* Last field is lpm, others are exact. */
         if (field_id + 1 == type_fields) {
-            return PSABPF_LPM;
+            return NIKSS_LPM;
         }
     }
 
-    return PSABPF_EXACT;
+    return NIKSS_EXACT;
 }
 
-static int parse_table_key_add_key_field(psabpf_table_entry_t *entry, int field_type, const char *field_data,
+static int parse_table_key_add_key_field(nikss_table_entry_t *entry, int field_type, const char *field_data,
                                          const char *field_mask, uint32_t prefix, size_t field_len)
 {
     if (field_len < 1) {
         return ENODATA;
     }
-    psabpf_match_key_t mk;
-    psabpf_matchkey_init(&mk);
+    nikss_match_key_t mk;
+    nikss_matchkey_init(&mk);
 
-    if (field_type == PSABPF_TERNARY) {
-        psabpf_matchkey_type(&mk, PSABPF_TERNARY);
-        psabpf_matchkey_data(&mk, field_data, field_len);
-        psabpf_matchkey_mask(&mk, field_mask, field_len);
-    } else if (field_type == PSABPF_LPM) {
-        psabpf_matchkey_type(&mk, PSABPF_LPM);
-        psabpf_matchkey_data(&mk, field_data, field_len);
+    if (field_type == NIKSS_TERNARY) {
+        nikss_matchkey_type(&mk, NIKSS_TERNARY);
+        nikss_matchkey_data(&mk, field_data, field_len);
+        nikss_matchkey_mask(&mk, field_mask, field_len);
+    } else if (field_type == NIKSS_LPM) {
+        nikss_matchkey_type(&mk, NIKSS_LPM);
+        nikss_matchkey_data(&mk, field_data, field_len);
         /* Convert network byte order into host order */
         swap_byte_order(mk.data, mk.key_size);
-        psabpf_matchkey_prefix_len(&mk, prefix);
-    } else if (field_type == PSABPF_EXACT) {
-        psabpf_matchkey_type(&mk, PSABPF_EXACT);
-        psabpf_matchkey_data(&mk, field_data, field_len);
+        nikss_matchkey_prefix_len(&mk, prefix);
+    } else if (field_type == NIKSS_EXACT) {
+        nikss_matchkey_type(&mk, NIKSS_EXACT);
+        nikss_matchkey_data(&mk, field_data, field_len);
     }
 
-    int ret = psabpf_table_entry_matchkey(entry, &mk);
-    psabpf_matchkey_free(&mk);
+    int ret = nikss_table_entry_matchkey(entry, &mk);
+    nikss_matchkey_free(&mk);
 
     return ret;
 }
 
-static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+static int parse_table_key_btf_info(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
                                     const char *key, const char *key_mask)
 {
     uint32_t key_type_id = ctx->table.key_type_id;
@@ -2968,7 +2968,7 @@ static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     if (btf_kind(key_type) == BTF_KIND_INT) {
         int field_type = decode_key_field_type_btf_info(ctx, key_mask, ctx->table.key_size, 1, 0);
         uint32_t prefix = 0;
-        if (field_type == PSABPF_LPM) {
+        if (field_type == NIKSS_LPM) {
             prefix = *((uint32_t *) key);
             key = key + sizeof(uint32_t);
         }
@@ -3007,7 +3007,7 @@ static int parse_table_key_btf_info(psabpf_table_entry_ctx_t *ctx, psabpf_table_
     return NO_ERROR;
 }
 
-int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
+int parse_table_key(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry,
                     const char *key, const char *key_mask)
 {
     if (ctx->btf_metadata.btf == NULL || ctx->table.key_type_id == 0) {
@@ -3017,7 +3017,7 @@ int parse_table_key(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
     return parse_table_key_btf_info(ctx, entry, key, key_mask);
 }
 
-static int get_next_ternary_table_key_mask(psabpf_table_entry_ctx_t *ctx)
+static int get_next_ternary_table_key_mask(nikss_table_entry_ctx_t *ctx)
 {
     int ret_code = NO_ERROR;
     char *prefix_value = NULL;
@@ -3100,7 +3100,8 @@ clean_up:
     return ret_code;
 }
 
-int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
+int nikss_table_entry_goto_next_key(nikss_table_entry_ctx_t *ctx)
+{
     void *next_key = NULL; /* do not free */
 
     if (ctx == NULL) {
@@ -3157,16 +3158,16 @@ int psabpf_table_entry_goto_next_key(psabpf_table_entry_ctx_t *ctx) {
     return NO_ERROR;
 }
 
-psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
+nikss_table_entry_t *nikss_table_entry_get_next(nikss_table_entry_ctx_t *ctx)
 {
-    psabpf_table_entry_t *ret_instance = NULL;
+    nikss_table_entry_t *ret_instance = NULL;
     char *value_buffer = NULL;
 
     if (ctx == NULL) {
         return NULL;
     }
 
-    if (psabpf_table_entry_goto_next_key(ctx) != NO_ERROR) {
+    if (nikss_table_entry_goto_next_key(ctx) != NO_ERROR) {
         /* Error or no next key */
         return NULL;
     }
@@ -3184,8 +3185,8 @@ psabpf_table_entry_t *psabpf_table_entry_get_next(psabpf_table_entry_ctx_t *ctx)
         goto clean_up;
     }
 
-    psabpf_table_entry_free(&ctx->current_entry);
-    psabpf_table_entry_init(&ctx->current_entry);
+    nikss_table_entry_free(&ctx->current_entry);
+    nikss_table_entry_init(&ctx->current_entry);
 
     /* Parse key */
     return_code = parse_table_key(ctx, &ctx->current_entry, ctx->current_raw_key, ctx->current_raw_key_mask);
@@ -3211,7 +3212,7 @@ clean_up:
     return ret_instance;
 }
 
-int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+int nikss_table_entry_get_default_entry(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     uint32_t key_buffer = 0;
     char *value_buffer = NULL;
@@ -3231,8 +3232,8 @@ int psabpf_table_entry_get_default_entry(psabpf_table_entry_ctx_t *ctx, psabpf_t
     }
 
     /* Prepare entry - remove everything from entry */
-    psabpf_table_entry_free(entry);
-    psabpf_table_entry_init(entry);
+    nikss_table_entry_free(entry);
+    nikss_table_entry_init(entry);
 
     value_buffer = malloc(ctx->table.value_size);
     if (value_buffer == NULL) {
