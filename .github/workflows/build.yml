@@ -1,4 +1,4 @@
-name: build psabpf
+name: build nikss
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
         git submodule update --init libbpf
         ./build_libbpf.sh
 
-    # Build static library version of psabpf
+    # Build static library version of nikss
     - name: Build static
       run: |
         mkdir build && pushd build || exit
@@ -33,7 +33,7 @@ jobs:
         sudo make install
         popd || exit
 
-    # Build shared library version of psabpf
+    # Build shared library version of nikss
     - name: Build shared
       run: |
         mkdir build_shared && pushd build_shared || exit

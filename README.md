@@ -1,17 +1,17 @@
-# psabpf - In-kernel P4 software switch 
+# NIKSS - In-kernel P4 software switch 
 
 **This project is still a work in progress. We make no guarantee for the stability of the API or CLI and may modify
 existing functions in the API or CLI.**
 
-**psabpf** is an in-kernel implementation of a P4 software switch. It works in conjunction with the P4-eBPF compiler. The **psabpf** switch uses Portable Switch Architecture (PSA) as a forwarding model and extended Berkeley Packet Filter (eBPF) as a packet processing engine. **psabpf** works seamlessly with both TC-based and XDP-based design of the PSA model for the P4-eBPF compiler. 
+**NIKSS** is an in-kernel implementation of a P4 software switch. It works in conjunction with the P4-eBPF compiler. The **NIKSS** switch uses Portable Switch Architecture (PSA) as a forwarding model and extended Berkeley Packet Filter (eBPF) as a packet processing engine. **nikss** works seamlessly with both TC-based and XDP-based design of the PSA model for the P4-eBPF compiler. 
 
-This repository implements C API & command line tool (`psabpf-ctl`) to manage P4/PSA programs for eBPF.
+This repository implements C API & command line tool (`nikss-ctl`) to manage P4/PSA programs for eBPF.
 
 # Installation
 
 ## Dependencies
 
-Psabpf depends on following libraries and utilities:
+NIKSS depends on following libraries and utilities:
 - GNU [make](https://www.gnu.org/software/make/)
 - [CMake](https://cmake.org/)
 - C compiler, GCC is tested
@@ -27,10 +27,10 @@ All the dependencies can be installed on Ubuntu 20.04 with the following command
 sudo apt install make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev
 ```
 
-Note that `psabpf-ctl` is statically linked with shipped `libbpf`, so there is no need to install this library
+Note that `nikss-ctl` is statically linked with shipped `libbpf`, so there is no need to install this library
 system-wide. It is a submodule for this repository.
 
-## Installing psabpf from source
+## Installing nikss from source
 
 1. Get the code with submodules:
 
@@ -61,9 +61,9 @@ system-wide. It is a submodule for this repository.
    |--------------|-----------------|---------------|-------------|
    | `-DCMAKE_BUILD_TYPE` | empty \| `Release` \| `Debug` | empty | Build type. Empty means Debug without debug symbols. |
    | `-DCMAKE_INSTALL_PREFIX` | any path | `/usr/local` | Sets the directory where `make install` intall the binaries. |
-   | `-DBUILD_SHARED` | `on` \| `off` | `off` | Build shared library. When disabled only the psabpf-ctl is built. |
+   | `-DBUILD_SHARED` | `on` \| `off` | `off` | Build shared library. When disabled only the nikss-ctl is built. |
 
-   Note on installing shared library: remember to execute `sudo ldconfig` after installation. If `libpsabpf` still can't
+   Note on installing shared library: remember to execute `sudo ldconfig` after installation. If `libnikss` still can't
    be loaded, you can do one of these things:
    - Change prefix, e.g. to `/usr` and reinstall.
    - Add path to `LD_LIBRARY_PATH`, e.g.:
@@ -106,7 +106,7 @@ other externs are created.
 
 Load pipeline into kernel bpf subsystem:
 ```shell
-psabpf-ctl pipeline load id <ID> <FILENAME>
+nikss-ctl pipeline load id <ID> <FILENAME>
 ```
 - ID - unique ID of the pipeline, natural number.
 - FILENAME - name of file with compiled PSA-eBPF programs.
@@ -115,7 +115,7 @@ psabpf-ctl pipeline load id <ID> <FILENAME>
 
 Unload pipeline from kernel bpf subsystem:
 ```shell
-psabpf-ctl pipeline unload id <ID>
+nikss-ctl pipeline unload id <ID>
 ```
 - ID - ID of the pipeline, natural number.
 
@@ -123,7 +123,7 @@ psabpf-ctl pipeline unload id <ID>
 
 Attach port:
 ```shell
-psabpf-ctl add-port pipe <ID> dev <INTERFACE>
+nikss-ctl add-port pipe <ID> dev <INTERFACE>
 ```
 - ID - ID of the pipeline, natural number.
 - INTERFACE - name of network interface to attach.
@@ -132,7 +132,7 @@ psabpf-ctl add-port pipe <ID> dev <INTERFACE>
 
 Detach port:
 ```shell
-psabpf-ctl del-port pipe <ID> dev <INTERFACE>
+nikss-ctl del-port pipe <ID> dev <INTERFACE>
 ```
 - ID - ID of the pipeline, natural number.
 - INTERFACE - name of network interface to attach.
@@ -141,7 +141,7 @@ psabpf-ctl del-port pipe <ID> dev <INTERFACE>
 
 Show pipeline information:
 ```shell
-psabpf-ctl pipeline show id <ID>
+nikss-ctl pipeline show id <ID>
 ```
 - ID - ID of the pipeline, natural number.
 
@@ -149,8 +149,8 @@ psabpf-ctl pipeline show id <ID>
 
 Create clone session and add member to it:
 ```shell
-psabpf-ctl clone-session create pipe <ID> id <SESSION_ID>
-psabpf-ctl clone-session add-member pipe <ID> id <SESSION_ID> egress-port <OUTPUT_PORT> instance <INSTANCE_ID> [cos <CLASS_OF_SERVICE>] [truncate plen_bytes <BYTES>]
+nikss-ctl clone-session create pipe <ID> id <SESSION_ID>
+nikss-ctl clone-session add-member pipe <ID> id <SESSION_ID> egress-port <OUTPUT_PORT> instance <INSTANCE_ID> [cos <CLASS_OF_SERVICE>] [truncate plen_bytes <BYTES>]
 ```
 - ID - ID of the pipeline, natural number.
 - SESSION_ID - unique ID of the session, natural number.
@@ -163,8 +163,8 @@ psabpf-ctl clone-session add-member pipe <ID> id <SESSION_ID> egress-port <OUTPU
 
 Create multicast group and add member to it:
 ```shell
-psabpf-ctl multicast-group create pipe <ID> id <MULTICAST_GROUP_ID>
-psabpf-ctl multicast-group add-member pipe <ID> id <MULTICAST_GROUP_ID> egress-port <OUTPUT_PORT> instance <INSTANCE_ID>
+nikss-ctl multicast-group create pipe <ID> id <MULTICAST_GROUP_ID>
+nikss-ctl multicast-group add-member pipe <ID> id <MULTICAST_GROUP_ID> egress-port <OUTPUT_PORT> instance <INSTANCE_ID>
 ```
 - ID - ID of the pipeline, natural number.
 - MULTICAST_GROUP_ID - unique ID of the multicast group, natural number.
@@ -175,7 +175,7 @@ psabpf-ctl multicast-group add-member pipe <ID> id <MULTICAST_GROUP_ID> egress-p
 
 Add an entry to a table without implementation:
 ```shell
-psabpf-ctl table add pipe <ID> <TABLE> action <ACTION> key <KEY> data <DATA> [priority <PRIORITY>]
+nikss-ctl table add pipe <ID> <TABLE> action <ACTION> key <KEY> data <DATA> [priority <PRIORITY>]
 ```
 - ID - ID of the pipeline, natural number.
 - TABLE - name of the table, with full path.
