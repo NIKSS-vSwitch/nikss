@@ -40,9 +40,9 @@ class P4Host(Host):
         print("**********")
 
 
-class PSAeBPFSwitch(Switch):
+class NIKSSSwitch(Switch):
     """
-    PSA-eBPF switch. Requires psabpf-ctl.
+    PSA-eBPF switch. Requires nikss-ctl.
     """
 
     # Device ID is also used as a PSA-eBPF pipeline ID. 
@@ -62,13 +62,13 @@ class PSAeBPFSwitch(Switch):
         
     def start(self, controllers):
         info("Starting PSA-eBPF switch {}.\n".format(self.name))
-        self.cmd("psabpf-ctl pipeline load id {} {}".format(self.device_id, self.bpf_path))
+        self.cmd("nikss-ctl pipeline load id {} {}".format(self.device_id, self.bpf_path))
 
         for port, intf in self.intfs.items():
             if not "s1-" in str(intf):
                 continue
             info("Attaching port {} to PSA-eBPF switch {}.\n".format(intf, self.name))
-            self.cmd("psabpf-ctl add-port pipe {} dev {}".format(self.device_id, intf))
+            self.cmd("nikss-ctl add-port pipe {} dev {}".format(self.device_id, intf))
 
 
     def stop(self, deleteIntfs=True):
@@ -76,6 +76,6 @@ class PSAeBPFSwitch(Switch):
             if not "s1-" in str(intf):
                 continue
             info("Detaching port {} from PSA-eBPF switch {}.\n".format(intf, self.name))
-            self.cmd("psabpf-ctl del-port pipe {} dev {}".format(self.device_id, intf))
-        self.cmd("psabpf-ctl pipeline unload id {}".format(self.device_id))
+            self.cmd("nikss-ctl del-port pipe {} dev {}".format(self.device_id, intf))
+        self.cmd("nikss-ctl pipeline unload id {}".format(self.device_id))
         super( PSAeBPFSwitch, self ).stop( deleteIntfs )
