@@ -76,7 +76,7 @@ static uint32_t find_data_section_type_id(struct btf *btf, uint32_t sec_type_id,
     return 0;
 }
 
-const struct btf_type *psabtf_get_type_by_id(struct btf *btf, uint32_t type_id)
+const struct btf_type *btf_get_type_by_id(struct btf *btf, uint32_t type_id)
 {
     type_id = follow_types(btf, type_id);
     if (type_id == 0) {
@@ -85,7 +85,7 @@ const struct btf_type *psabtf_get_type_by_id(struct btf *btf, uint32_t type_id)
     return btf__type_by_id(btf, type_id);
 }
 
-static uint32_t psabtf_get_map_type_id_by_name(struct btf *btf, const char *name)
+static uint32_t get_map_type_id_by_name(struct btf *btf, const char *name)
 {
     uint32_t type_id = 0;
     unsigned nodes = btf__get_nr_types(btf);
@@ -117,8 +117,8 @@ static uint32_t psabtf_get_map_type_id_by_name(struct btf *btf, const char *name
     return follow_types(btf, type_id);
 }
 
-int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
-        const char *member_name, psabtf_struct_member_md_t *md)
+int btf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
+                              const char *member_name, btf_struct_member_md_t *md)
 {
     if (type_id == 0 || btf == NULL) {
         return EPERM;
@@ -153,8 +153,8 @@ int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
     return EPERM;
 }
 
-int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
-                                  psabtf_struct_member_md_t *md)
+int btf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
+                               btf_struct_member_md_t *md)
 {
     if (type_id == 0 || btf == NULL) {
         return EPERM;
@@ -187,8 +187,8 @@ int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t in
 
 static uint32_t get_member_type_id_by_name(struct btf *btf, uint32_t type_id, const char *member_name)
 {
-    psabtf_struct_member_md_t md = {};
-    if (psabtf_get_member_md_by_name(btf, type_id, member_name, &md) != 0) {
+    btf_struct_member_md_t md = {};
+    if (btf_get_member_md_by_name(btf, type_id, member_name, &md) != 0) {
         return 0;
     }
 
@@ -196,9 +196,9 @@ static uint32_t get_member_type_id_by_name(struct btf *btf, uint32_t type_id, co
 }
 
 /* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to get size of any data structure */
-size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
+size_t btf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
 {
-    const struct btf_type *type = psabtf_get_type_by_id(btf, type_id);
+    const struct btf_type *type = btf_get_type_by_id(btf, type_id);
     if (type == NULL) {
         return 0;
     }
@@ -215,7 +215,7 @@ size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
             const struct btf_array *array_info = btf_array(type);
             // BTF is taken from kernel, so we can trust in it that there is no
             // infinite dimensional array (we do not prevent from stack overflow).
-            size_t type_size = psabtf_get_type_size_by_id(btf, array_info->type);
+            size_t type_size = btf_get_type_size_by_id(btf, array_info->type);
             return type_size * (array_info->nelems);
         }
 
@@ -328,7 +328,7 @@ int open_bpf_map(nikss_context_t *nikss_ctx, const char *name, nikss_btf_t *btf,
     md->key_type_id = 0;
     md->value_type_id = 0;
     if (btf != NULL && btf->btf != NULL) {
-        uint32_t btf_type_id = psabtf_get_map_type_id_by_name(btf->btf, name);
+        uint32_t btf_type_id = get_map_type_id_by_name(btf->btf, name);
         if (btf_type_id == 0) {
             fprintf(stderr, "can't get BTF info for %s\n", name);
         }

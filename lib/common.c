@@ -139,7 +139,7 @@ static int setup_struct_field_descriptor_set_no_btf(nikss_struct_field_descripto
 /* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to count all the fields in any data structure */
 static size_t count_total_fields(nikss_btf_t *btf_md, uint32_t type_id)
 {
-    const struct btf_type *type = psabtf_get_type_by_id(btf_md->btf, type_id);
+    const struct btf_type *type = btf_get_type_by_id(btf_md->btf, type_id);
 
     if (btf_is_int(type)) {
         return 1;
@@ -153,15 +153,15 @@ static size_t count_total_fields(nikss_btf_t *btf_md, uint32_t type_id)
     unsigned total_entries = struct_entries;
 
     for (unsigned i = 0; i < struct_entries; i++) {
-        psabtf_struct_member_md_t md;
-        if (psabtf_get_member_md_by_index(btf_md->btf, type_id, i, &md) != NO_ERROR) {
+        btf_struct_member_md_t md;
+        if (btf_get_member_md_by_index(btf_md->btf, type_id, i, &md) != NO_ERROR) {
             fprintf(stderr, "invalid field or type\n");
             return 0;
         }
 
         /* Let's skip a bpf_spin_lock field.
          * This is an internal field not relevant to a user. */
-        const struct btf_type *member_type = psabtf_get_type_by_id(btf_md->btf, md.effective_type_id);
+        const struct btf_type *member_type = btf_get_type_by_id(btf_md->btf, md.effective_type_id);
         if (member_type == NULL) {
             fprintf(stderr, "invalid type\n");
             return false;
@@ -191,7 +191,7 @@ static size_t count_total_fields(nikss_btf_t *btf_md, uint32_t type_id)
 static int setup_struct_field_descriptor_set_btf(nikss_btf_t *btf_md, nikss_struct_field_descriptor_set_t *fds,
                                                  uint32_t type_id, unsigned *field_idx, const size_t base_offset)
 {
-    const struct btf_type *type = psabtf_get_type_by_id(btf_md->btf, type_id);
+    const struct btf_type *type = btf_get_type_by_id(btf_md->btf, type_id);
     if (type == NULL) {
         fprintf(stderr, "invalid type id: %u\n", type_id);
         return EINVAL;
@@ -204,7 +204,7 @@ static int setup_struct_field_descriptor_set_btf(nikss_btf_t *btf_md, nikss_stru
 
         fds->fields[*field_idx].type = NIKSS_STRUCT_FIELD_TYPE_DATA;
         fds->fields[*field_idx].data_offset = base_offset;
-        fds->fields[*field_idx].data_len = psabtf_get_type_size_by_id(btf_md->btf, type_id);
+        fds->fields[*field_idx].data_len = btf_get_type_size_by_id(btf_md->btf, type_id);
 
         /* hide type name (e.g. 'unsigned int'), but we don't have information about name used in C code */
         char name_tmp[128];
@@ -226,15 +226,15 @@ static int setup_struct_field_descriptor_set_btf(nikss_btf_t *btf_md, nikss_stru
 
     unsigned entries = btf_vlen(type);
     for (unsigned i = 0; i < entries; i++) {
-        psabtf_struct_member_md_t md;
-        if (psabtf_get_member_md_by_index(btf_md->btf, type_id, i, &md) != NO_ERROR) {
+        btf_struct_member_md_t md;
+        if (btf_get_member_md_by_index(btf_md->btf, type_id, i, &md) != NO_ERROR) {
             fprintf(stderr, "invalid field or type\n");
             return 0;
         }
 
         /* Let's skip a bpf_spin_lock field.
          * This is an internal field not relevant to a user. */
-        const struct btf_type *member_type = psabtf_get_type_by_id(btf_md->btf, md.effective_type_id);
+        const struct btf_type *member_type = btf_get_type_by_id(btf_md->btf, md.effective_type_id);
         if (member_type == NULL) {
             fprintf(stderr, "invalid type\n");
             return EINVAL;
@@ -254,7 +254,7 @@ static int setup_struct_field_descriptor_set_btf(nikss_btf_t *btf_md, nikss_stru
 
         fds->fields[*field_idx].type = NIKSS_STRUCT_FIELD_TYPE_DATA;
         fds->fields[*field_idx].data_offset = base_offset + md.bit_offset / 8;
-        fds->fields[*field_idx].data_len = psabtf_get_type_size_by_id(btf_md->btf, md.effective_type_id);
+        fds->fields[*field_idx].data_len = btf_get_type_size_by_id(btf_md->btf, md.effective_type_id);
         const char *field_name = btf__name_by_offset(btf_md->btf, md.member->name_off);
         if (field_name != NULL) {
             fds->fields[*field_idx].name = strdup(field_name);

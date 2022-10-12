@@ -23,21 +23,21 @@
 #include <linux/btf.h>
 #include <stdint.h>
 
-const struct btf_type *psabtf_get_type_by_id(struct btf *btf, uint32_t type_id);
+const struct btf_type *btf_get_type_by_id(struct btf *btf, uint32_t type_id);
 
-typedef struct psabtf_struct_member_md {
+typedef struct btf_struct_member_md {
     const struct btf_member *member;
     int index;
     uint32_t effective_type_id;
     size_t bit_offset;
-} psabtf_struct_member_md_t;
+} btf_struct_member_md_t;
 
-int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
-        const char *member_name, psabtf_struct_member_md_t *md);
-int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
-        psabtf_struct_member_md_t *md);
+int btf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
+                              const char *member_name, btf_struct_member_md_t *md);
+int btf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
+                               btf_struct_member_md_t *md);
 
-size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id);
+size_t btf_get_type_size_by_id(struct btf *btf, uint32_t type_id);
 
 void init_btf(nikss_btf_t *btf);
 int load_btf(nikss_context_t *nikss_ctx, nikss_btf_t *btf);

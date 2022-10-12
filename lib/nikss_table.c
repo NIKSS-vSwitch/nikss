@@ -99,7 +99,7 @@ static int get_value_type(nikss_table_entry_ctx_t *ctx, const struct btf_type **
     if (ctx->table.value_type_id == 0) {
         return ENOENT;
     }
-    *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, ctx->table.value_type_id);
+    *value_type = btf_get_type_by_id(ctx->btf_metadata.btf, ctx->table.value_type_id);
     if (*value_type == NULL) {
         return EPERM;
     }
@@ -123,7 +123,7 @@ static bool member_is_direct_or_implementation_object(nikss_btf_t *btf, const st
         return false;
     }
 
-    const struct btf_type *type = psabtf_get_type_by_id(btf->btf, member->type);
+    const struct btf_type *type = btf_get_type_by_id(btf->btf, member->type);
     if (type == NULL) {
         return false;
     }
@@ -170,7 +170,7 @@ static int count_direct_objects(nikss_table_entry_ctx_t *ctx)
             continue;
         }
 
-        size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
+        size_t member_size = btf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
         nikss_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
         if (counter_type != NIKSS_COUNTER_TYPE_UNKNOWN) {
             /* DirectCounter */
@@ -196,7 +196,7 @@ static int count_direct_objects(nikss_table_entry_ctx_t *ctx)
 static void try_find_group_mark_for_table_impl(nikss_table_entry_ctx_t *ctx, unsigned table_impl_id)
 {
     char expected_name[256];
-    psabtf_struct_member_md_t md;
+    btf_struct_member_md_t md;
     if (ctx->table.value_type_id == 0) {
         return;
     }
@@ -204,11 +204,11 @@ static void try_find_group_mark_for_table_impl(nikss_table_entry_ctx_t *ctx, uns
     snprintf(expected_name, sizeof(expected_name), "%s_is_group_ref",
              ctx->table_implementations.fields[table_impl_id].name);
 
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, expected_name, &md) != NO_ERROR) {
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, expected_name, &md) != NO_ERROR) {
         return;
     }
 
-    size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, md.effective_type_id);
+    size_t size = btf_get_type_size_by_id(ctx->btf_metadata.btf, md.effective_type_id);
     if (size != sizeof(uint32_t)) {
         return;
     }
@@ -243,7 +243,7 @@ static int init_direct_objects_context(nikss_table_entry_ctx_t *ctx)
             continue;
         }
 
-        size_t member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
+        size_t member_size = btf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
         size_t member_offset = btf_member_bit_offset(value_type, i) / 8;
         nikss_counter_type_t counter_type = get_counter_type(&ctx->btf_metadata, member->type);
 
@@ -914,17 +914,17 @@ const char *nikss_action_param_get_name(nikss_table_entry_ctx_t *ctx, nikss_tabl
     /* Find out number of action parameters. Action parameter name is known
      * only if number of parameter from entry is equal to that number. */
 
-    psabtf_struct_member_md_t union_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, "u", &union_md) != NO_ERROR) {
+    btf_struct_member_md_t union_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, "u", &union_md) != NO_ERROR) {
         return NULL;
     }
 
-    psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, entry->action->action_id, &action_md) != NO_ERROR) {
+    btf_struct_member_md_t action_md = {};
+    if (btf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, entry->action->action_id, &action_md) != NO_ERROR) {
         return NULL;
     }
 
-    const struct btf_type *action_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, action_md.effective_type_id);
+    const struct btf_type *action_type = btf_get_type_by_id(ctx->btf_metadata.btf, action_md.effective_type_id);
     if (action_type == NULL) {
         return NULL;
     }
@@ -937,8 +937,8 @@ const char *nikss_action_param_get_name(nikss_table_entry_ctx_t *ctx, nikss_tabl
         return NULL;
     }
 
-    psabtf_struct_member_md_t param_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, action_md.effective_type_id, param->param_id, &param_md) != NO_ERROR) {
+    btf_struct_member_md_t param_md = {};
+    if (btf_get_member_md_by_index(ctx->btf_metadata.btf, action_md.effective_type_id, param->param_id, &param_md) != NO_ERROR) {
         return NULL;
     }
 
@@ -991,13 +991,13 @@ uint32_t nikss_table_get_action_id_by_name(nikss_table_entry_ctx_t *ctx, const c
         return NIKSS_INVALID_ACTION_ID;
     }
 
-    psabtf_struct_member_md_t union_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, "u", &union_md) != NO_ERROR) {
+    btf_struct_member_md_t union_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, "u", &union_md) != NO_ERROR) {
         return NIKSS_INVALID_ACTION_ID;
     }
 
-    psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, union_md.effective_type_id, name, &action_md) != NO_ERROR) {
+    btf_struct_member_md_t action_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, union_md.effective_type_id, name, &action_md) != NO_ERROR) {
         return NIKSS_INVALID_ACTION_ID;
     }
 
@@ -1068,13 +1068,13 @@ const char *nikss_action_get_name(nikss_table_entry_ctx_t *ctx, uint32_t action_
         return NULL;
     }
 
-    psabtf_struct_member_md_t union_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, "u", &union_md) != NO_ERROR) {
+    btf_struct_member_md_t union_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, ctx->table.value_type_id, "u", &union_md) != NO_ERROR) {
         return NULL;
     }
 
-    psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, action_id, &action_md) != NO_ERROR) {
+    btf_struct_member_md_t action_md = {};
+    if (btf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, action_id, &action_md) != NO_ERROR) {
         return NULL;
     }
 
@@ -1095,7 +1095,7 @@ static int write_buffer_btf(char *buffer, size_t buffer_len, size_t offset,
                             const void *data, size_t data_len, nikss_table_entry_ctx_t *ctx,
                             uint32_t dst_type_id, const char *dst_type, enum write_flags flags)
 {
-    size_t data_type_len = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, dst_type_id);
+    size_t data_type_len = btf_get_type_size_by_id(ctx->btf_metadata.btf, dst_type_id);
 
     if (offset + data_len > buffer_len || data_len > data_type_len) {
         fprintf(stderr, "too much data in %s "
@@ -1181,8 +1181,8 @@ static bool is_table_dummy_key(nikss_table_entry_ctx_t *ctx, const struct btf_ty
         return false;
     }
 
-    psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, key_type_id, "__dummy_table_key", &action_md) == NO_ERROR) {
+    btf_struct_member_md_t action_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, key_type_id, "__dummy_table_key", &action_md) == NO_ERROR) {
         return true;
     }
 
@@ -1195,7 +1195,7 @@ int fill_key_btf_info(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_e
     if (key_type_id == 0) {
         return EAGAIN;
     }
-    const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, key_type_id);
+    const struct btf_type *key_type = btf_get_type_by_id(ctx->btf_metadata.btf, key_type_id);
     if (key_type == NULL) {
         return EAGAIN;
     }
@@ -1214,13 +1214,13 @@ int fill_key_btf_info(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_e
         const struct btf_member *member = btf_members(key_type);
         unsigned entries = btf_vlen(key_type);
         unsigned expected_entries = entries;
-        psabtf_struct_member_md_t prefix_md = { 0 }; /* For LPM trie map only */
+        btf_struct_member_md_t prefix_md = {0 }; /* For LPM trie map only */
 
         if (ctx->table.type == BPF_MAP_TYPE_LPM_TRIE) {
             /* Omit prefix length */
             --expected_entries;
             /* Get prefix metadata */
-            if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, key_type_id, 0, &prefix_md) != NO_ERROR) {
+            if (btf_get_member_md_by_index(ctx->btf_metadata.btf, key_type_id, 0, &prefix_md) != NO_ERROR) {
                 return EAGAIN;
             }
         }
@@ -1334,8 +1334,8 @@ static int fill_value_byte_by_byte(char * buffer, nikss_table_entry_ctx_t *ctx, 
 static int fill_action_id(char * buffer, nikss_table_entry_ctx_t *ctx,
                           nikss_table_entry_t *entry, uint32_t value_type_id)
 {
-    psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_md) != NO_ERROR) {
+    btf_struct_member_md_t action_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_md) != NO_ERROR) {
         fprintf(stderr, "action id entry not found\n");
         return EAGAIN;  /* Allow fallback to byte by byte mode */
     }
@@ -1351,8 +1351,8 @@ static int fill_priority(char * buffer, nikss_table_entry_ctx_t *ctx,
         return NO_ERROR;
     }
 
-    psabtf_struct_member_md_t priority_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "priority", &priority_md) != NO_ERROR) {
+    btf_struct_member_md_t priority_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "priority", &priority_md) != NO_ERROR) {
         fprintf(stderr, "priority entry not found\n");
         return ENOENT;
     }
@@ -1365,23 +1365,23 @@ static int fill_action_data(char * buffer, nikss_table_entry_ctx_t *ctx,
                             nikss_table_entry_t *entry, uint32_t value_type_id)
 {
     /* find union with action data */
-    psabtf_struct_member_md_t action_union_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &action_union_md) != NO_ERROR) {
+    btf_struct_member_md_t action_union_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &action_union_md) != NO_ERROR) {
         fprintf(stderr, "actions data structure not found\n");
         return ENOENT;
     }
     size_t base_offset = action_union_md.bit_offset / 8;
 
     /* find action data structure in the union */
-    psabtf_struct_member_md_t action_data_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, action_union_md.effective_type_id,
-                                      entry->action->action_id, &action_data_md) != NO_ERROR) {
+    btf_struct_member_md_t action_data_md = {};
+    if (btf_get_member_md_by_index(ctx->btf_metadata.btf, action_union_md.effective_type_id,
+                                   entry->action->action_id, &action_data_md) != NO_ERROR) {
         fprintf(stderr, "action with id %u does not exist\n", entry->action->action_id);
         return EPERM;  /* not fixable, invalid action ID */
     }
     /* to be sure of offset, take into account offset of action data structure in the union */
     base_offset = base_offset + action_data_md.bit_offset / 8;
-    const struct btf_type * data_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, action_data_md.effective_type_id);
+    const struct btf_type * data_type = btf_get_type_by_id(ctx->btf_metadata.btf, action_data_md.effective_type_id);
 
     /* fill action data */
     unsigned entries = btf_vlen(data_type);
@@ -1421,7 +1421,7 @@ static int fill_action_references(char * buffer, nikss_table_entry_ctx_t *ctx,
             fprintf(stderr, "not enough member/group references\n");
             return EAGAIN;
         }
-        const struct btf_type * member_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, member->type);
+        const struct btf_type * member_type = btf_get_type_by_id(ctx->btf_metadata.btf, member->type);
         const char * member_name = btf__name_by_offset(ctx->btf_metadata.btf, member->name_off);
 
         /* skip errors, non-int members and reserved names */
@@ -1480,7 +1480,7 @@ static int fill_value_btf_info(char * buffer, nikss_table_entry_ctx_t *ctx, niks
     if (value_type_id == 0) {
         return EAGAIN;
     }
-    const struct btf_type *value_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, value_type_id);
+    const struct btf_type *value_type = btf_get_type_by_id(ctx->btf_metadata.btf, value_type_id);
     if (value_type == NULL) {
         return EAGAIN;
     }
@@ -1590,7 +1590,7 @@ static int fill_key_mask_btf(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_
         return EAGAIN;
     }
 
-    const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, ctx->table.key_type_id);
+    const struct btf_type *key_type = btf_get_type_by_id(ctx->btf_metadata.btf, ctx->table.key_type_id);
     if (key_type == NULL) {
         return EAGAIN;
     }
@@ -1615,7 +1615,7 @@ static int fill_key_mask_btf(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_
     for (unsigned i = 0; i < entries; i++, member++) {
         nikss_match_key_t *mk = entry->match_keys[i];
         unsigned offset = btf_member_bit_offset(key_type, i) / 8;
-        size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
+        size_t size = btf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
 
         ret = EAGAIN;
         memset(tmp_mask, 0, ctx->table.key_size);
@@ -1775,7 +1775,7 @@ struct ternary_table_prefix_metadata {
 
 static int get_ternary_table_prefix_md(nikss_table_entry_ctx_t *ctx, struct ternary_table_prefix_metadata *md)
 {
-    psabtf_struct_member_md_t member;
+    btf_struct_member_md_t member;
 
     md->tuple_id_size = sizeof(uint32_t);
     md->next_mask_size = ctx->table.key_size;
@@ -1795,24 +1795,24 @@ static int get_ternary_table_prefix_md(nikss_table_entry_ctx_t *ctx, struct tern
     }
 
     /* tuple id */
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "tuple_id", &member) != NO_ERROR) {
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "tuple_id", &member) != NO_ERROR) {
         return EPERM;
     }
-    md->tuple_id_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
+    md->tuple_id_size = btf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
     md->tuple_id_offset = member.bit_offset / 8;
 
     /* next mask */
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "next_tuple_mask", &member) != NO_ERROR) {
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "next_tuple_mask", &member) != NO_ERROR) {
         return EPERM;
     }
-    md->next_mask_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
+    md->next_mask_size = btf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
     md->next_mask_offset = member.bit_offset / 8;
 
     /* has next */
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "has_next", &member) != NO_ERROR) {
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "has_next", &member) != NO_ERROR) {
         return EPERM;
     }
-    md->has_next_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
+    md->has_next_size = btf_get_type_size_by_id(ctx->btf_metadata.btf, member.effective_type_id);
     md->has_next_offset = member.bit_offset / 8;
 
     /* validate size and offset */
@@ -2556,11 +2556,11 @@ static int parse_table_value_action(nikss_table_entry_ctx_t *ctx, nikss_table_en
                                     const char *value, uint32_t value_type_id)
 {
     /* Get action ID */
-    psabtf_struct_member_md_t action_id_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_id_md) != NO_ERROR) {
+    btf_struct_member_md_t action_id_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "action", &action_id_md) != NO_ERROR) {
         return ENOENT;
     }
-    size_t action_id_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, action_id_md.effective_type_id);
+    size_t action_id_size = btf_get_type_size_by_id(ctx->btf_metadata.btf, action_id_md.effective_type_id);
     if (action_id_size > sizeof(entry->action->action_id)) {
         return EINVAL;
     }
@@ -2568,16 +2568,16 @@ static int parse_table_value_action(nikss_table_entry_ctx_t *ctx, nikss_table_en
     memcpy(&entry->action->action_id, value + action_id_md.bit_offset / 8, action_id_size);
 
     /* Get action params */
-    psabtf_struct_member_md_t union_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &union_md) != NO_ERROR) {
+    btf_struct_member_md_t union_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "u", &union_md) != NO_ERROR) {
         return EINVAL;
     }
-    psabtf_struct_member_md_t action_md = {};
-    if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, entry->action->action_id, &action_md) != NO_ERROR) {
+    btf_struct_member_md_t action_md = {};
+    if (btf_get_member_md_by_index(ctx->btf_metadata.btf, union_md.effective_type_id, entry->action->action_id, &action_md) != NO_ERROR) {
         return EINVAL;
     }
 
-    const struct btf_type *action_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, action_md.effective_type_id);
+    const struct btf_type *action_type = btf_get_type_by_id(ctx->btf_metadata.btf, action_md.effective_type_id);
     if (action_type == NULL) {
         return EINVAL;
     }
@@ -2598,13 +2598,13 @@ static int parse_table_value_action(nikss_table_entry_ctx_t *ctx, nikss_table_en
     const size_t base_offset = (union_md.bit_offset + action_md.bit_offset) / 8;
     const struct btf_member *member = btf_members(action_type);
     for (unsigned i = 0; i < number_of_params; i++, member++) {
-        psabtf_struct_member_md_t param_md = {};
-        if (psabtf_get_member_md_by_index(ctx->btf_metadata.btf, action_md.effective_type_id, i, &param_md) != NO_ERROR) {
+        btf_struct_member_md_t param_md = {};
+        if (btf_get_member_md_by_index(ctx->btf_metadata.btf, action_md.effective_type_id, i, &param_md) != NO_ERROR) {
             return EINVAL;
         }
 
         size_t offset = base_offset + param_md.bit_offset / 8;
-        size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, param_md.effective_type_id);
+        size_t size = btf_get_type_size_by_id(ctx->btf_metadata.btf, param_md.effective_type_id);
         if (size + offset > ctx->table.value_size) {
             return EINVAL;
         }
@@ -2625,11 +2625,11 @@ static int parse_table_value_priority(nikss_table_entry_ctx_t *ctx, nikss_table_
         return NO_ERROR;
     }
 
-    psabtf_struct_member_md_t priority_md = {};
-    if (psabtf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "priority", &priority_md) != NO_ERROR) {
+    btf_struct_member_md_t priority_md = {};
+    if (btf_get_member_md_by_name(ctx->btf_metadata.btf, value_type_id, "priority", &priority_md) != NO_ERROR) {
         return ENOENT;
     }
-    size_t size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, priority_md.effective_type_id);
+    size_t size = btf_get_type_size_by_id(ctx->btf_metadata.btf, priority_md.effective_type_id);
     if (size > sizeof(entry->priority)) {
         return EINVAL;
     }
@@ -2960,7 +2960,7 @@ static int parse_table_key_btf_info(nikss_table_entry_ctx_t *ctx, nikss_table_en
     if (key_type_id == 0) {
         return EINVAL;
     }
-    const struct btf_type *key_type = psabtf_get_type_by_id(ctx->btf_metadata.btf, key_type_id);
+    const struct btf_type *key_type = btf_get_type_by_id(ctx->btf_metadata.btf, key_type_id);
     if (key_type == NULL) {
         return EINVAL;
     }
@@ -2994,7 +2994,7 @@ static int parse_table_key_btf_info(nikss_table_entry_ctx_t *ctx, nikss_table_en
 
         /* assume that every field is byte aligned */
         unsigned offset = btf_member_bit_offset(key_type, member_idx) / 8;
-        unsigned member_size = psabtf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
+        unsigned member_size = btf_get_type_size_by_id(ctx->btf_metadata.btf, member->type);
         int field_type = decode_key_field_type_btf_info(ctx, key_mask + offset, member_size, entries, member_idx);
         uint32_t prefix = global_prefix + 32 - offset * 8;
 

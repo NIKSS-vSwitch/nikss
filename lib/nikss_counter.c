@@ -62,7 +62,7 @@ void nikss_counter_ctx_free(nikss_counter_context_t *ctx)
 
 nikss_counter_type_t get_counter_type(nikss_btf_t *btf, uint32_t type_id)
 {
-    const struct btf_type *type = psabtf_get_type_by_id(btf->btf, type_id);
+    const struct btf_type *type = btf_get_type_by_id(btf->btf, type_id);
     if (btf_kind(type) != BTF_KIND_STRUCT) {
         return NIKSS_COUNTER_TYPE_UNKNOWN;
     }
