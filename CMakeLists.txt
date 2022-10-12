@@ -14,16 +14,16 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.16)
-project(psabpf C)
+project(nikss C)
 
 set(CMAKE_C_STANDARD 11)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
 
-OPTION (BUILD_SHARED "Build a shared library which the psabpf-ctl program will link against. Useful for other programs to link against as well." OFF)
+OPTION (BUILD_SHARED "Build a shared library which the nikss-ctl program will link against. Useful for other programs to link against as well." OFF)
 
-set(PSABPFLIB_SRCS
+set(NIKSSLIB_SRCS
         lib/btf.c
         lib/common.c
         lib/nikss.c
@@ -39,7 +39,7 @@ set(PSABPFLIB_SRCS
         lib/nikss_direct_meter.c
         lib/nikss_value_set.c)
 
-set(PSABPFCTL_SRCS
+set(NIKSSCTL_SRCS
         CLI/action_selector.c
         CLI/common.c
         CLI/clone_session.c
@@ -58,22 +58,22 @@ add_compile_definitions(_XOPEN_SOURCE=500)
 add_compile_definitions(_GNU_SOURCE)
 
 if (BUILD_SHARED)
-  add_library(psabpf SHARED ${PSABPFLIB_SRCS})
-  target_link_libraries(psabpf ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
-  install(TARGETS psabpf DESTINATION lib)
-  add_executable(psabpf-ctl ${PSABPFCTL_SRCS})
+  add_library(nikss SHARED ${NIKSSLIB_SRCS})
+  target_link_libraries(nikss ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
+  install(TARGETS nikss DESTINATION lib)
+  add_executable(nikss-ctl ${NIKSSCTL_SRCS})
 else ()
-  add_executable(psabpf-ctl ${PSABPFLIB_SRCS} ${PSABPFCTL_SRCS})
+  add_executable(nikss-ctl ${NIKSSLIB_SRCS} ${NIKSSCTL_SRCS})
 endif ()
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/include)
 if (BUILD_SHARED)
   link_directories(${CMAKE_CURRENT_BINARY_DIR})
-  target_link_libraries(psabpf-ctl psabpf z elf gmp m jansson)
+  target_link_libraries(nikss-ctl nikss z elf gmp m jansson)
 else ()
-  target_link_libraries(psabpf-ctl z elf gmp m jansson)
+  target_link_libraries(nikss-ctl z elf gmp m jansson)
 endif ()
-target_link_libraries(psabpf-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
-install(TARGETS psabpf-ctl RUNTIME DESTINATION bin)
+target_link_libraries(nikss-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
+install(TARGETS nikss-ctl RUNTIME DESTINATION bin)
 
 # linter
 set(C_LANG_OPTIONS_CHECK
@@ -118,6 +118,6 @@ add_custom_target(clint
         COMMAND echo Running cppcheck
         COMMAND cppcheck ${CPPCHECK_CONFIG} ${CPPCHECK_CHECKS} ${C_LANG_OPTIONS_CHECK} ./CLI ./include ./lib main.c
         COMMAND echo Running clang-tidy
-        COMMAND clang-tidy ${CLANG_TIDY_CONFIG} ${CLANG_TIDY_CHECKS} ${PSABPFLIB_SRCS} ${PSABPFCTL_SRCS} -- ${C_LANG_OPTIONS_CHECK}
+        COMMAND clang-tidy ${CLANG_TIDY_CONFIG} ${CLANG_TIDY_CHECKS} ${NIKSSLIB_SRCS} ${NIKSSCTL_SRCS} -- ${C_LANG_OPTIONS_CHECK}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "C static checks")
