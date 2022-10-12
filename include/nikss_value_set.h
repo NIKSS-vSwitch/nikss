@@ -18,7 +18,7 @@
 #ifndef __NIKSS_VALUE_SET_H_
 #define __NIKSS_VALUE_SET_H_
 
-#include <psabpf.h>
+#include <nikss.h>
 
 typedef struct nikss_value_set_context {
     nikss_bpf_map_descriptor_t set_map;

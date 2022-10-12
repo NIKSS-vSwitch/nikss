@@ -28,7 +28,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include <psabpf_pipeline.h>
+#include <nikss_pipeline.h>
 
 #include "bpf_defs.h"
 #include "btf.h"

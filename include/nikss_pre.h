@@ -18,7 +18,7 @@
 #ifndef __NIKSS_PRE_H
 #define __NIKSS_PRE_H
 
-#include "psabpf.h"
+#include "nikss.h"
 
 /*
  * PRE - Clone Sessions

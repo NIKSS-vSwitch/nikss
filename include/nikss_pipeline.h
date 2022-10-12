@@ -18,7 +18,7 @@
 #ifndef __NIKSS_PIPELINE_H
 #define __NIKSS_PIPELINE_H
 
-#include "psabpf.h"
+#include "nikss.h"
 
 bool nikss_pipeline_exists(nikss_context_t *ctx);
 /* This function should load BPF program and initialize default maps (call map initializer program) */

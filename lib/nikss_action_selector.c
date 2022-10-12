@@ -22,11 +22,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "btf.h"
 #include "common.h"
-#include "psabpf_table.h"
+#include "nikss_table.h"
 
 static int open_group_map(nikss_action_selector_context_t *ctx,
                           nikss_action_selector_group_context_t *group)

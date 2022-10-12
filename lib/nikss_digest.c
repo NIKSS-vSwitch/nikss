@@ -20,8 +20,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
-#include <psabpf_digest.h>
+#include <nikss.h>
+#include <nikss_digest.h>
 
 #include "btf.h"
 #include "common.h"

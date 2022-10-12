@@ -22,12 +22,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
-#include <psabpf_value_set.h>
+#include <nikss.h>
+#include <nikss_value_set.h>
 
 #include "btf.h"
 #include "common.h"
-#include "psabpf_table.h"
+#include "nikss_table.h"
 
 void nikss_value_set_context_init(nikss_value_set_context_t *ctx)
 {

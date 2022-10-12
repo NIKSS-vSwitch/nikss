@@ -19,7 +19,7 @@
 #define __NIKSS_COMMON_H
 
 #include <stdint.h>
-#include <psabpf.h>
+#include <nikss.h>
 
 int str_ends_with(const char *str, const char *suffix);
 bool remove_suffix_from_str(char *str, const char *suffix);

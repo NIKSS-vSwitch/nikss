@@ -18,7 +18,7 @@
 #ifndef __NIKSS_DIGEST_H
 #define __NIKSS_DIGEST_H
 
-#include <psabpf.h>
+#include <nikss.h>
 
 typedef struct nikss_digest_context {
     nikss_bpf_map_descriptor_t queue;

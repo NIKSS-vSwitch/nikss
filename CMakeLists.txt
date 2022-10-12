@@ -26,18 +26,18 @@ OPTION (BUILD_SHARED "Build a shared library which the psabpf-ctl program will l
 set(PSABPFLIB_SRCS
         lib/btf.c
         lib/common.c
-        lib/psabpf.c
-        lib/psabpf_pre.c
-        lib/psabpf_digest.c
-        lib/psabpf_pipeline.c
-        lib/psabpf_table.c
-        lib/psabpf_action_selector.c
-        lib/psabpf_meter.c
-        lib/psabpf_counter.c
-        lib/psabpf_register.c
-        lib/psabpf_direct_counter.c
-        lib/psabpf_direct_meter.c
-        lib/psabpf_value_set.c)
+        lib/nikss.c
+        lib/nikss_pre.c
+        lib/nikss_digest.c
+        lib/nikss_pipeline.c
+        lib/nikss_table.c
+        lib/nikss_action_selector.c
+        lib/nikss_meter.c
+        lib/nikss_counter.c
+        lib/nikss_register.c
+        lib/nikss_direct_counter.c
+        lib/nikss_direct_meter.c
+        lib/nikss_value_set.c)
 
 set(PSABPFCTL_SRCS
         CLI/action_selector.c

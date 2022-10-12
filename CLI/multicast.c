@@ -20,7 +20,7 @@
 
 #include <jansson.h>
 
-#include <psabpf_pre.h>
+#include <nikss_pre.h>
 
 #include "multicast.h"
 

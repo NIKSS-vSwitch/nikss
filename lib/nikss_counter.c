@@ -20,12 +20,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "bpf_defs.h"
 #include "btf.h"
 #include "common.h"
-#include "psabpf_counter.h"
+#include "nikss_counter.h"
 
 #define MAX_COUNTER_VALUE_SIZE 16
 

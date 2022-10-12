@@ -21,8 +21,8 @@
 
 #include <jansson.h>
 
-#include <psabpf.h>
-#include <psabpf_value_set.h>
+#include <nikss.h>
+#include <nikss_value_set.h>
 
 #include "value_set.h"
 

@@ -24,8 +24,8 @@
 
 #include <jansson.h>
 
-#include <psabpf.h>
-#include <psabpf_pipeline.h>
+#include <nikss.h>
+#include <nikss_pipeline.h>
 
 #include "common.h"
 

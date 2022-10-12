@@ -22,7 +22,7 @@
 
 #include <jansson.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "meter.h"
 

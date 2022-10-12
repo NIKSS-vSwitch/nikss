@@ -24,13 +24,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "btf.h"
 #include "common.h"
-#include "psabpf_counter.h"
-#include "psabpf_meter.h"
-#include "psabpf_table.h"
+#include "nikss_counter.h"
+#include "nikss_meter.h"
+#include "nikss_table.h"
 
 void nikss_table_entry_ctx_init(nikss_table_entry_ctx_t *ctx)
 {

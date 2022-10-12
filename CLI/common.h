@@ -21,7 +21,7 @@
 
 #include <jansson.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #ifndef __NIKSSCTL_COMMON_H
 #define __NIKSSCTL_COMMON_H

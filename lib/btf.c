@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "bpf_defs.h"
 #include "btf.h"

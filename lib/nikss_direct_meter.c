@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 void nikss_direct_meter_ctx_init(nikss_direct_meter_context_t *dm_ctx)
 {

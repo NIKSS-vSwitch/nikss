@@ -21,7 +21,7 @@
 
 #include <jansson.h>
 
-#include <psabpf_digest.h>
+#include <nikss_digest.h>
 
 #include "digest.h"
 
