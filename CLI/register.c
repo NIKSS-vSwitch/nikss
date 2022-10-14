@@ -15,14 +15,15 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
+
 #include <jansson.h>
 
-#include "register.h"
 #include <psabpf.h>
+
+#include "register.h"
 
 static int parse_dst_register(int *argc, char ***argv, const char **register_name,
                              psabpf_context_t *psabpf_ctx, psabpf_register_context_t *ctx)
@@ -32,11 +33,13 @@ static int parse_dst_register(int *argc, char ***argv, const char **register_nam
         return EINVAL;
     }
 
-    if (register_name != NULL)
+    if (register_name != NULL) {
         *register_name = **argv;
+    }
     int error_code = psabpf_register_ctx_name(psabpf_ctx, ctx, **argv);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
     NEXT_ARGP();
     return NO_ERROR;
@@ -44,20 +47,23 @@ static int parse_dst_register(int *argc, char ***argv, const char **register_nam
 
 static int parse_register_index(int *argc, char ***argv, psabpf_register_entry_t *entry)
 {
-    if (!is_keyword(**argv, "index"))
+    if (!is_keyword(**argv, "index")) {
         return NO_ERROR; /* index is optional */
+    }
     NEXT_ARGP_RET();
 
     bool has_any_index = false;
     while (*argc > 0) {
         if (has_any_index) {
-            if (is_keyword(**argv, "value"))
+            if (is_keyword(**argv, "value")) {
                 return NO_ERROR;
+            }
         }
 
         int err = translate_data_to_bytes(**argv, entry, CTX_REGISTER_INDEX);
-        if (err != NO_ERROR)
+        if (err != NO_ERROR) {
             return err;
+        }
 
         has_any_index = true;
         NEXT_ARGP();
@@ -77,8 +83,9 @@ static int parse_register_value(int *argc, char ***argv, psabpf_register_entry_t
     int ret = ENODATA;
     while (*argc > 0) {
         ret = translate_data_to_bytes(**argv, entry, CTX_REGISTER_DATA);
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             return ret;
+        }
         NEXT_ARGP();
     }
 
@@ -135,14 +142,15 @@ static int get_and_print_register_json(psabpf_register_context_t *ctx, psabpf_re
         ret = build_entry(ctx, entry, json_entry);
         json_array_append_new(entries, json_entry);
     } else {
-        psabpf_register_entry_t *iter;
+        psabpf_register_entry_t *iter = NULL;
         while ((iter = psabpf_register_get_next(ctx)) != NULL) {
             json_t *json_entry = json_object();
             ret = build_entry(ctx, iter, json_entry);
             json_array_append_new(entries, json_entry);
             psabpf_register_entry_free(iter);
-            if (ret != NO_ERROR)
+            if (ret != NO_ERROR) {
                 break;
+            }
         }
     }
 
@@ -174,16 +182,19 @@ int do_register_get(int argc, char **argv)
     psabpf_register_ctx_init(&ctx);
     psabpf_register_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_dst_register(&argc, &argv, &register_name, &psabpf_ctx, &ctx) != NO_ERROR)
+    if (parse_dst_register(&argc, &argv, &register_name, &psabpf_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     bool register_index_provided = (argc >= 1 && is_keyword(*argv, "index"));
     if (register_index_provided) {
-        if (parse_register_index(&argc, &argv, &entry) != NO_ERROR)
+        if (parse_register_index(&argc, &argv, &entry) != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     if (argc > 0) {
@@ -212,17 +223,21 @@ int do_register_set(int argc, char **argv) {
     psabpf_register_ctx_init(&ctx);
     psabpf_register_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_dst_register(&argc, &argv, &register_name, &psabpf_ctx, &ctx) != NO_ERROR)
+    if (parse_dst_register(&argc, &argv, &register_name, &psabpf_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_register_index(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_register_index(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_register_value(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_register_value(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);

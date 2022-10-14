@@ -1,0 +1,34 @@
+name: static checks
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+
+concurrency:
+  # if workflow for PR or push is already running stop it, and start new one
+  group: static-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt install -y cppcheck make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev
+          git submodule update --init libbpf
+          ./build_libbpf.sh
+
+      - name: Configure
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Run C linter
+        working-directory: ${{github.workspace}}/build
+        run: make clint

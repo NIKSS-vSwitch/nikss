@@ -15,30 +15,33 @@
  * limitations under the License.
  */
 
-#include <errno.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
+#include <errno.h>
 #include <linux/bpf.h>
 #include <linux/btf.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #include <psabpf.h>
+
+#include "bpf_defs.h"
 #include "btf.h"
 #include "common.h"
-#include "bpf_defs.h"
 
 static uint32_t follow_types(struct btf *btf, uint32_t type_id)
 {
-    if (type_id == 0)
+    if (type_id == 0) {
         return type_id;
+    }
 
     const struct btf_type *type = btf__type_by_id(btf, type_id);
     while (true) {
-        if (btf_is_typedef(type) || btf_is_ptr(type))
+        if (btf_is_typedef(type) || btf_is_ptr(type)) {
             type_id = type->type;
-        else
+        } else {
             break;
+        }
         type = btf__type_by_id(btf, type_id);
     }
 
@@ -48,11 +51,13 @@ static uint32_t follow_types(struct btf *btf, uint32_t type_id)
 static uint32_t find_data_section_type_id(struct btf *btf, uint32_t sec_type_id, const char *name)
 {
     const struct btf_type *type = btf__type_by_id(btf, sec_type_id);
-    if (type == NULL)
+    if (type == NULL) {
         return 0;
+    }
 
-    if (!btf_is_datasec(type))
+    if (!btf_is_datasec(type)) {
         return 0;
+    }
 
     unsigned entries = btf_vlen(type);
     const struct btf_var_secinfo *info = btf_var_secinfos(type);
@@ -74,8 +79,9 @@ static uint32_t find_data_section_type_id(struct btf *btf, uint32_t sec_type_id,
 const struct btf_type *psabtf_get_type_by_id(struct btf *btf, uint32_t type_id)
 {
     type_id = follow_types(btf, type_id);
-    if (type_id == 0)
+    if (type_id == 0) {
         return NULL;
+    }
     return btf__type_by_id(btf, type_id);
 }
 
@@ -87,11 +93,13 @@ static uint32_t psabtf_get_map_type_id_by_name(struct btf *btf, const char *name
     /* First find ".maps" section to avoid false positive match to name */
     for (unsigned i = 1; i <= nodes; i++) {
         const struct btf_type *type = btf__type_by_id(btf, i);
-        if (!type->name_off)
+        if (!type->name_off) {
             continue;
+        }
         const char *type_name = btf__name_by_offset(btf, type->name_off);
-        if (type_name == NULL)
+        if (type_name == NULL) {
             continue;
+        }
         if (strcmp(type_name, ".maps") == 0) {
             type_id = i;
             break;
@@ -112,23 +120,27 @@ static uint32_t psabtf_get_map_type_id_by_name(struct btf *btf, const char *name
 int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
         const char *member_name, psabtf_struct_member_md_t *md)
 {
-    if (type_id == 0 || btf == NULL)
+    if (type_id == 0 || btf == NULL) {
         return EPERM;
+    }
 
     const struct btf_type *type = btf__type_by_id(btf, type_id);
-    if (type == NULL)
+    if (type == NULL) {
         return EPERM;
-    // type must be a struct or union
+    }
+    /* type must be a struct or union */
     if (btf_kind(type) != BTF_KIND_STRUCT &&
-        btf_kind(type) != BTF_KIND_UNION)
+        btf_kind(type) != BTF_KIND_UNION) {
         return EPERM;
+    }
 
     int type_entries = btf_vlen(type);
     const struct btf_member *type_member = btf_members(type);
     for (int i = 0; i < type_entries; i++, type_member++) {
         const char *name = btf__name_by_offset(btf, type_member->name_off);
-        if (name == NULL)
+        if (name == NULL) {
             continue;
+        }
         if (strcmp(name, member_name) == 0) {
             md->member = type_member;
             md->index = i;
@@ -144,20 +156,24 @@ int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
 int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
                                   psabtf_struct_member_md_t *md)
 {
-    if (type_id == 0 || btf == NULL)
+    if (type_id == 0 || btf == NULL) {
         return EPERM;
+    }
 
     const struct btf_type *type = btf__type_by_id(btf, type_id);
-    if (type == NULL)
+    if (type == NULL) {
         return EPERM;
-    // type must be a struct or union
+    }
+    /* type must be a struct or union */
     if (btf_kind(type) != BTF_KIND_STRUCT &&
-        btf_kind(type) != BTF_KIND_UNION)
+        btf_kind(type) != BTF_KIND_UNION) {
         return EPERM;
+    }
 
     int type_entries = btf_vlen(type);
-    if (index >= type_entries)
+    if (index >= type_entries) {
         return EPERM;
+    }
 
     const struct btf_member *type_member = btf_members(type);
     type_member += index;
@@ -172,17 +188,20 @@ int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t in
 static uint32_t get_member_type_id_by_name(struct btf *btf, uint32_t type_id, const char *member_name)
 {
     psabtf_struct_member_md_t md = {};
-    if (psabtf_get_member_md_by_name(btf, type_id, member_name, &md) != 0)
+    if (psabtf_get_member_md_by_name(btf, type_id, member_name, &md) != 0) {
         return 0;
+    }
 
     return md.effective_type_id;
 }
 
+/* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to get size of any data structure */
 size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
 {
     const struct btf_type *type = psabtf_get_type_by_id(btf, type_id);
-    if (type == NULL)
+    if (type == NULL) {
         return 0;
+    }
 
     switch (btf_kind(type)) {
         case BTF_KIND_INT:
@@ -231,14 +250,16 @@ static int try_load_btf(psabpf_btf_t *btf, const char *program_name)
 
     error = btf__get_from_id(prog_info.btf_id, (struct btf **) &(btf->btf));
     btf->btf_fd = bpf_btf_get_fd_by_id(prog_info.btf_id);
-    if (btf->btf == NULL || btf->btf_fd < 0 || error != 0)
+    if (btf->btf == NULL || btf->btf_fd < 0 || error != 0) {
         goto free_btf;
+    }
 
     return NO_ERROR;
 
 free_btf:
-    if (btf->btf != NULL)
+    if (btf->btf != NULL) {
         btf__free(btf->btf);
+    }
     btf->btf = NULL;
     close_object_fd(&btf->btf_fd);
 
@@ -247,8 +268,9 @@ free_btf:
 
 int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
 {
-    if (btf->btf != NULL)
+    if (btf->btf != NULL) {
         return NO_ERROR;
+    }
 
     char program_file_name[256];
     const char *programs_to_search[] = { TC_INGRESS_PROG, XDP_INGRESS_PROG, TC_EGRESS_PROG };
@@ -257,22 +279,26 @@ int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
     for (int i = 0; i < number_of_programs; i++) {
         snprintf(program_file_name, sizeof(program_file_name), "%s/%s%u/%s",
                  BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx), programs_to_search[i]);
-        if (try_load_btf(btf, program_file_name) == NO_ERROR)
+        if (try_load_btf(btf, program_file_name) == NO_ERROR) {
             break;
+        }
     }
-    if (btf->btf == NULL)
+    if (btf->btf == NULL) {
         return ENOENT;
+    }
 
     return NO_ERROR;
 }
 
 void free_btf(psabpf_btf_t *btf)
 {
-    if (btf == NULL)
+    if (btf == NULL) {
         return;
+    }
 
-    if (btf->btf)
+    if (btf->btf) {
         btf__free(btf->btf);
+    }
     btf->btf = NULL;
     close_object_fd(&btf->btf_fd);
 }
@@ -280,28 +306,32 @@ void free_btf(psabpf_btf_t *btf)
 int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *btf, psabpf_bpf_map_descriptor_t *md)
 {
     char buffer[256];
-    int errno_val;
+    int errno_val = NO_ERROR;
 
-    if (md == NULL)
+    if (md == NULL) {
         return EPERM;
+    }
 
     build_ebpf_map_filename(buffer, sizeof(buffer), psabpf_ctx, name);
     md->fd = bpf_obj_get(buffer);
-    if (md->fd < 0)
+    if (md->fd < 0) {
         return errno;
+    }
 
     /* get key/value size */
     errno_val = update_map_info(md);
-    if (errno_val != NO_ERROR)
+    if (errno_val != NO_ERROR) {
         return errno_val;
+    }
 
     /* Find BTF type IDs for our map */
     md->key_type_id = 0;
     md->value_type_id = 0;
     if (btf != NULL && btf->btf != NULL) {
         uint32_t btf_type_id = psabtf_get_map_type_id_by_name(btf->btf, name);
-        if (btf_type_id == 0)
+        if (btf_type_id == 0) {
             fprintf(stderr, "can't get BTF info for %s\n", name);
+        }
 
         if (md->map_key_type_id == 0) {
             md->key_type_id = get_member_type_id_by_name(btf->btf, btf_type_id, "key");
@@ -321,10 +351,12 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
 
 int update_map_info(psabpf_bpf_map_descriptor_t *md)
 {
-    if (md == NULL)
+    if (md == NULL) {
         return EINVAL;
-    if (md->fd < 0)
+    }
+    if (md->fd < 0) {
         return EBADF;
+    }
 
     struct bpf_map_info info = {};
     uint32_t len = sizeof(info);

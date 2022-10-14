@@ -18,29 +18,29 @@
 #include <getopt.h>
 #include <stdio.h>
 
-#include "CLI/common.h"
+#include "CLI/action_selector.h"
 #include "CLI/clone_session.h"
+#include "CLI/common.h"
+#include "CLI/counter.h"
+#include "CLI/digest.h"
+#include "CLI/meter.h"
 #include "CLI/multicast.h"
 #include "CLI/pipeline.h"
-#include "CLI/table.h"
-#include "CLI/action_selector.h"
-#include "CLI/meter.h"
-#include "CLI/digest.h"
-#include "CLI/counter.h"
 #include "CLI/register.h"
+#include "CLI/table.h"
 #include "CLI/value_set.h"
 
-const char *program_name;
+/* Removing this line will require too much effort or result in strange C construct (assign to const value) */
+const char *program_name;  /* NOLINT(cppcoreguidelines-avoid-non-const-global-variables) */
 
 int cmd_select(const struct cmd *cmds, int argc, char **argv,
                int (*help)(int, char **))
 {
-    unsigned int i;
-
-    if (argc < 1)
+    if (argc < 1) {
         return help(argc, argv);
+    }
 
-    for (i = 0; cmds[i].cmd; i++) {
+    for (unsigned int i = 0; cmds[i].cmd; i++) {
         if (is_keyword(*argv, cmds[i].cmd)) {
             if (!cmds[i].func) {
                 return -1;
@@ -89,16 +89,18 @@ static int do_pipeline(int argc, char **argv)
 
 static int do_port_add(int argc, char **argv)
 {
-    if (is_keyword(*argv, "help") || argc < 1)
+    if (is_keyword(*argv, "help") || argc < 1) {
         return do_pipeline_help(argc, argv);
+    }
 
     return do_pipeline_port_add(argc, argv);
 }
 
 static int do_port_del(int argc, char **argv)
 {
-    if (is_keyword(*argv, "help") || argc < 1)
+    if (is_keyword(*argv, "help") || argc < 1) {
         return do_pipeline_help(argc, argv);
+    }
 
     return do_pipeline_port_del(argc, argv);
 }
@@ -180,7 +182,7 @@ int main(int argc, char **argv)
 {
     program_name = argv[0];
 
-    // TODO: parse program options
+    /* TODO: parse program options */
 
     argc -= optind;
     argv += optind;

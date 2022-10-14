@@ -136,7 +136,7 @@ typedef enum psabpf_counter_type {
 
 typedef struct psabpf_counter_entry {
     psabpf_struct_field_set_t entry_key;
-    void *raw_key;
+    char *raw_key;
     size_t current_key_id;
     psabpf_struct_field_t current_field;
 
@@ -185,8 +185,8 @@ int psabpf_counter_reset(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *
 typedef struct psabpf_register_entry {
     psabpf_struct_field_set_t entry_key;
     psabpf_struct_field_set_t entry_value;
-    void *raw_key;
-    void *raw_value;
+    char *raw_key;
+    char *raw_value;
     size_t current_field_id;
     psabpf_struct_field_t current_field;
 } psabpf_register_entry_t;
@@ -224,7 +224,7 @@ typedef uint64_t psabpf_meter_value_t;
 
 typedef struct psabpf_meter_entry {
     psabpf_struct_field_set_t index_sfs;
-    void *raw_index;
+    char *raw_index;
     size_t current_index_field_id;
     psabpf_struct_field_t current_index_field;
 

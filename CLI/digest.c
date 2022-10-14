@@ -15,13 +15,14 @@
  * limitations under the License.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
 
 #include <jansson.h>
 
 #include <psabpf_digest.h>
+
 #include "digest.h"
 
 static int parse_digest(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
@@ -54,11 +55,13 @@ int get_digests_and_print(int argc, char **argv, bool only_single_entry)
     psabpf_context_init(&psabpf_ctx);
     psabpf_digest_ctx_init(&ctx);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up_psabpf;
+    }
 
-    if (parse_digest(&argc, &argv, &psabpf_ctx, &ctx, &digest_instance_name) != NO_ERROR)
+    if (parse_digest(&argc, &argv, &psabpf_ctx, &ctx, &digest_instance_name) != NO_ERROR) {
         goto clean_up_psabpf;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -90,11 +93,13 @@ int get_digests_and_print(int argc, char **argv, bool only_single_entry)
         json_array_append_new(entries, entry);
         psabpf_digest_free(&digest);
 
-        if (ret != NO_ERROR)
+        if (ret != NO_ERROR) {
             break;
+        }
 
-        if (only_single_entry)
+        if (only_single_entry) {
             break;
+        }
     }
 
     json_dumpf(root, stdout, JSON_INDENT(4) | JSON_ENSURE_ASCII);

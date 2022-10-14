@@ -15,14 +15,16 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
+
 #include <jansson.h>
 
-#include "value_set.h"
 #include <psabpf.h>
 #include <psabpf_value_set.h>
+
+#include "value_set.h"
 
 static int parse_dst_value_set(int *argc, char ***argv, const char **value_set_name,
                                psabpf_context_t *psabpf_ctx, psabpf_value_set_context_t *ctx)
@@ -32,11 +34,13 @@ static int parse_dst_value_set(int *argc, char ***argv, const char **value_set_n
         return EINVAL;
     }
 
-    if (value_set_name != NULL)
+    if (value_set_name != NULL) {
         *value_set_name = **argv;
+    }
     int error_code = psabpf_value_set_context_name(psabpf_ctx, ctx, **argv);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
     NEXT_ARGP();
     return NO_ERROR;
@@ -108,14 +112,17 @@ int do_value_set_delete(int argc, char **argv)
     psabpf_value_set_context_init(&ctx);
     psabpf_table_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR)
+    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_value_set_value(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_value_set_value(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -144,14 +151,17 @@ int do_value_set_insert(int argc, char **argv)
     psabpf_value_set_context_init(&ctx);
     psabpf_table_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR)
+    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_value_set_value(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_value_set_value(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -180,11 +190,13 @@ int do_value_set_get(int argc, char **argv)
     psabpf_value_set_context_init(&ctx);
     psabpf_table_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
-    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR)
+    if (parse_dst_value_set(&argc, &argv, &value_set_name, &psabpf_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);

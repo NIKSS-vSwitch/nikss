@@ -24,8 +24,9 @@
 
 void psabpf_direct_counter_ctx_init(psabpf_direct_counter_context_t *dc_ctx)
 {
-    if (dc_ctx == NULL)
+    if (dc_ctx == NULL) {
         return;
+    }
 
     memset(dc_ctx, 0, sizeof(psabpf_direct_counter_context_t));
     dc_ctx->counter_idx = -1;
@@ -34,19 +35,22 @@ void psabpf_direct_counter_ctx_init(psabpf_direct_counter_context_t *dc_ctx)
 
 void psabpf_direct_counter_ctx_free(psabpf_direct_counter_context_t *dc_ctx)
 {
-    if (dc_ctx == NULL)
+    if (dc_ctx == NULL) {
         return;
+    }
 
-    if (dc_ctx->name != NULL && dc_ctx->mem_can_be_freed == true)
+    if (dc_ctx->name != NULL && dc_ctx->mem_can_be_freed == true) {
         free((void *) dc_ctx->name);
+    }
     dc_ctx->name = NULL;
 }
 
 int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
                                    psabpf_table_entry_ctx_t *table_ctx, const char *dc_name)
 {
-    if (dc_ctx == NULL || table_ctx == NULL || dc_name == NULL)
+    if (dc_ctx == NULL || table_ctx == NULL || dc_name == NULL) {
         return EINVAL;
+    }
 
     for (unsigned i = 0; i < table_ctx->n_direct_counters; i++) {
         if (strcmp(table_ctx->direct_counters_ctx[i].name, dc_name) == 0) {
@@ -67,14 +71,16 @@ int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
 int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
                                           psabpf_direct_counter_context_t *dc_ctx, psabpf_counter_entry_t *dc)
 {
-    if (entry == NULL || dc_ctx == NULL || dc == NULL)
+    if (entry == NULL || dc_ctx == NULL || dc == NULL) {
         return EINVAL;
+    }
 
     void *tmp_ptr = NULL;
-    if (entry->direct_counters == NULL)
+    if (entry->direct_counters == NULL) {
         tmp_ptr = malloc(sizeof(psabpf_direct_counter_entry_t));
-    else
+    } else {
         tmp_ptr = realloc(entry->direct_counters, (entry->n_direct_counters + 1) * sizeof(psabpf_direct_counter_entry_t));
+    }
     if (tmp_ptr == NULL) {
         fprintf(stderr, "not enough memory\n");
         return ENOMEM;
@@ -93,8 +99,9 @@ int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
 
 psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return NULL;
+    }
 
     if (entry->current_direct_counter_ctx_id >= ctx->n_direct_counters) {
         entry->current_direct_counter_ctx_id = 0;
@@ -113,22 +120,25 @@ psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table
 
 psabpf_counter_type_t psabpf_direct_counter_get_type(psabpf_direct_counter_context_t *dc_ctx)
 {
-    if (dc_ctx == NULL)
+    if (dc_ctx == NULL) {
         return PSABPF_COUNTER_TYPE_UNKNOWN;
+    }
     return dc_ctx->counter_type;
 }
 
 const char *psabpf_direct_counter_get_name(psabpf_direct_counter_context_t *dc_ctx)
 {
-    if (dc_ctx == NULL)
+    if (dc_ctx == NULL) {
         return NULL;
+    }
     return dc_ctx->name;
 }
 
 int psabpf_direct_counter_get_entry(psabpf_direct_counter_context_t *dc_ctx, psabpf_table_entry_t *entry, psabpf_counter_entry_t *dc)
 {
-    if (dc_ctx == NULL || entry == NULL || dc == NULL)
+    if (dc_ctx == NULL || entry == NULL || dc == NULL) {
         return EINVAL;
+    }
     psabpf_counter_entry_init(dc);
 
     for (unsigned i = 0; i < entry->n_direct_counters; i++) {

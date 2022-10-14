@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
+#include <bpf/bpf.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <bpf/bpf.h>
 
 #include <psabpf.h>
 #include <psabpf_digest.h>
@@ -28,8 +28,9 @@
 
 void psabpf_digest_ctx_init(psabpf_digest_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
     memset(ctx, 0, sizeof(psabpf_digest_context_t));
 
     ctx->queue.fd = -1;
@@ -38,8 +39,9 @@ void psabpf_digest_ctx_init(psabpf_digest_context_t *ctx)
 
 void psabpf_digest_ctx_free(psabpf_digest_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
 
     free_btf(&ctx->btf_metadata);
     close_object_fd(&(ctx->queue.fd));
@@ -53,16 +55,19 @@ static int parse_digest_btf(psabpf_digest_context_t *ctx)
 
 int psabpf_digest_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name)
 {
-    if (psabpf_ctx == NULL || ctx == NULL || name == NULL)
+    if (psabpf_ctx == NULL || ctx == NULL || name == NULL) {
         return EINVAL;
+    }
 
     /* get the BTF, it is optional so print only warning */
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR)
+    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "warning: couldn't find BTF info\n");
+    }
 
     int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->queue);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     if (ctx->queue.type != BPF_MAP_TYPE_QUEUE) {
         fprintf(stderr, "%s: not a Digest instance\n", name);
@@ -81,13 +86,15 @@ int psabpf_digest_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t
 
 int psabpf_digest_get_next(psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
 {
-    if (ctx == NULL || digest == NULL)
+    if (ctx == NULL || digest == NULL) {
         return EINVAL;
+    }
 
     memset(digest, 0, sizeof(psabpf_digest_t));
 
-    if (ctx->queue.fd < 0)
+    if (ctx->queue.fd < 0) {
         return EBADF;
+    }
 
     digest->raw_data = malloc(ctx->queue.value_size);
     if (digest->raw_data == NULL) {
@@ -98,8 +105,9 @@ int psabpf_digest_get_next(psabpf_digest_context_t *ctx, psabpf_digest_t *digest
     int ret = bpf_map_lookup_and_delete_elem(ctx->queue.fd, NULL, digest->raw_data);
     if (ret != 0) {
         ret = errno;
-        if (ret != ENOENT)
+        if (ret != ENOENT) {
             fprintf(stderr, "failed to pop element from queue: %s\n", strerror(ret));
+        }
         psabpf_digest_free(digest);
         return ret;
     }
@@ -109,21 +117,24 @@ int psabpf_digest_get_next(psabpf_digest_context_t *ctx, psabpf_digest_t *digest
 
 void psabpf_digest_free(psabpf_digest_t *digest)
 {
-    if (digest == NULL)
+    if (digest == NULL) {
         return;
+    }
 
-    if (digest->raw_data != NULL)
+    if (digest->raw_data != NULL) {
         free(digest->raw_data);
+    }
 
     memset(digest, 0, sizeof(psabpf_digest_t));
 }
 
 psabpf_struct_field_t * psabpf_digest_get_next_field(psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
 {
-    if (ctx == NULL || digest == NULL)
+    if (ctx == NULL || digest == NULL) {
         return NULL;
+    }
 
-    psabpf_struct_field_descriptor_t *fd;
+    psabpf_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->fds, digest->current_field_id);
     if (fd == NULL) {
         digest->current_field_id = 0;

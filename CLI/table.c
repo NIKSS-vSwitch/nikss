@@ -15,19 +15,20 @@
  * limitations under the License.
  */
 
+#include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
-#include <errno.h>
 
 #include <jansson.h>
 
 #include <psabpf.h>
-#include "table.h"
+
 #include "common.h"
 #include "counter.h"
 #include "meter.h"
+#include "table.h"
 
 /******************************************************************************
  * Command line parsing functions
@@ -36,11 +37,13 @@
 static int parse_dst_table(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
                            psabpf_table_entry_ctx_t *ctx, const char **table_name, bool can_be_last)
 {
-    if (table_name != NULL)
+    if (table_name != NULL) {
         *table_name = **argv;
+    }
     int error_code = psabpf_table_entry_ctx_tblname(psabpf_ctx, ctx, **argv);
-    if (error_code != NO_ERROR)
+    if (error_code != NO_ERROR) {
         return error_code;
+    }
 
     if (can_be_last) {
         NEXT_ARGP();
@@ -61,7 +64,7 @@ static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t 
 
         if (is_keyword(**argv, "id")) {
             NEXT_ARGP_RET();
-            char *ptr;
+            char *ptr = NULL;
             psabpf_action_set_id(action, strtoul(**argv, &ptr, 0));
             if (*ptr) {
                 fprintf(stderr, "%s: unable to parse as an action id\n", **argv);
@@ -84,18 +87,20 @@ static int parse_table_action(int *argc, char ***argv, psabpf_table_entry_ctx_t 
         return EINVAL;
     }
 
-    if (can_be_last)
+    if (can_be_last) {
         NEXT_ARGP();
-    else
+    } else {
         NEXT_ARGP_RET();
+    }
 
     return NO_ERROR;
 }
 
 static int parse_table_key(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
-    if (!is_keyword(**argv, "key"))
+    if (!is_keyword(**argv, "key")) {
         return NO_ERROR;
+    }
 
     return parse_key_data(argc, argv, entry);
 }
@@ -104,8 +109,9 @@ static int parse_direct_counter_entry(int *argc, char ***argv,
                                       psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
                                       psabpf_direct_counter_context_t *dc, psabpf_counter_entry_t *counter)
 {
-    if (!is_keyword(**argv, "counter"))
+    if (!is_keyword(**argv, "counter")) {
         return EINVAL;
+    }
 
     NEXT_ARGP_RET();
     const char *name = **argv;
@@ -118,12 +124,14 @@ static int parse_direct_counter_entry(int *argc, char ***argv,
 
     NEXT_ARGP_RET();
     ret = parse_counter_value_str(**argv, psabpf_direct_counter_get_type(dc), counter);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     ret = psabpf_table_entry_set_direct_counter(entry, dc, counter);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         fprintf(stderr, "%s: failed to append DirectCounter to table entry\n", name);
+    }
 
     return ret;
 }
@@ -132,8 +140,9 @@ static int parse_direct_meter_entry(int *argc, char ***argv,
                                     psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry,
                                     psabpf_direct_meter_context_t *dm, psabpf_meter_entry_t *meter)
 {
-    if (!is_keyword(**argv, "meter"))
+    if (!is_keyword(**argv, "meter")) {
         return EINVAL;
+    }
 
     NEXT_ARGP_RET();
     const char *meter_name = **argv;
@@ -145,12 +154,14 @@ static int parse_direct_meter_entry(int *argc, char ***argv,
     }
 
     ret = parse_meter_data(argc, argv, meter);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     ret = psabpf_table_entry_set_direct_meter(entry, dm, meter);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         fprintf(stderr, "%s: failed to append DirectMeter to table entry\n", meter_name);
+    }
 
     return ret;
 }
@@ -170,8 +181,9 @@ static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *
 
     do {
         NEXT_ARGP_RET();
-        if (is_keyword(**argv, "priority"))
+        if (is_keyword(**argv, "priority")) {
             return NO_ERROR;
+        }
 
         bool ref_is_group_ref = false;
         if (indirect_table) {
@@ -190,11 +202,14 @@ static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *
                 int ret = parse_direct_counter_entry(argc, argv, ctx, entry, &dc, &counter);
                 psabpf_counter_entry_free(&counter);
                 psabpf_direct_counter_ctx_free(&dc);
-                if (ret != NO_ERROR)
+                if (ret != NO_ERROR) {
                     return ret;
+                }
 
                 continue;
-            } else if (is_keyword(**argv, "meter")) {
+            }
+
+            if (is_keyword(**argv, "meter")) {
                 psabpf_direct_meter_context_t dm;
                 psabpf_meter_entry_t meter;
 
@@ -204,8 +219,9 @@ static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *
                 int ret = parse_direct_meter_entry(argc, argv, ctx, entry, &dm, &meter);
                 psabpf_meter_entry_free(&meter);
                 psabpf_direct_meter_ctx_free(&dm);
-                if (ret != NO_ERROR)
+                if (ret != NO_ERROR) {
                     return ret;
+                }
 
                 continue;
             }
@@ -217,11 +233,13 @@ static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *
             psabpf_action_param_free(&param);
             return error_code;
         }
-        if (ref_is_group_ref)
+        if (ref_is_group_ref) {
             psabpf_action_param_mark_group_reference(&param);
+        }
         error_code = psabpf_action_param(action, &param);
-        if (error_code != NO_ERROR)
+        if (error_code != NO_ERROR) {
             return error_code;
+        }
     } while ((*argc) > 1);
     NEXT_ARGP();
 
@@ -230,11 +248,12 @@ static int parse_action_data(int *argc, char ***argv, psabpf_table_entry_ctx_t *
 
 static int parse_entry_priority(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
-    if (!is_keyword(**argv, "priority"))
+    if (!is_keyword(**argv, "priority")) {
         return NO_ERROR;
+    }
     NEXT_ARGP_RET();
 
-    char *ptr;
+    char *ptr = NULL;
     psabpf_table_entry_priority(entry, strtoul(**argv, &ptr, 0));
     if (*ptr) {
         fprintf(stderr, "%s: unable to parse priority\n", **argv);
@@ -261,8 +280,9 @@ static int parse_table_type(int *argc, char ***argv, psabpf_table_entry_ctx_t *c
 static json_t *create_json_entry_action_params(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *param_root = json_array();
-    if (param_root == NULL)
+    if (param_root == NULL) {
         return NULL;
+    }
 
     psabpf_action_param_t *ap = NULL;
     while ((ap = psabpf_action_param_get_next(entry)) != NULL) {
@@ -280,8 +300,9 @@ static json_t *create_json_entry_action_params(psabpf_table_entry_ctx_t *ctx, ps
         }
         const char *name = psabpf_action_param_get_name(ctx, entry, ap);
 
-        if (name != NULL)
+        if (name != NULL) {
             json_object_set_new(param_entry, "name", json_string(name));
+        }
         json_object_set_new(param_entry, "value", json_string(data));
         json_array_append(param_root, param_entry);
 
@@ -295,14 +316,16 @@ static json_t *create_json_entry_action_params(psabpf_table_entry_ctx_t *ctx, ps
 static json_t *create_json_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *action_root = json_object();
-    if (action_root == NULL)
+    if (action_root == NULL) {
         return NULL;
+    }
 
     uint32_t action_id = psabpf_action_get_id(entry);
     json_object_set_new(action_root, "id", json_integer(action_id));
     const char *action_name = psabpf_action_get_name(ctx, action_id);
-    if (action_name != NULL)
+    if (action_name != NULL) {
         json_object_set_new(action_root, "name", json_string(action_name));
+    }
 
     json_t *action_params = create_json_entry_action_params(ctx, entry);
     if (action_params == NULL) {
@@ -317,8 +340,9 @@ static json_t *create_json_entry_action(psabpf_table_entry_ctx_t *ctx, psabpf_ta
 static json_t *create_json_entry_references(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *refs_root = json_array();
-    if (refs_root == NULL)
+    if (refs_root == NULL) {
         return NULL;
+    }
 
     psabpf_action_param_t *ap = NULL;
     while ((ap = psabpf_action_param_get_next(entry)) != NULL) {
@@ -334,12 +358,14 @@ static json_t *create_json_entry_references(psabpf_table_entry_ctx_t *ctx, psabp
         }
         memcpy(&ref_value, psabpf_action_param_get_data(ap), ref_len);
 
-        if (name != NULL)
+        if (name != NULL) {
             json_object_set_new(ref, "target", json_string(name));
-        if (psabpf_action_param_is_group_reference(ap))
+        }
+        if (psabpf_action_param_is_group_reference(ap)) {
             json_object_set_new(ref, "group_ref", json_integer(ref_value));
-        else
+        } else {
             json_object_set_new(ref, "member_ref", json_integer(ref_value));
+        }
         json_array_append_new(refs_root, ref);
 
         psabpf_action_param_free(ap);
@@ -351,10 +377,11 @@ static json_t *create_json_entry_references(psabpf_table_entry_ctx_t *ctx, psabp
 static json_t *create_json_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *counters_root = json_object();
-    if (counters_root == NULL)
+    if (counters_root == NULL) {
         return NULL;
+    }
 
-    psabpf_direct_counter_context_t *dc_ctx;
+    psabpf_direct_counter_context_t *dc_ctx = NULL;
     while ((dc_ctx = psabpf_direct_counter_get_next_ctx(ctx, entry)) != NULL) {
         psabpf_counter_entry_t counter;
         int ret = psabpf_direct_counter_get_entry(dc_ctx, entry, &counter);
@@ -395,10 +422,11 @@ static json_t *create_json_entry_direct_counter(psabpf_table_entry_ctx_t *ctx, p
 static json_t *create_json_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
 {
     json_t *meters_root = json_object();
-    if (meters_root == NULL)
+    if (meters_root == NULL) {
         return NULL;
+    }
 
-    psabpf_direct_meter_context_t *dm_ctx;
+    psabpf_direct_meter_context_t *dm_ctx = NULL;
     while ((dm_ctx = psabpf_direct_meter_get_next_ctx(ctx, entry)) != NULL) {
         psabpf_meter_entry_t meter;
         const char *name = psabpf_direct_meter_get_name(dm_ctx);
@@ -429,8 +457,9 @@ static json_t *create_json_entry_direct_meter(psabpf_table_entry_ctx_t *ctx, psa
 static json_t *create_json_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry, bool is_default_entry)
 {
     json_t *entry_root = json_object();
-    if (entry_root == NULL)
+    if (entry_root == NULL) {
         return NULL;
+    }
 
     if (!is_default_entry) {
         json_t *key = create_json_entry_key(entry);
@@ -482,16 +511,18 @@ static json_t *create_json_entry(psabpf_table_entry_ctx_t *ctx, psabpf_table_ent
 
 static int build_json_table_metadata(psabpf_table_entry_ctx_t *ctx, json_t *parent)
 {
-    if (psabpf_table_entry_ctx_is_indirect(ctx))
+    if (psabpf_table_entry_ctx_is_indirect(ctx)) {
         return NO_ERROR;
+    }
 
     /* DirectCounter */
 
     json_t *direct_counters = json_object();
-    if (direct_counters == NULL)
+    if (direct_counters == NULL) {
         return ENOMEM;
+    }
 
-    psabpf_direct_counter_context_t *dc_ctx;
+    psabpf_direct_counter_context_t *dc_ctx = NULL;
     psabpf_table_entry_t entry;
     psabpf_table_entry_init(&entry);
     while ((dc_ctx = psabpf_direct_counter_get_next_ctx(ctx, &entry)) != NULL) {
@@ -541,8 +572,9 @@ static int print_json_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t 
         goto clean_up;
     }
 
-    if (mode == PRINT_SINGLE_ENTRY || mode == PRINT_WHOLE_TABLE)
+    if (mode == PRINT_SINGLE_ENTRY || mode == PRINT_WHOLE_TABLE) {
         json_object_set(instance_name, "entries", entries);
+    }
 
     if (entry != NULL && mode == PRINT_SINGLE_ENTRY) {
         json_t *parsed_entry = create_json_entry(ctx, entry, false);
@@ -554,7 +586,7 @@ static int print_json_table(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t 
     }
 
     if (mode == PRINT_WHOLE_TABLE) {
-        psabpf_table_entry_t *current_entry;
+        psabpf_table_entry_t *current_entry = NULL;
         while ((current_entry = psabpf_table_entry_get_next(ctx)) != NULL) {
             json_t *parsed_entry = create_json_entry(ctx, current_entry, false);
             if (parsed_entry == NULL) {
@@ -622,8 +654,9 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
     psabpf_action_init(&action);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* no NEXT_ARG before in version from this file, so this check must be preserved */
     if (argc < 1) {
@@ -632,28 +665,33 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
     }
 
     /* 1. Get table */
-    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, NULL, false) != NO_ERROR)
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, NULL, false) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get action */
     bool can_ba_last_arg = write_type == TABLE_SET_DEFAULT_ENTRY ? true : false;
-    if (parse_table_action(&argc, &argv, &ctx, &action, can_ba_last_arg) != NO_ERROR)
+    if (parse_table_action(&argc, &argv, &ctx, &action, can_ba_last_arg) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 3. Get key - default entry has no key */
     if (write_type != TABLE_SET_DEFAULT_ENTRY) {
-        if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
+        if (parse_table_key(&argc, &argv, &entry) != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     /* 4. Get action parameters */
-    if (parse_action_data(&argc, &argv, &ctx, &entry, &action) != NO_ERROR)
+    if (parse_action_data(&argc, &argv, &ctx, &entry, &action) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 5. Get entry priority - not applicable to default entry */
     if (write_type != TABLE_SET_DEFAULT_ENTRY) {
-        if (parse_entry_priority(&argc, &argv, &entry) != NO_ERROR)
+        if (parse_entry_priority(&argc, &argv, &entry) != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     if (argc > 0) {
@@ -663,12 +701,13 @@ int do_table_write(int argc, char **argv, enum table_write_type_t write_type)
 
     psabpf_table_entry_action(&entry, &action);
 
-    if (write_type == TABLE_ADD_NEW_ENTRY)
+    if (write_type == TABLE_ADD_NEW_ENTRY) {
         error_code = psabpf_table_entry_add(&ctx, &entry);
-    else if (write_type == TABLE_UPDATE_EXISTING_ENTRY)
+    } else if (write_type == TABLE_UPDATE_EXISTING_ENTRY) {
         error_code = psabpf_table_entry_update(&ctx, &entry);
-    else if (write_type == TABLE_SET_DEFAULT_ENTRY)
+    } else if (write_type == TABLE_SET_DEFAULT_ENTRY) {
         error_code = psabpf_table_entry_set_default_entry(&ctx, &entry);
+    }
 
 clean_up:
     psabpf_action_free(&action);
@@ -701,8 +740,9 @@ int do_table_delete(int argc, char **argv)
     psabpf_table_entry_init(&entry);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* no NEXT_ARG before in version from this file, so this check must be preserved */
     if (argc < 1) {
@@ -711,12 +751,14 @@ int do_table_delete(int argc, char **argv)
     }
 
     /* 1. Get table */
-    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, NULL, true) != NO_ERROR)
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, NULL, true) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Get key */
-    if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
+    if (parse_table_key(&argc, &argv, &entry) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -744,12 +786,14 @@ static int do_table_default_get(int argc, char **argv)
     psabpf_table_entry_ctx_init(&ctx);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 1. Get table */
-    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, &table_name, true) != NO_ERROR)
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, &table_name, true) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -770,14 +814,16 @@ int do_table_default(int argc, char **argv)
     if (is_keyword(*argv, "set")) {
         NEXT_ARG();
         return do_table_write(argc, argv, TABLE_SET_DEFAULT_ENTRY);
-    } if (is_keyword(*argv, "get")) {
+    }
+    if (is_keyword(*argv, "get")) {
         NEXT_ARG_RET();
         return do_table_default_get(argc, argv);
-    } else {
-        if (*argv != NULL)
-            fprintf(stderr, "%s: unknown keyword\n", *argv);
-        return do_table_help(argc, argv);
     }
+
+    if (*argv != NULL) {
+        fprintf(stderr, "%s: unknown keyword\n", *argv);
+    }
+    return do_table_help(argc, argv);
 }
 
 int do_table_get(int argc, char **argv)
@@ -794,23 +840,27 @@ int do_table_get(int argc, char **argv)
     psabpf_table_entry_init(&entry);
 
     /* 0. Get the pipeline id */
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR)
+    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 1. Get table */
-    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, &table_name, true) != NO_ERROR)
+    if (parse_dst_table(&argc, &argv, &psabpf_ctx, &ctx, &table_name, true) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 2. Check if table is indirect */
-    if (parse_table_type(&argc, &argv, &ctx) != NO_ERROR)
+    if (parse_table_type(&argc, &argv, &ctx) != NO_ERROR) {
         goto clean_up;
+    }
 
     /* 3. Get key */
     bool key_provided = (argc >= 1 && is_keyword(*argv, "key"));
     if (key_provided) {
         print_mode = PRINT_SINGLE_ENTRY;
-        if (parse_table_key(&argc, &argv, &entry) != NO_ERROR)
+        if (parse_table_key(&argc, &argv, &entry) != NO_ERROR) {
             goto clean_up;
+        }
     }
 
     if (argc > 0) {
@@ -820,8 +870,9 @@ int do_table_get(int argc, char **argv)
 
     if (key_provided) {
         error_code = psabpf_table_entry_get(&ctx, &entry);
-        if (error_code != NO_ERROR)
+        if (error_code != NO_ERROR) {
             goto clean_up;
+        }
     }
     error_code = print_json_table(&ctx, &entry, table_name, print_mode);
 

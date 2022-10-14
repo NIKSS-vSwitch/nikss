@@ -17,7 +17,7 @@
 
 #include <string.h>
 
-#include "../include/psabpf.h"
+#include <psabpf.h>
 
 void psabpf_context_init(psabpf_context_t *ctx)
 {
@@ -26,8 +26,9 @@ void psabpf_context_init(psabpf_context_t *ctx)
 
 void psabpf_context_free(psabpf_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return;
+    }
 
     memset( ctx, 0, sizeof(psabpf_context_t));
 }

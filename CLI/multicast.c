@@ -15,28 +15,32 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
 #include <errno.h>
+#include <stdio.h>
+
 #include <jansson.h>
 
-#include "multicast.h"
 #include <psabpf_pre.h>
+
+#include "multicast.h"
 
 static int parse_group(int *argc, char ***argv, psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *mcast_grp)
 {
     int ret = parse_pipeline_id(argc, argv, ctx);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
-    psabpf_mcast_grp_id_t group_id;
+    psabpf_mcast_grp_id_t group_id = 0;
     parser_keyword_value_pair_t kv[] = {
             {"id", &group_id, sizeof(group_id), true, "multicast group id"},
             { 0 },
     };
 
     ret = parse_keyword_value_pairs(argc, argv, &kv[0]);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     psabpf_mcast_grp_id(mcast_grp, group_id);
 
@@ -52,8 +56,9 @@ int do_multicast_create_group(int argc, char **argv)
     psabpf_context_init(&ctx);
     psabpf_mcast_grp_context_init(&mcast_grp);
 
-    if (parse_group(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR)
+    if (parse_group(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR) {
         goto err;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -84,8 +89,9 @@ int do_multicast_delete_group(int argc, char **argv)
     psabpf_context_init(&ctx);
     psabpf_mcast_grp_context_init(&mcast_grp);
 
-    if (parse_group(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR)
+    if (parse_group(&argc, &argv, &ctx, &mcast_grp) != NO_ERROR) {
         goto err;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -111,11 +117,12 @@ static int parse_group_and_member(int *argc, char ***argv, psabpf_context_t *ctx
                                   psabpf_mcast_grp_ctx_t *mcast_grp, psabpf_mcast_grp_member_t *member)
 {
     int ret = parse_group(argc, argv, ctx, mcast_grp);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
-    uint32_t egress_port;
-    uint16_t instance;
+    uint32_t egress_port = 0;
+    uint16_t instance = 0;
     parser_keyword_value_pair_t kv[] = {
             {"egress-port", &egress_port, sizeof(egress_port), true, "egress port"},
             {"instance",    &instance,    sizeof(instance),    true, "egress port instance"},
@@ -123,8 +130,9 @@ static int parse_group_and_member(int *argc, char ***argv, psabpf_context_t *ctx
     };
 
     ret = parse_keyword_value_pairs(argc, argv, &kv[0]);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     psabpf_mcast_grp_member_port(member, egress_port);
     psabpf_mcast_grp_member_instance(member, instance);
@@ -143,8 +151,9 @@ int do_multicast_add_group_member(int argc, char **argv)
     psabpf_mcast_grp_context_init(&mcast_grp);
     psabpf_mcast_grp_member_init(&member);
 
-    if (parse_group_and_member(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR)
+    if (parse_group_and_member(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR) {
         goto err;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -178,8 +187,9 @@ int do_multicast_del_group_member(int argc, char **argv)
     psabpf_mcast_grp_context_init(&mcast_grp);
     psabpf_mcast_grp_member_init(&member);
 
-    if (parse_group_and_member(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR)
+    if (parse_group_and_member(&argc, &argv, &ctx, &mcast_grp, &member) != NO_ERROR) {
         goto err;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
@@ -215,7 +225,7 @@ static json_t *create_json_single_group(psabpf_context_t *ctx, psabpf_mcast_grp_
     json_object_set_new(root, "id", json_integer(psabpf_mcast_grp_get_id(group)));
     json_object_set_new(root, "members", all_members);
 
-    psabpf_mcast_grp_member_t *member;
+    psabpf_mcast_grp_member_t *member = NULL;
     while ((member = psabpf_mcast_grp_get_next_member(ctx, group)) != NULL) {
         json_t *member_root = json_object();
         if (member_root == NULL) {
@@ -239,17 +249,19 @@ static int print_mcast_group(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *grou
     int ret = ENOMEM;
     json_t *root = json_object();
     json_t *groups = json_array();
-    json_t *group_json;
+    json_t *group_json = NULL;
 
-    if (root == NULL || groups == NULL)
+    if (root == NULL || groups == NULL) {
         goto clean_up;
+    }
 
     json_object_set(root, "multicast_groups", groups);
 
     if (group != NULL) {
         group_json = create_json_single_group(ctx, group);
-        if (group_json == NULL)
+        if (group_json == NULL) {
             goto clean_up;
+        }
         json_array_append_new(groups, group_json);
     } else {
         psabpf_mcast_grp_list_t list;
@@ -284,25 +296,27 @@ int do_multicast_get(int argc, char **argv)
     psabpf_context_t ctx;
     psabpf_mcast_grp_ctx_t group;
     bool group_id_specified = false;
-    int ret;
+    int ret = NO_ERROR;
 
     psabpf_context_init(&ctx);
     psabpf_mcast_grp_context_init(&group);
 
-    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR) {
         goto clean_up;
+    }
 
     if (argc > 0) {
         group_id_specified = true;
 
-        psabpf_mcast_grp_id_t group_id;
+        psabpf_mcast_grp_id_t group_id = 0;
         parser_keyword_value_pair_t kv[] = {
                 {"id", &group_id, sizeof(group_id), true, "multicast group id"},
                 { 0 },
         };
 
-        if ((ret = parse_keyword_value_pairs(&argc, &argv, &kv[0])) != NO_ERROR)
+        if ((ret = parse_keyword_value_pairs(&argc, &argv, &kv[0])) != NO_ERROR) {
             goto clean_up;
+        }
 
         psabpf_mcast_grp_id(&group, group_id);
         if (!psabpf_mcast_grp_exists(&ctx, &group)) {

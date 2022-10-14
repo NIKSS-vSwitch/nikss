@@ -15,21 +15,23 @@
  * limitations under the License.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #include <gmp.h>  /* GNU LGPL v3 or GNU GPL v2, used only by function convert_number_to_bytes() */
 #include <jansson.h>
 
-#include "common.h"
 #include <psabpf_pipeline.h>
+
+#include "common.h"
 
 bool is_keyword(const char *word, const char *str)
 {
-    if (!word)
+    if (!word) {
         return false;
+    }
 
     if (strlen(word) != strlen(str)) {
         return false;
@@ -51,7 +53,7 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
     }
     NEXT_ARGP();
 
-    char *endptr;
+    char *endptr = NULL;
     psabpf_pipeline_id_t id = strtoul(**argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", **argv);
@@ -75,20 +77,20 @@ int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair
         if (is_keyword(**argv, kv_pairs[i].keyword)) {
             NEXT_ARGP_RET();
 
-            char *ptr;
+            char *ptr = NULL;
             uint32_t value = strtoul(**argv, &ptr, 0);
             if (*ptr) {
                 fprintf(stderr, "%s: can't parse '%s'\n", kv_pairs[i].comment, **argv);
                 return EINVAL;
             }
 
-            if (kv_pairs[i].dst_size == sizeof(uint32_t))
-                *((uint32_t *) kv_pairs[i].destination) = (uint32_t) value;
-            else if (kv_pairs[i].dst_size == sizeof(uint16_t))
+            if (kv_pairs[i].dst_size == sizeof(uint32_t)) {
+                *((uint32_t *) kv_pairs[i].destination) = (uint32_t) value;  /* NOLINT(google-readability-casting): for readability explicitly show type */
+            } else if (kv_pairs[i].dst_size == sizeof(uint16_t)) {
                 *((uint16_t *) kv_pairs[i].destination) = (uint16_t) value;
-            else if (kv_pairs[i].dst_size == sizeof(uint8_t))
+            } else if (kv_pairs[i].dst_size == sizeof(uint8_t)) {
                 *((uint8_t *) kv_pairs[i].destination) = (uint8_t) value;
-            else {
+            } else {
                 fprintf(stderr, "BUG: type width not supported\n");
                 return EPERM;
             }
@@ -108,9 +110,10 @@ int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair
  * JSON related functions
  *****************************************************************************/
 
+/* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to build JSON tree */
 int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_func_t get_next_field)
 {
-    psabpf_struct_field_t *field;
+    psabpf_struct_field_t *field = NULL;
     while ((field = get_next_field(ctx, entry)) != NULL) {
         /* To build flat structure of output JSON just remove this and next conditional
          * statement. In other words, preserve only condition and instructions below it:
@@ -129,17 +132,20 @@ int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_
 
             int ret = build_struct_json(sub_struct, ctx, entry, get_next_field);
             json_decref(sub_struct);
-            if (ret != NO_ERROR)
+            if (ret != NO_ERROR) {
                 return ret;
+            }
 
             continue;
         }
 
-        if (psabpf_struct_get_field_type(field) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_END)
+        if (psabpf_struct_get_field_type(field) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_END) {
             return NO_ERROR;
+        }
 
-        if (psabpf_struct_get_field_type(field) != PSABPF_STRUCT_FIELD_TYPE_DATA)
+        if (psabpf_struct_get_field_type(field) != PSABPF_STRUCT_FIELD_TYPE_DATA) {
             continue;
+        }
 
         const char *encoded_data = convert_bin_data_to_hexstr(psabpf_struct_get_field_data(field),
                                                               psabpf_struct_get_field_data_len(field));
@@ -148,8 +154,9 @@ int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_
             return ENOMEM;
         }
         const char *field_name = psabpf_struct_get_field_name(field);
-        if (field_name == NULL)
+        if (field_name == NULL) {
             field_name = "";
+        }
         json_object_set_new(json_parent, field_name, json_string(encoded_data));
         free((void *) encoded_data);
     }
@@ -163,54 +170,65 @@ int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_
 
 static int update_context(const char *data, size_t len, void *ctx, enum destination_ctx_type_t ctx_type)
 {
-    if (ctx_type == CTX_MATCH_KEY)
-        return psabpf_matchkey_data(ctx, data, len);
-    else if (ctx_type == CTX_MATCH_KEY_TERNARY_MASK)
-        return psabpf_matchkey_mask(ctx, data, len);
-    else if (ctx_type == CTX_ACTION_DATA)
-        return psabpf_action_param_create(ctx, data, len);
-    else if (ctx_type == CTX_METER_INDEX)
-        return psabpf_meter_entry_index(ctx, data, len);
-    else if (ctx_type == CTX_COUNTER_KEY)
-        return psabpf_counter_entry_set_key(ctx, data, len);
-    else if (ctx_type == CTX_REGISTER_INDEX)
-        return psabpf_register_entry_set_key(ctx, data, len);
-    else if (ctx_type == CTX_REGISTER_DATA)
-        return psabpf_register_entry_set_value(ctx, data, len);
+    switch (ctx_type) {  /* NOLINT(hicpp-multiway-paths-covered): do not add default branch so clang-tidy can warn about unimplemented support for new context type */
+        case CTX_MATCH_KEY:
+            return psabpf_matchkey_data(ctx, data, len);
+
+        case CTX_MATCH_KEY_TERNARY_MASK:
+            return psabpf_matchkey_mask(ctx, data, len);
+
+        case CTX_ACTION_DATA:
+            return psabpf_action_param_create(ctx, data, len);
+
+        case CTX_METER_INDEX:
+            return psabpf_meter_entry_index(ctx, data, len);
+
+        case CTX_COUNTER_KEY:
+            return psabpf_counter_entry_set_key(ctx, data, len);
+
+        case CTX_REGISTER_INDEX:
+            return psabpf_register_entry_set_key(ctx, data, len);
+
+        case CTX_REGISTER_DATA:
+            return psabpf_register_entry_set_value(ctx, data, len);
+    }
 
     return EPERM;
 }
 
-/* TODO: Is there any ready to use function for this purpose? */
 static bool is_valid_mac_address(const char * data)
 {
-    if (strlen(data) != 2*6+5)  /* 11:22:33:44:55:66 */
+    if (strlen(data) != 2*6+5)  /* 11:22:33:44:55:66 */{
         return false;
+    }
 
-    unsigned digits = 0, separators = 0, pos = 0;
-    unsigned separator_pos[] = {2, 5, 8, 11, 14};
+    unsigned digits = 0;
+    unsigned separators = 0;
+    unsigned pos = 0;
+    const unsigned separator_pos[] = {2, 5, 8, 11, 14};
     while (*data) {
-        if (pos == separator_pos[separators]) {
-            if ((*data != ':') && (*data != '-'))
+        if (separators < 5 && pos == separator_pos[separators]) {
+            if ((*data != ':') && (*data != '-')) {
                 return false;
+            }
             separators++;
         } else if (isxdigit(*data)) {
             digits++;
         } else {
             return false;
         }
-        if (separators > 5 || digits > 12)
-            return false;
         data++; pos++;
     }
-    return true;
+
+    return separators == 5 && digits == 12;
 }
 
 static int convert_number_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type)
 {
     mpz_t number;  /* converts any precision number to stream of bytes */
-    size_t len, forced_len = 0;
-    char * buffer;
+    size_t len = 0;
+    size_t forced_len = 0;
+    char * buffer = NULL;
     int error_code = EPERM;
 
     /* try find width specification */
@@ -232,8 +250,9 @@ static int convert_number_to_bytes(const char *data, void *ctx, enum destination
         data = end_ptr + 1;
         size_t part_byte = forced_len % 8;
         forced_len = forced_len / 8;
-        if (part_byte != 0)
+        if (part_byte != 0) {
             forced_len += 1;
+        }
     }
 
     mpz_init(number);
@@ -243,8 +262,9 @@ static int convert_number_to_bytes(const char *data, void *ctx, enum destination
     }
 
     len = mpz_sizeinbase(number, 16);
-    if (len % 2 != 0)
+    if (len % 2 != 0) {
         len += 1;
+    }
     len /= 2;  /* two digits per byte */
 
     if (forced_len != 0) {
@@ -286,12 +306,13 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
 
     /* Try parse as a MAC address */
     if (is_valid_mac_address(data)) {
-        int v[6];
-        if (sscanf(data, "%x%*c%x%*c%x%*c%x%*c%x%*c%x",
+        unsigned int v[6];
+        if (sscanf(data, "%x%*c%x%*c%x%*c%x%*c%x%*c%x",  /* NOLINT(cert-err34-c): we can ignore errors because string has been validated */
                    &(v[0]), &(v[1]), &(v[2]), &(v[3]), &(v[4]), &(v[5])) == 6) {
             uint8_t bytes[6];
-            for (int i = 0; i < 6; i++)
-                bytes[i] = (uint8_t) v[5-i];
+            for (int i = 0; i < 6; i++) {
+                bytes[i] = (uint8_t) v[5 - i];
+            }
             return update_context((void *) &(bytes[0]), 6, ctx, ctx_type);
         }
     }
@@ -302,13 +323,15 @@ int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_ty
 
 char * convert_bin_data_to_hexstr(const void *data, size_t len)
 {
-    if (data == NULL)
+    if (data == NULL) {
         return NULL;
+    }
 
     size_t buff_len = len * 2 + 2 + 1; /* 2 characters per byte, prefix, null terminator */
     char *buff = calloc(1, buff_len);
-    if (buff == NULL)
+    if (buff == NULL) {
         return NULL;
+    }
 
     buff[0] = '0';
     if (len < 1) {
@@ -344,8 +367,9 @@ char * convert_bin_data_to_hexstr(const void *data, size_t len)
 static json_t *create_json_match_key(psabpf_match_key_t *mk)
 {
     json_t *root = json_object();
-    if (root == NULL)
+    if (root == NULL) {
         return NULL;
+    }
 
     char *value_str = convert_bin_data_to_hexstr(psabpf_matchkey_get_data(mk), psabpf_matchkey_get_data_size(mk));
     char *mask_str = convert_bin_data_to_hexstr(psabpf_matchkey_get_mask(mk), psabpf_matchkey_get_mask_size(mk));
@@ -354,18 +378,20 @@ static json_t *create_json_match_key(psabpf_match_key_t *mk)
     switch (psabpf_matchkey_get_type(mk)) {
         case PSABPF_EXACT:
             json_object_set_new(root, "type", json_string("exact"));
-            if (value_str != NULL)
+            if (value_str != NULL) {
                 json_object_set_new(root, "value", json_string(value_str));
-            else
+            } else {
                 failed = true;
+            }
             break;
 
         case PSABPF_LPM:
             json_object_set_new(root, "type", json_string("lpm"));
-            if (value_str != NULL)
+            if (value_str != NULL) {
                 json_object_set_new(root, "value", json_string(value_str));
-            else
+            } else {
                 failed = true;
+            }
             json_object_set_new(root, "prefix_len", json_integer(psabpf_matchkey_get_prefix_len(mk)));
             break;
 
@@ -374,8 +400,9 @@ static json_t *create_json_match_key(psabpf_match_key_t *mk)
             if (value_str != NULL && mask_str != NULL) {
                 json_object_set_new(root, "value", json_string(value_str));
                 json_object_set_new(root, "mask", json_string(mask_str));
-            } else
+            } else {
                 failed = true;
+            }
             break;
 
         default:
@@ -388,10 +415,12 @@ static json_t *create_json_match_key(psabpf_match_key_t *mk)
         root = NULL;
     }
 
-    if (value_str != NULL)
+    if (value_str != NULL) {
         free(value_str);
-    if (mask_str != NULL)
+    }
+    if (mask_str != NULL) {
         free(mask_str);
+    }
 
     return root;
 }
@@ -399,8 +428,9 @@ static json_t *create_json_match_key(psabpf_match_key_t *mk)
 json_t *create_json_entry_key(psabpf_table_entry_t *entry)
 {
     json_t *keys = json_array();
-    if (keys == NULL)
+    if (keys == NULL) {
         return NULL;
+    }
 
     psabpf_match_key_t *mk = NULL;
     while ((mk = psabpf_table_entry_get_next_matchkey(entry)) != NULL) {
@@ -419,26 +449,32 @@ json_t *create_json_entry_key(psabpf_table_entry_t *entry)
 int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
 {
     bool has_any_key = false;
-    int error_code = EPERM;
+    /* cppcheck-suppress unreadVariable */
+    int error_code = NO_ERROR;
 
     do {
         NEXT_ARGP_RET();
-        if (is_keyword(**argv, "data") || is_keyword(**argv, "priority"))
+        if (**argv[0] == 0) {
+            return EINVAL;  /* should never occur because of above check, added for clang-tidy */
+        }
+
+        if (is_keyword(**argv, "data") || is_keyword(**argv, "priority")) {
             return NO_ERROR;
+        }
 
         if (is_keyword(**argv, "none")) {
             if (!has_any_key) {
                 NEXT_ARGP();
                 return NO_ERROR;
-            } else {
-                fprintf(stderr, "Unexpected none key\n");
-                return EPERM;
             }
+
+            fprintf(stderr, "Unexpected none key\n");
+            return EPERM;
         }
 
         psabpf_match_key_t mk;
         psabpf_matchkey_init(&mk);
-        char *substr_ptr;
+        char *substr_ptr = NULL;
         if ((substr_ptr = strstr(**argv, "/")) != NULL) {
             psabpf_matchkey_type(&mk, PSABPF_LPM);
             *(substr_ptr++) = 0;
@@ -447,9 +483,10 @@ int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
                 return EINVAL;
             }
             error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
-            if (error_code != NO_ERROR)
+            if (error_code != NO_ERROR) {
                 return error_code;
-            char *ptr;
+            }
+            char *ptr = NULL;
             psabpf_matchkey_prefix_len(&mk, strtoul(substr_ptr, &ptr, 0));
             if (*ptr) {
                 fprintf(stderr, "%s: unable to parse prefix length\n", substr_ptr);
@@ -468,21 +505,25 @@ int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
                 return EINVAL;
             }
             error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
-            if (error_code != NO_ERROR)
+            if (error_code != NO_ERROR) {
                 return error_code;
+            }
             error_code = translate_data_to_bytes(substr_ptr, &mk, CTX_MATCH_KEY_TERNARY_MASK);
-            if (error_code != NO_ERROR)
+            if (error_code != NO_ERROR) {
                 return error_code;
+            }
         } else {
             psabpf_matchkey_type(&mk, PSABPF_EXACT);
             error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
-            if (error_code != NO_ERROR)
+            if (error_code != NO_ERROR) {
                 return error_code;
+            }
         }
         error_code = psabpf_table_entry_matchkey(entry, &mk);
         psabpf_matchkey_free(&mk);
-        if (error_code != NO_ERROR)
+        if (error_code != NO_ERROR) {
             return error_code;
+        }
 
         has_any_key = true;
     } while ((*argc) > 1);

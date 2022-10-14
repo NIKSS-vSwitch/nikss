@@ -16,15 +16,17 @@
  */
 
 #include <errno.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
 #include <jansson.h>
 
 #include <psabpf.h>
 #include <psabpf_pipeline.h>
+
 #include "common.h"
 
 static json_t * json_port_entry(const char *intf, int ifindex)
@@ -46,8 +48,9 @@ static int print_pipeline_json(psabpf_context_t *ctx)
 {
     char date_buf[256];
     uint64_t load_timestamp = psabpf_pipeline_get_load_timestamp(ctx);
+    struct tm date;
     /* format timestamp into ISO 8601 date */
-    strftime(date_buf, sizeof(date_buf), "%Y-%m-%dT%H:%M:%S%z", localtime((time_t *) &load_timestamp));
+    strftime(date_buf, sizeof(date_buf), "%Y-%m-%dT%H:%M:%S%z", localtime_r((time_t *) &load_timestamp, &date));
 
     const char *hook_point_name = psabpf_pipeline_is_TC_based(ctx) ? "TC" : "XDP";
 
@@ -68,7 +71,7 @@ static int print_pipeline_json(psabpf_context_t *ctx)
     psabpf_port_list_t list;
     psabpf_port_list_init(&list, ctx);
 
-    psabpf_port_spec_t *port;
+    psabpf_port_spec_t *port = NULL;
     while ((port = psabpf_port_list_get_next_port(&list)) != NULL) {
         json_t *entry = json_port_entry(psabpf_port_spec_get_name(port), (int) psabpf_port_sepc_get_id(port));
         json_array_append(ports_root, entry);
@@ -80,7 +83,7 @@ static int print_pipeline_json(psabpf_context_t *ctx)
     psabpf_pipeline_objects_list_t objs;
     psabpf_pipeline_objects_list_init(&objs, ctx);
 
-    psabpf_pipeline_object_t *obj;
+    psabpf_pipeline_object_t *obj = NULL;
     while ((obj = psabpf_pipeline_objects_list_get_next_object(&objs)) != NULL) {
         json_array_append(objects_root, json_string(psabpf_pipeline_object_get_name(obj)));
         psabpf_pipeline_object_free(obj);
@@ -100,7 +103,7 @@ static int parse_pipeline_id_without_pipe_keyword(int *argc, char ***argv, uint3
         return EINVAL;
     }
     NEXT_ARGP_RET();
-    char *endptr;
+    char *endptr = NULL;
     *id = strtoul(**argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", **argv);
@@ -114,13 +117,15 @@ int do_pipeline_load(int argc, char **argv)
 {
     uint32_t id = 0;
 
-    if (parse_pipeline_id_without_pipe_keyword(&argc, &argv, &id) != NO_ERROR)
+    if (parse_pipeline_id_without_pipe_keyword(&argc, &argv, &id) != NO_ERROR) {
         return EINVAL;
+    }
 
     if (argc < 1) {
         fprintf(stderr, "expected path to the ELF file\n");
         return EINVAL;
-    } else if (argc > 1) {
+    }
+    if (argc > 1) {
         fprintf(stderr, "too many arguments\n");
         return EINVAL;
     }
@@ -154,8 +159,9 @@ int do_pipeline_unload(int argc, char **argv)
     int error = NO_ERROR;
     uint32_t id = 0;
 
-    if (parse_pipeline_id_without_pipe_keyword(&argc, &argv, &id) != NO_ERROR)
+    if (parse_pipeline_id_without_pipe_keyword(&argc, &argv, &id) != NO_ERROR) {
         return EINVAL;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "too many arguments\n");
@@ -202,16 +208,18 @@ static int parse_interface(int *argc, char ***argv, const char **interface)
 
 int do_pipeline_port_add(int argc, char **argv)
 {
-    int ret;
-    const char *intf;
+    int ret = NO_ERROR;
+    const char *intf = NULL;
     psabpf_context_t ctx;
     psabpf_context_init(&ctx);
 
-    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR) {
         goto err;
+    }
 
-    if ((ret = parse_interface(&argc, &argv, &intf)) != NO_ERROR)
+    if ((ret = parse_interface(&argc, &argv, &intf)) != NO_ERROR) {
         goto err;
+    }
 
     if (argc != 0) {
         fprintf(stderr, "too many arguments\n");
@@ -234,16 +242,18 @@ err:
 
 int do_pipeline_port_del(int argc, char **argv)
 {
-    int ret;
-    const char *intf;
+    int ret = NO_ERROR;
+    const char *intf = NULL;
     psabpf_context_t ctx;
     psabpf_context_init(&ctx);
 
-    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR)
+    if ((ret = parse_pipeline_id(&argc, &argv, &ctx)) != NO_ERROR) {
         goto err;
+    }
 
-    if ((ret = parse_interface(&argc, &argv, &intf)) != NO_ERROR)
+    if ((ret = parse_interface(&argc, &argv, &intf)) != NO_ERROR) {
         goto err;
+    }
 
     if (argc != 0) {
         fprintf(stderr, "too many arguments\n");
@@ -267,8 +277,9 @@ int do_pipeline_show(int argc, char **argv)
     int ret_code = EINVAL;
     uint32_t id = 0;
 
-    if (parse_pipeline_id_without_pipe_keyword(&argc, &argv, &id) != NO_ERROR)
+    if (parse_pipeline_id_without_pipe_keyword(&argc, &argv, &id) != NO_ERROR) {
         return EINVAL;
+    }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);

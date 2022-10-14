@@ -15,27 +15,31 @@
  * limitations under the License.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
 #include <bpf/bpf.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <psabpf.h>
-#include "common.h"
-#include "btf.h"
-#include "bpf_defs.h"
 
-void psabpf_register_ctx_init(psabpf_register_context_t *ctx) {
-    if (ctx == NULL)
+#include "btf.h"
+#include "common.h"
+
+void psabpf_register_ctx_init(psabpf_register_context_t *ctx)
+{
+    if (ctx == NULL) {
         return;
+    }
 
     memset(ctx, 0, sizeof(psabpf_register_context_t));
     init_btf(&ctx->btf_metadata);
 }
 
-void psabpf_register_ctx_free(psabpf_register_context_t *ctx) {
-    if (ctx == NULL)
+void psabpf_register_ctx_free(psabpf_register_context_t *ctx)
+{
+    if (ctx == NULL) {
         return;
+    }
 
     free_btf(&ctx->btf_metadata);
     close_object_fd(&(ctx->reg.fd));
@@ -53,9 +57,11 @@ static int parse_value_type(psabpf_register_context_t *ctx)
     return parse_struct_type(&ctx->btf_metadata, ctx->reg.value_type_id, ctx->reg.value_size, &ctx->value_fds);
 }
 
-int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_context_t *ctx, const char *name) {
-    if (psabpf_ctx == NULL || ctx == NULL || name == NULL)
+int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_context_t *ctx, const char *name)
+{
+    if (psabpf_ctx == NULL || ctx == NULL || name == NULL) {
         return EINVAL;
+    }
 
     if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "couldn't find a BTF info\n");
@@ -80,82 +86,101 @@ int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_conte
     return NO_ERROR;
 }
 
-void psabpf_register_entry_init(psabpf_register_entry_t *entry) {
-    if (entry == NULL)
+void psabpf_register_entry_init(psabpf_register_entry_t *entry)
+{
+    if (entry == NULL) {
         return;
+    }
 
     memset(entry, 0, sizeof(psabpf_register_entry_t));
 }
 
-void psabpf_register_entry_free(psabpf_register_entry_t *entry) {
-    if (entry == NULL)
+void psabpf_register_entry_free(psabpf_register_entry_t *entry)
+{
+    if (entry == NULL) {
         return;
+    }
 
     free_struct_field_set(&entry->entry_key);
 
-    if (entry->raw_key != NULL)
+    if (entry->raw_key != NULL) {
         free(entry->raw_key);
+    }
     entry->raw_key = NULL;
 
-    if (entry->raw_value != NULL)
+    if (entry->raw_value != NULL) {
         free(entry->raw_value);
+    }
     entry->raw_value = NULL;
 }
 
-int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *data, size_t data_len) {
-    if (entry == NULL)
+int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *data, size_t data_len)
+{
+    if (entry == NULL) {
         return EINVAL;
-    if (data == NULL || data_len < 1)
+    }
+    if (data == NULL || data_len < 1) {
         return ENODATA;
+    }
 
     int ret = struct_field_set_append(&entry->entry_key, data, data_len);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't append key to an entry: %s\n", strerror(ret));
+    }
     return ret;
 }
 
-int psabpf_register_entry_set_value(psabpf_register_entry_t *entry, const void *data, size_t data_len) {
-    if (entry == NULL)
+int psabpf_register_entry_set_value(psabpf_register_entry_t *entry, const void *data, size_t data_len)
+{
+    if (entry == NULL) {
         return EINVAL;
-    if (data == NULL || data_len < 1)
+    }
+    if (data == NULL || data_len < 1) {
         return ENODATA;
+    }
 
     int ret = struct_field_set_append(&entry->entry_value, data, data_len);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't append value to an entry: %s\n", strerror(ret));
+    }
     return ret;
 }
 
 static void *allocate_key_buffer(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
 {
-    if (entry->raw_key != NULL)
+    if (entry->raw_key != NULL) {
         return entry->raw_key;  /* already allocated */
+    }
 
     entry->raw_key = malloc(ctx->reg.key_size);
-    if (entry->raw_key == NULL)
+    if (entry->raw_key == NULL) {
         fprintf(stderr, "not enough memory\n");
+    }
 
     return entry->raw_key;
 }
 
 static void *allocate_value_buffer(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
 {
-    if (entry->raw_value != NULL)
+    if (entry->raw_value != NULL) {
         return entry->raw_value;
+    }
 
     entry->raw_value = malloc(ctx->reg.value_size);
-    if (entry->raw_value == NULL)
+    if (entry->raw_value == NULL) {
         fprintf(stderr, "not enough memory\n");
+    }
 
     return entry->raw_value;
 }
 
 psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
 {
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return NULL;
+    }
 
-    psabpf_struct_field_descriptor_t *fd;
+    psabpf_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->value_fds, entry->current_field_id);
     if (fd == NULL) {
         entry->current_field_id = 0;
@@ -174,10 +199,11 @@ psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_con
 
 psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
 {
-    if (ctx == NULL || entry == NULL)
+    if (ctx == NULL || entry == NULL) {
         return NULL;
+    }
 
-    psabpf_struct_field_descriptor_t *fd;
+    psabpf_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->key_fds, entry->current_field_id);
     if (fd == NULL) {
         entry->current_field_id = 0;
@@ -196,17 +222,20 @@ psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_con
 
 psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ctx)
 {
-    if (ctx == NULL)
+    if (ctx == NULL) {
         return NULL;
+    }
 
-    if (allocate_key_buffer(ctx, &ctx->current_entry) == NULL)
+    if (allocate_key_buffer(ctx, &ctx->current_entry) == NULL) {
         return NULL;
+    }
 
     /* on first call ctx->prev_entry_ke must be NULL */
     if (bpf_map_get_next_key(ctx->reg.fd, ctx->prev_entry_key, ctx->current_entry.raw_key) != 0) {
         /* no more entries, prepare for next iteration */
-        if (ctx->prev_entry_key != NULL)
+        if (ctx->prev_entry_key != NULL) {
             free(ctx->prev_entry_key);
+        }
         ctx->prev_entry_key = NULL;
 
         return NULL;
@@ -222,8 +251,9 @@ psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ct
 
     memcpy(ctx->prev_entry_key, ctx->current_entry.raw_key, ctx->reg.key_size);
 
-    if (allocate_value_buffer(ctx, &ctx->current_entry) == NULL)
+    if (allocate_value_buffer(ctx, &ctx->current_entry) == NULL) {
         return NULL;
+    }
 
     int ret = bpf_map_lookup_elem(ctx->reg.fd, ctx->current_entry.raw_key, ctx->current_entry.raw_value);
     if (ret != NO_ERROR) {
@@ -236,15 +266,18 @@ psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ct
 
 int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
 {
-    if (allocate_key_buffer(ctx, entry) == NULL)
+    if (allocate_key_buffer(ctx, entry) == NULL) {
         return ENOMEM;
+    }
 
     int ret = construct_struct_from_fields(&entry->entry_key, &ctx->key_fds, entry->raw_key, ctx->reg.key_size);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
-    if (allocate_value_buffer(ctx, entry) == NULL)
+    if (allocate_value_buffer(ctx, entry) == NULL) {
         return ENOMEM;
+    }
 
     ret = bpf_map_lookup_elem(ctx->reg.fd, entry->raw_key, entry->raw_value);
     if (ret != 0) {
@@ -257,19 +290,23 @@ int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t 
 }
 
 int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry) {
-    if (allocate_key_buffer(ctx, entry) == NULL)
+    if (allocate_key_buffer(ctx, entry) == NULL) {
         return ENOMEM;
+    }
 
     int ret = construct_struct_from_fields(&entry->entry_key, &ctx->key_fds, entry->raw_key, ctx->reg.key_size);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
-    if (allocate_value_buffer(ctx, entry) == NULL)
+    if (allocate_value_buffer(ctx, entry) == NULL) {
         return ENOMEM;
+    }
 
     ret = construct_struct_from_fields(&entry->entry_value, &ctx->value_fds, entry->raw_value, ctx->reg.value_size);
-    if (ret != NO_ERROR)
+    if (ret != NO_ERROR) {
         return ret;
+    }
 
     ret = bpf_map_update_elem(ctx->reg.fd, entry->raw_key, entry->raw_value, 0);
     if (ret != NO_ERROR) {
