@@ -1,16 +1,16 @@
-# Using PSA-eBPF with Mininet
+# Using NIKSS with Mininet
 
-This file explains how to use PSA-eBPF with Mininet. To learn more about the PSA-eBPF compiler, please visit [the official documentation site](https://github.com/p4lang/p4c/tree/main/backends/ebpf/psa).
+This file explains how to use NIKSS with Mininet. To learn more about the PSA-eBPF compiler for NIKSS, please visit [the official documentation site](https://github.com/p4lang/p4c/tree/main/backends/ebpf/psa).
 
-The `mininet/lib` directory contains a Python file (`nikss_mn.py`) that implements Mininet objects to run PSA-eBPF in the Mininet environment. 
+The `mininet/lib` directory contains a Python file (`nikss_mn.py`) that implements Mininet objects to run NIKSS in the Mininet environment. 
 The Mininet objects are Python wrappers on top of the `nikss-ctl` tool.
 
-**Note!** The PSA-eBPF switch does not currently expose any remote control interface (such as P4Runtime or Thrift). The integration of PSA-eBPF with a control plane software stack is 
+**Note!** The NIKSS switch does not currently expose any remote control interface (such as P4Runtime or Thrift). The integration of NIKSS with a control plane software stack is 
 still to be done. Hence, the Mininet wrappers use local the `nikss-ctl` commands to manage P4 programs.
 
-## Writing Mininet script for PSA-eBPF
+## Writing Mininet script for NIKSS
 
-Using Mininet to run PSA-eBPF is as simple as using Python/Mininet objects in your script defining a Mininet topology. `demo.py` gives a basic example of how to define a Mininet topology composed of PSA-eBPF switches.
+Using Mininet to run NIKSS is as simple as using Python/Mininet objects in your script defining a Mininet topology. `demo.py` gives a basic example of how to define a Mininet topology composed of NIKSS switches.
 
 ## Demo
 
@@ -39,9 +39,9 @@ sudo ./demo.py
 
 You should see the Mininet CLI. 
 
-### Configure PSA-eBPF switch
+### Configure NIKSS switch
 
-Once you have the Mininet topology running, you can configure PSA-eBPF switch(es). You can do it by:
+Once you have the Mininet topology running, you can configure NIKSS switch(es). You can do it by:
 - extending the Python script to install table entries automatically. The `demo.py` provides an example in lines 48-49, or
 - manually executing `nikss-ctl` commands from Mininet CLI. For example, `s1 nikss-ctl table add ..` executes the `nikss-ctl` command on switch `s1`.
 

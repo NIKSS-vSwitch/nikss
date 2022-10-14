@@ -32,7 +32,7 @@
 static const char *BPF_FS = "/sys/fs/bpf";
 
 /**
- * Prefix of the mount point for PSA-eBPF pipelines.
+ * Prefix of the mount point for pipelines.
  */
 static const char *PIPELINE_PREFIX = "pipeline";
 
