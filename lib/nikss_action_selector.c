@@ -22,14 +22,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "btf.h"
 #include "common.h"
-#include "psabpf_table.h"
+#include "nikss_table.h"
 
-static int open_group_map(psabpf_action_selector_context_t *ctx,
-                          psabpf_action_selector_group_context_t *group)
+static int open_group_map(nikss_action_selector_context_t *ctx,
+                          nikss_action_selector_group_context_t *group)
 {
     if (ctx->map_of_groups.fd < 0) {
         fprintf(stderr, "map of groups not opened\n");
@@ -55,7 +55,7 @@ static int open_group_map(psabpf_action_selector_context_t *ctx,
     return NO_ERROR;
 }
 
-static int get_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t *number_of_members)
+static int get_number_of_members_in_group(nikss_action_selector_context_t *ctx, uint32_t *number_of_members)
 {
     uint32_t key = 0;
     int return_code = bpf_map_lookup_elem(ctx->group.fd, &key, number_of_members);
@@ -67,7 +67,7 @@ static int get_number_of_members_in_group(psabpf_action_selector_context_t *ctx,
     return NO_ERROR;
 }
 
-static int update_number_of_members_in_group(psabpf_action_selector_context_t *ctx, uint32_t new_value)
+static int update_number_of_members_in_group(nikss_action_selector_context_t *ctx, uint32_t new_value)
 {
     uint32_t key = 0;
     int return_code = bpf_map_update_elem(ctx->group.fd, &key, &new_value, BPF_ANY);
@@ -79,9 +79,9 @@ static int update_number_of_members_in_group(psabpf_action_selector_context_t *c
     return NO_ERROR;
 }
 
-static uint32_t find_member_entry_idx_in_group(psabpf_bpf_map_descriptor_t *group,
+static uint32_t find_member_entry_idx_in_group(nikss_bpf_map_descriptor_t *group,
                                                uint32_t number_of_members,
-                                               psabpf_action_selector_member_context_t *member)
+                                               nikss_action_selector_member_context_t *member)
 {
     for (uint32_t index = 1; index <= number_of_members; ++index) {
         uint32_t current_member_ref;  /* NOLINT(cppcoreguidelines-init-variables) */
@@ -93,8 +93,8 @@ static uint32_t find_member_entry_idx_in_group(psabpf_bpf_map_descriptor_t *grou
     return 0;
 }
 
-static bool validate_member_reference(psabpf_action_selector_context_t *ctx,
-                                      psabpf_action_selector_member_context_t *member)
+static bool validate_member_reference(nikss_action_selector_context_t *ctx,
+                                      nikss_action_selector_member_context_t *member)
 {
     char *value = malloc(ctx->map_of_members.value_size);
     if (value == NULL) {
@@ -110,7 +110,7 @@ static bool validate_member_reference(psabpf_action_selector_context_t *ctx,
     return true;
 }
 
-void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx)
+void nikss_action_selector_ctx_init(nikss_action_selector_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -126,13 +126,13 @@ void psabpf_action_selector_ctx_init(psabpf_action_selector_context_t *ctx)
     ctx->empty_group_action.fd = -1;
     ctx->cache.fd = -1;
 
-    psabpf_action_selector_group_init(&ctx->current_group);
-    psabpf_action_selector_member_init(&ctx->current_member);
-    ctx->current_group_id = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
-    ctx->current_member_id = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    nikss_action_selector_group_init(&ctx->current_group);
+    nikss_action_selector_member_init(&ctx->current_member);
+    ctx->current_group_id = NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
+    ctx->current_member_id = NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
 }
 
-void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx)
+void nikss_action_selector_ctx_free(nikss_action_selector_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -146,17 +146,17 @@ void psabpf_action_selector_ctx_free(psabpf_action_selector_context_t *ctx)
     close_object_fd(&ctx->empty_group_action.fd);
     close_object_fd(&ctx->cache.fd);
 
-    psabpf_action_selector_group_free(&ctx->current_group);
-    psabpf_action_selector_member_free(&ctx->current_member);
+    nikss_action_selector_group_free(&ctx->current_group);
+    nikss_action_selector_member_free(&ctx->current_member);
 }
 
-static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
+static int do_open_action_selector(nikss_context_t *nikss_ctx, nikss_action_selector_context_t *ctx, const char *name)
 {
     int ret = 0;
     char derived_name[256];
 
     snprintf(derived_name, sizeof(derived_name), "%s_groups_inner", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->group);
+    ret = open_bpf_map(nikss_ctx, derived_name, &ctx->btf, &ctx->group);
     if (ret != NO_ERROR) {
         /* Maybe ActionSelector is an ActionProfile so do not bother user in this case */
         if (ret != ENOENT) {
@@ -167,28 +167,28 @@ static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_s
     close_object_fd(&ctx->group.fd);
 
     snprintf(derived_name, sizeof(derived_name), "%s_groups", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->map_of_groups);
+    ret = open_bpf_map(nikss_ctx, derived_name, &ctx->btf, &ctx->map_of_groups);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_actions", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->map_of_members);
+    ret = open_bpf_map(nikss_ctx, derived_name, &ctx->btf, &ctx->map_of_members);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_defaultActionGroup", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->empty_group_action);
+    ret = open_bpf_map(nikss_ctx, derived_name, &ctx->btf, &ctx->empty_group_action);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", derived_name, strerror(ret));
         return ret;
     }
 
     snprintf(derived_name, sizeof(derived_name), "%s_cache", name);
-    ret = open_bpf_map(psabpf_ctx, derived_name, &ctx->btf, &ctx->cache);
+    ret = open_bpf_map(nikss_ctx, derived_name, &ctx->btf, &ctx->cache);
     if (ret != NO_ERROR) {
         fprintf(stderr, "warning: couldn't find ActionSelector cache: %s\n", strerror(ret));
     }
@@ -196,9 +196,9 @@ static int do_open_action_selector(psabpf_context_t *psabpf_ctx, psabpf_action_s
     return NO_ERROR;
 }
 
-static int do_open_action_profile(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
+static int do_open_action_profile(nikss_context_t *nikss_ctx, nikss_action_selector_context_t *ctx, const char *name)
 {
-    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf, &ctx->map_of_members);
+    int ret = open_bpf_map(nikss_ctx, name, &ctx->btf, &ctx->map_of_members);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open map %s: %s\n", name, strerror(ret));
         return ret;
@@ -207,20 +207,20 @@ static int do_open_action_profile(psabpf_context_t *psabpf_ctx, psabpf_action_se
     return NO_ERROR;
 }
 
-int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_selector_context_t *ctx, const char *name)
+int nikss_action_selector_ctx_name(nikss_context_t *nikss_ctx, nikss_action_selector_context_t *ctx, const char *name)
 {
-    if (ctx == NULL || psabpf_ctx == NULL || name == NULL) {
+    if (ctx == NULL || nikss_ctx == NULL || name == NULL) {
         return EINVAL;
     }
 
     /* get the BTF, it is optional so print only warning */
-    if (load_btf(psabpf_ctx, &ctx->btf) != NO_ERROR) {
+    if (load_btf(nikss_ctx, &ctx->btf) != NO_ERROR) {
         fprintf(stderr, "warning: couldn't find BTF info\n");
     }
 
-    int ret = do_open_action_selector(psabpf_ctx, ctx, name);
+    int ret = do_open_action_selector(nikss_ctx, ctx, name);
     if (ret == ENOENT) {
-        ret = do_open_action_profile(psabpf_ctx, ctx, name);
+        ret = do_open_action_profile(nikss_ctx, ctx, name);
     }
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open ActionSelector/ActionProfile %s: %s\n", name, strerror(ret));
@@ -230,44 +230,44 @@ int psabpf_action_selector_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_action_
     return NO_ERROR;
 }
 
-void psabpf_action_selector_member_init(psabpf_action_selector_member_context_t *member)
+void nikss_action_selector_member_init(nikss_action_selector_member_context_t *member)
 {
     if (member == NULL) {
         return;
     }
 
     memset(member, 0, sizeof(*member));
-    member->member_ref = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    member->member_ref = NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
 
-    psabpf_action_init(&member->action);
+    nikss_action_init(&member->action);
 }
 
-void psabpf_action_selector_member_free(psabpf_action_selector_member_context_t *member)
+void nikss_action_selector_member_free(nikss_action_selector_member_context_t *member)
 {
     if (member == NULL) {
         return;
     }
 
-    psabpf_action_free(&member->action);
-    psabpf_action_param_free(&member->current_action_param);
+    nikss_action_free(&member->action);
+    nikss_action_param_free(&member->current_action_param);
 }
 
-void psabpf_action_selector_group_init(psabpf_action_selector_group_context_t *group)
+void nikss_action_selector_group_init(nikss_action_selector_group_context_t *group)
 {
     if (group == NULL) {
         return;
     }
 
     memset(group, 0, sizeof(*group));
-    group->group_ref = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    group->group_ref = NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
 }
 
-void psabpf_action_selector_group_free(psabpf_action_selector_group_context_t *group)
+void nikss_action_selector_group_free(nikss_action_selector_group_context_t *group)
 {
     (void) group;
 }
 
-bool psabpf_action_selector_has_group_capability(psabpf_action_selector_context_t *ctx)
+bool nikss_action_selector_has_group_capability(nikss_action_selector_context_t *ctx)
 {
     if (ctx == NULL) {
         return false;
@@ -275,7 +275,7 @@ bool psabpf_action_selector_has_group_capability(psabpf_action_selector_context_
     return ctx->map_of_groups.fd >= 0;
 }
 
-int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t *member, psabpf_action_t *action)
+int nikss_action_selector_member_action(nikss_action_selector_member_context_t *member, nikss_action_t *action)
 {
     if (member == NULL || action == NULL) {
         return EINVAL;
@@ -285,15 +285,15 @@ int psabpf_action_selector_member_action(psabpf_action_selector_member_context_t
     return NO_ERROR;
 }
 
-uint32_t psabpf_action_selector_get_member_reference(psabpf_action_selector_member_context_t *member)
+uint32_t nikss_action_selector_get_member_reference(nikss_action_selector_member_context_t *member)
 {
     if (member == NULL) {
-        return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+        return NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
     }
     return member->member_ref;
 }
 
-void psabpf_action_selector_set_member_reference(psabpf_action_selector_member_context_t *member, uint32_t member_ref)
+void nikss_action_selector_set_member_reference(nikss_action_selector_member_context_t *member, uint32_t member_ref)
 {
     if (member == NULL) {
         return;
@@ -301,15 +301,15 @@ void psabpf_action_selector_set_member_reference(psabpf_action_selector_member_c
     member->member_ref = member_ref;
 }
 
-uint32_t psabpf_action_selector_get_group_reference(psabpf_action_selector_group_context_t *group)
+uint32_t nikss_action_selector_get_group_reference(nikss_action_selector_group_context_t *group)
 {
     if (group == NULL) {
-        return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+        return NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
     }
     return group->group_ref;
 }
 
-void psabpf_action_selector_set_group_reference(psabpf_action_selector_group_context_t *group, uint32_t group_ref)
+void nikss_action_selector_set_group_reference(nikss_action_selector_group_context_t *group, uint32_t group_ref)
 {
     if (group == NULL) {
         return;
@@ -317,22 +317,22 @@ void psabpf_action_selector_set_group_reference(psabpf_action_selector_group_con
     group->group_ref = group_ref;
 }
 
-static uint32_t find_and_reserve_reference(psabpf_bpf_map_descriptor_t *map, void *data)
+static uint32_t find_and_reserve_reference(nikss_bpf_map_descriptor_t *map, void *data)
 {
-    uint32_t ref = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    uint32_t ref = NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
     if (map->key_size != 4) {
         fprintf(stderr, "expected that map have 32 bit key\n");
-        return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+        return NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
     }
     if (map->fd < 0) {
         fprintf(stderr, "map not opened\n");
-        return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+        return NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
     }
 
     char *value = malloc(map->value_size);
     if (value == NULL) {
         fprintf(stderr, "not enough memory\n");
-        return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+        return NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
     }
     if (data != NULL) {
         memcpy(value, data, map->value_size);
@@ -353,10 +353,10 @@ static uint32_t find_and_reserve_reference(psabpf_bpf_map_descriptor_t *map, voi
     if (found == true) {
         return ref;
     }
-    return PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    return NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
 }
 
-int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
+int nikss_action_selector_add_member(nikss_action_selector_context_t *ctx, nikss_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL) {
         return EINVAL;
@@ -367,12 +367,12 @@ int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psa
     }
 
     member->member_ref = find_and_reserve_reference(&ctx->map_of_members, NULL);
-    if (member->member_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
+    if (member->member_ref == NIKSS_ACTION_SELECTOR_INVALID_REFERENCE) {
         fprintf(stderr, "failed to find available reference for member\n");
         return EFBIG;  /* Probably, here we know we have access to eBPF, so most probably version is that map is full */
     }
 
-    int ret = psabpf_action_selector_update_member(ctx, member);
+    int ret = nikss_action_selector_update_member(ctx, member);
     if (ret != NO_ERROR) {
         /* Remove reserved reference if failed to add */
         bpf_map_delete_elem(ctx->map_of_members.fd, &member->member_ref);
@@ -382,7 +382,7 @@ int psabpf_action_selector_add_member(psabpf_action_selector_context_t *ctx, psa
     return ret;
 }
 
-int psabpf_action_selector_update_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
+int nikss_action_selector_update_member(nikss_action_selector_context_t *ctx, nikss_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL) {
         return EINVAL;
@@ -393,30 +393,30 @@ int psabpf_action_selector_update_member(psabpf_action_selector_context_t *ctx, 
     }
 
     /* Let's go the simplest way - abuse (little) table API. Don't do this at home! */
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->map_of_members,
             .btf_metadata = ctx->btf,
             .cache = ctx->cache,  /* Allow clear cache if applicable */
     };
-    psabpf_match_key_t mk[] = {
+    nikss_match_key_t mk[] = {
             {
-                    .type = PSABPF_EXACT,
+                    .type = NIKSS_EXACT,
                     .key_size = sizeof(member->member_ref),
                     .data = &member->member_ref,
             },
     };
-    psabpf_match_key_t * mk_ptr = &(mk[0]);
-    psabpf_table_entry_t te = {
+    nikss_match_key_t * mk_ptr = &(mk[0]);
+    nikss_table_entry_t te = {
             .action = &member->action,
             .match_keys = &mk_ptr,
             .n_keys = 1,
     };
 
     /* Will also clear cache */
-    return psabpf_table_entry_update(&tec, &te);
+    return nikss_table_entry_update(&tec, &te);
 }
 
-static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
+static bool member_in_use(nikss_action_selector_context_t *ctx, nikss_action_selector_member_context_t *member)
 {
     bool found = false;
     uint32_t key = 0;
@@ -437,7 +437,7 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
         key = tmp_key;
 
         /* Get group */
-        psabpf_action_selector_group_context_t group;
+        nikss_action_selector_group_context_t group;
         group.group_ref = key;
         if (open_group_map(ctx, &group) != NO_ERROR) {
             continue;
@@ -457,7 +457,7 @@ static bool member_in_use(psabpf_action_selector_context_t *ctx, psabpf_action_s
     return found;
 }
 
-int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
+int nikss_action_selector_del_member(nikss_action_selector_context_t *ctx, nikss_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL) {
         return EINVAL;
@@ -496,7 +496,7 @@ int psabpf_action_selector_del_member(psabpf_action_selector_context_t *ctx, psa
     return NO_ERROR;
 }
 
-int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
+int nikss_action_selector_add_group(nikss_action_selector_context_t *ctx, nikss_action_selector_group_context_t *group)
 {
     if (ctx == NULL || group == NULL) {
         return EINVAL;
@@ -534,7 +534,7 @@ int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psab
     /* Group is no more needed, restore ctx to its original state */
     close_object_fd(&ctx->group.fd);
 
-    if (group->group_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
+    if (group->group_ref == NIKSS_ACTION_SELECTOR_INVALID_REFERENCE) {
         fprintf(stderr, "failed to insert new group to map of groups\n");
         return EFBIG;
     }
@@ -542,7 +542,7 @@ int psabpf_action_selector_add_group(psabpf_action_selector_context_t *ctx, psab
     return NO_ERROR;
 }
 
-int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
+int nikss_action_selector_del_group(nikss_action_selector_context_t *ctx, nikss_action_selector_group_context_t *group)
 {
     if (ctx == NULL || group == NULL) {
         return EINVAL;
@@ -567,8 +567,8 @@ int psabpf_action_selector_del_group(psabpf_action_selector_context_t *ctx, psab
     return NO_ERROR;
 }
 
-static int append_member_to_group(psabpf_action_selector_context_t *ctx,
-                                  psabpf_action_selector_member_context_t *member)
+static int append_member_to_group(nikss_action_selector_context_t *ctx,
+                                  nikss_action_selector_member_context_t *member)
 {
     if (ctx->group.key_size != 4 || ctx->group.value_size != 4 || ctx->group.fd < 0) {
         return EINVAL;
@@ -607,9 +607,9 @@ static int append_member_to_group(psabpf_action_selector_context_t *ctx,
     return NO_ERROR;
 }
 
-int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t *ctx,
-                                               psabpf_action_selector_group_context_t *group,
-                                               psabpf_action_selector_member_context_t *member)
+int nikss_action_selector_add_member_to_group(nikss_action_selector_context_t *ctx,
+                                              nikss_action_selector_group_context_t *group,
+                                              nikss_action_selector_member_context_t *member)
 {
     int return_code = NO_ERROR;
 
@@ -650,20 +650,20 @@ int psabpf_action_selector_add_member_to_group(psabpf_action_selector_context_t 
     return return_code;
 }
 
-static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
-                                    psabpf_action_selector_member_context_t *member)
+static int remove_member_from_group(nikss_action_selector_context_t *ctx,
+                                    nikss_action_selector_member_context_t *member)
 {
     if (ctx->group.key_size != 4 || ctx->group.value_size != 4 || ctx->group.fd < 0) {
         return EINVAL;
     }
-    if (member->member_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
+    if (member->member_ref == NIKSS_ACTION_SELECTOR_INVALID_REFERENCE) {
         return EINVAL;
     }
 
     int return_code = NO_ERROR;
     uint32_t number_of_members = 0;
     uint32_t index_to_remove = 0;
-    uint32_t last_member_ref = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    uint32_t last_member_ref = NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
 
     /* 1. Find out number of members */
     if (get_number_of_members_in_group(ctx, &number_of_members) != NO_ERROR) {
@@ -720,9 +720,9 @@ static int remove_member_from_group(psabpf_action_selector_context_t *ctx,
     return NO_ERROR;
 }
 
-int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_t *ctx,
-                                                 psabpf_action_selector_group_context_t *group,
-                                                 psabpf_action_selector_member_context_t *member)
+int nikss_action_selector_del_member_from_group(nikss_action_selector_context_t *ctx,
+                                                nikss_action_selector_group_context_t *group,
+                                                nikss_action_selector_member_context_t *member)
 {
     int return_code = NO_ERROR;
 
@@ -738,7 +738,7 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
         return EINVAL;
     }
 
-    if (member->member_ref == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
+    if (member->member_ref == NIKSS_ACTION_SELECTOR_INVALID_REFERENCE) {
         fprintf(stderr, "invalid member reference\n");
         return EINVAL;
     }
@@ -764,7 +764,7 @@ int psabpf_action_selector_del_member_from_group(psabpf_action_selector_context_
     return NO_ERROR;
 }
 
-int psabpf_action_selector_set_empty_group_action(psabpf_action_selector_context_t *ctx, psabpf_action_t *action)
+int nikss_action_selector_set_empty_group_action(nikss_action_selector_context_t *ctx, nikss_action_t *action)
 {
     if (ctx == NULL || action == NULL) {
         return EINVAL;
@@ -780,31 +780,31 @@ int psabpf_action_selector_set_empty_group_action(psabpf_action_selector_context
     uint32_t key = 0;
 
     /* Let's again abuse (little) table API. Don't do this at home! */
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->empty_group_action,
             .btf_metadata = ctx->btf,
             .cache = ctx->cache,  /* Allow clear cache if applicable */
     };
-    psabpf_match_key_t mk[] = {
+    nikss_match_key_t mk[] = {
             {
-                    .type = PSABPF_EXACT,
+                    .type = NIKSS_EXACT,
                     .key_size = sizeof(key),
                     .data = &key,
             },
     };
-    psabpf_match_key_t * mk_ptr = &(mk[0]);
-    psabpf_table_entry_t te = {
+    nikss_match_key_t * mk_ptr = &(mk[0]);
+    nikss_table_entry_t te = {
             .action = action,
             .match_keys = &mk_ptr,
             .n_keys = 1,
     };
 
     /* Will also clear cache */
-    return psabpf_table_entry_update(&tec, &te);
+    return nikss_table_entry_update(&tec, &te);
 }
 
-int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context_t *ctx,
-                                                  psabpf_action_selector_member_context_t *member)
+int nikss_action_selector_get_empty_group_action(nikss_action_selector_context_t *ctx,
+                                                 nikss_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL) {
         return EINVAL;
@@ -819,25 +819,25 @@ int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context
     }
 
     uint32_t key = 0;
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->empty_group_action,
             .btf_metadata = ctx->btf,
             .cache = ctx->cache,  /* Allow clear cache if applicable */
     };
-    psabpf_match_key_t mk[] = {
+    nikss_match_key_t mk[] = {
             {
-                    .type = PSABPF_EXACT,
+                    .type = NIKSS_EXACT,
                     .key_size = sizeof(key),
                     .data = &key,
             },
     };
-    psabpf_match_key_t * mk_ptr = &(mk[0]);
-    psabpf_table_entry_t te = {
+    nikss_match_key_t * mk_ptr = &(mk[0]);
+    nikss_table_entry_t te = {
             .match_keys = &mk_ptr,
             .n_keys = 1,
     };
 
-    int ret = psabpf_table_entry_get(&tec, &te);
+    int ret = nikss_table_entry_get(&tec, &te);
     move_action(&member->action, te.action);
     if (te.action) {
         free(te.action);
@@ -846,18 +846,18 @@ int psabpf_action_selector_get_empty_group_action(psabpf_action_selector_context
     return ret;
 }
 
-uint32_t psabpf_action_selector_get_action_id_by_name(psabpf_action_selector_context_t *ctx, const char *name)
+uint32_t nikss_action_selector_get_action_id_by_name(nikss_action_selector_context_t *ctx, const char *name)
 {
-    psabpf_table_entry_ctx_t table_ctx = {
+    nikss_table_entry_ctx_t table_ctx = {
             .btf_metadata = ctx->btf,
             .table = ctx->map_of_members,
             .is_indirect = false,
     };
 
-    return psabpf_table_get_action_id_by_name(&table_ctx, name);
+    return nikss_table_get_action_id_by_name(&table_ctx, name);
 }
 
-int psabpf_action_selector_get_group(psabpf_action_selector_context_t *ctx, psabpf_action_selector_group_context_t *group)
+int nikss_action_selector_get_group(nikss_action_selector_context_t *ctx, nikss_action_selector_group_context_t *group)
 {
     if (ctx == NULL || group == NULL) {
         return EINVAL;
@@ -883,7 +883,7 @@ int psabpf_action_selector_get_group(psabpf_action_selector_context_t *ctx, psab
     return NO_ERROR;
 }
 
-psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(psabpf_action_selector_context_t *ctx)
+nikss_action_selector_group_context_t *nikss_action_selector_get_next_group(nikss_action_selector_context_t *ctx)
 {
     if (ctx == NULL) {
         return NULL;
@@ -898,10 +898,10 @@ psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(ps
     }
 
     close_object_fd(&ctx->group.fd);
-    psabpf_action_selector_group_free(&ctx->current_group);
-    psabpf_action_selector_group_init(&ctx->current_group);
+    nikss_action_selector_group_free(&ctx->current_group);
+    nikss_action_selector_group_init(&ctx->current_group);
 
-    if (ctx->current_group_id == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
+    if (ctx->current_group_id == NIKSS_ACTION_SELECTOR_INVALID_REFERENCE) {
         /* group map is not open, so we start from this point */
         if (bpf_map_get_next_key(ctx->map_of_groups.fd, NULL, &ctx->current_group.group_ref) != 0) {
             goto err_or_no_more_groups;
@@ -917,42 +917,42 @@ psabpf_action_selector_group_context_t *psabpf_action_selector_get_next_group(ps
     return &ctx->current_group;
 
 err_or_no_more_groups:
-    ctx->current_group_id = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    ctx->current_group_id = NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
     return NULL;
 }
 
-static int get_member_action(psabpf_action_selector_context_t *ctx,
-                             psabpf_action_selector_member_context_t *member)
+static int get_member_action(nikss_action_selector_context_t *ctx,
+                             nikss_action_selector_member_context_t *member)
 {
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->map_of_members,
             .btf_metadata = ctx->btf,
             .cache = ctx->cache,
     };
-    psabpf_match_key_t mk[] = {
+    nikss_match_key_t mk[] = {
             {
-                    .type = PSABPF_EXACT,
+                    .type = NIKSS_EXACT,
                     .key_size = sizeof(member->member_ref),
                     .data = &member->member_ref,
             },
     };
-    psabpf_match_key_t * mk_ptr = &(mk[0]);
-    psabpf_table_entry_t te = {
+    nikss_match_key_t * mk_ptr = &(mk[0]);
+    nikss_table_entry_t te = {
             .match_keys = &mk_ptr,
             .n_keys = 1,
     };
 
-    int ret = psabpf_table_entry_get(&tec, &te);
+    int ret = nikss_table_entry_get(&tec, &te);
     if (te.action != NULL) {
-        memcpy(&member->action, te.action, sizeof(psabpf_action_t));
+        memcpy(&member->action, te.action, sizeof(nikss_action_t));
         free(te.action);
     }
 
     return ret;
 }
 
-psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_member(psabpf_action_selector_context_t *ctx,
-                                                                                      psabpf_action_selector_group_context_t *group)
+nikss_action_selector_member_context_t *nikss_action_selector_get_next_group_member(nikss_action_selector_context_t *ctx,
+                                                                                    nikss_action_selector_group_context_t *group)
 {
     if (ctx == NULL) {
         return NULL;
@@ -963,8 +963,8 @@ psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_group_m
         return NULL;
     }
 
-    psabpf_action_selector_member_free(&ctx->current_member);
-    psabpf_action_selector_member_init(&ctx->current_member);
+    nikss_action_selector_member_free(&ctx->current_member);
+    nikss_action_selector_member_init(&ctx->current_member);
 
     if (ctx->group.fd < 0 || ctx->current_group_id != group->group_ref) {
         close_object_fd(&ctx->group.fd);
@@ -1003,7 +1003,7 @@ err_or_no_more_members:
     return NULL;
 }
 
-psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_member(psabpf_action_selector_context_t *ctx)
+nikss_action_selector_member_context_t *nikss_action_selector_get_next_member(nikss_action_selector_context_t *ctx)
 {
     if (ctx == NULL) {
         return NULL;
@@ -1018,10 +1018,10 @@ psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_member(
         return NULL;
     }
 
-    psabpf_action_selector_member_free(&ctx->current_member);
-    psabpf_action_selector_member_init(&ctx->current_member);
+    nikss_action_selector_member_free(&ctx->current_member);
+    nikss_action_selector_member_init(&ctx->current_member);
 
-    if (ctx->current_member_id == PSABPF_ACTION_SELECTOR_INVALID_REFERENCE) {
+    if (ctx->current_member_id == NIKSS_ACTION_SELECTOR_INVALID_REFERENCE) {
         if (bpf_map_get_next_key(ctx->map_of_members.fd, NULL, &ctx->current_member.member_ref) != 0) {
             goto err_or_no_more_members;
         }
@@ -1039,11 +1039,11 @@ psabpf_action_selector_member_context_t *psabpf_action_selector_get_next_member(
     return &ctx->current_member;
 
 err_or_no_more_members:
-    ctx->current_member_id = PSABPF_ACTION_SELECTOR_INVALID_REFERENCE;
+    ctx->current_member_id = NIKSS_ACTION_SELECTOR_INVALID_REFERENCE;
     return NULL;
 }
 
-int psabpf_action_selector_get_member(psabpf_action_selector_context_t *ctx, psabpf_action_selector_member_context_t *member)
+int nikss_action_selector_get_member(nikss_action_selector_context_t *ctx, nikss_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL) {
         return EINVAL;
@@ -1060,8 +1060,8 @@ int psabpf_action_selector_get_member(psabpf_action_selector_context_t *ctx, psa
     return get_member_action(ctx, member);
 }
 
-uint32_t psabpf_action_selector_get_member_action_id(psabpf_action_selector_context_t *ctx,
-                                                     psabpf_action_selector_member_context_t *member)
+uint32_t nikss_action_selector_get_member_action_id(nikss_action_selector_context_t *ctx,
+                                                    nikss_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL) {
         return 0;
@@ -1070,21 +1070,21 @@ uint32_t psabpf_action_selector_get_member_action_id(psabpf_action_selector_cont
     return member->action.action_id;
 }
 
-const char *psabpf_action_selector_get_member_action_name(psabpf_action_selector_context_t *ctx,
-                                                          psabpf_action_selector_member_context_t *member)
+const char *nikss_action_selector_get_member_action_name(nikss_action_selector_context_t *ctx,
+                                                         nikss_action_selector_member_context_t *member)
 {
     if (ctx == NULL || member == NULL) {
         return NULL;
     }
 
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->map_of_members,
             .btf_metadata = ctx->btf,
     };
-    return psabpf_action_get_name(&tec, member->action.action_id);
+    return nikss_action_get_name(&tec, member->action.action_id);
 }
 
-psabpf_action_param_t *psabpf_action_selector_action_param_get_next(psabpf_action_selector_member_context_t *member)
+nikss_action_param_t *nikss_action_selector_action_param_get_next(nikss_action_selector_member_context_t *member)
 {
     if (member == NULL) {
         return NULL;
@@ -1097,7 +1097,7 @@ psabpf_action_param_t *psabpf_action_selector_action_param_get_next(psabpf_actio
 
     memcpy(&member->current_action_param,
            &member->action.params[member->current_action_param_id],
-           sizeof(psabpf_action_param_t));
+           sizeof(nikss_action_param_t));
     member->current_action_param.mem_can_be_freed = false;
 
     member->current_action_param_id += 1;
@@ -1105,21 +1105,21 @@ psabpf_action_param_t *psabpf_action_selector_action_param_get_next(psabpf_actio
     return &member->current_action_param;
 }
 
-const char *psabpf_action_selector_action_param_get_name(psabpf_action_selector_context_t *ctx,
-                                                         psabpf_action_selector_member_context_t *member,
-                                                         psabpf_action_param_t *param)
+const char *nikss_action_selector_action_param_get_name(nikss_action_selector_context_t *ctx,
+                                                        nikss_action_selector_member_context_t *member,
+                                                        nikss_action_param_t *param)
 {
     if (ctx == NULL || member == NULL) {
         return NULL;
     }
 
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->map_of_members,
             .btf_metadata = ctx->btf,
     };
-    psabpf_table_entry_t te = {
+    nikss_table_entry_t te = {
             .action = &member->action,
     };
 
-    return psabpf_action_param_get_name(&tec, &te, param);
+    return nikss_action_param_get_name(&tec, &te, param);
 }

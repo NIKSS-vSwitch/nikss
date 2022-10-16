@@ -20,22 +20,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "btf.h"
 #include "common.h"
 
-void psabpf_register_ctx_init(psabpf_register_context_t *ctx)
+void nikss_register_ctx_init(nikss_register_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
 
-    memset(ctx, 0, sizeof(psabpf_register_context_t));
+    memset(ctx, 0, sizeof(nikss_register_context_t));
     init_btf(&ctx->btf_metadata);
 }
 
-void psabpf_register_ctx_free(psabpf_register_context_t *ctx)
+void nikss_register_ctx_free(nikss_register_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -47,27 +47,27 @@ void psabpf_register_ctx_free(psabpf_register_context_t *ctx)
     free_struct_field_descriptor_set(&ctx->value_fds);
 }
 
-static int parse_key_type(psabpf_register_context_t *ctx)
+static int parse_key_type(nikss_register_context_t *ctx)
 {
     return parse_struct_type(&ctx->btf_metadata, ctx->reg.key_type_id, ctx->reg.key_size, &ctx->key_fds);
 }
 
-static int parse_value_type(psabpf_register_context_t *ctx)
+static int parse_value_type(nikss_register_context_t *ctx)
 {
     return parse_struct_type(&ctx->btf_metadata, ctx->reg.value_type_id, ctx->reg.value_size, &ctx->value_fds);
 }
 
-int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_context_t *ctx, const char *name)
+int nikss_register_ctx_name(nikss_context_t *nikss_ctx, nikss_register_context_t *ctx, const char *name)
 {
-    if (psabpf_ctx == NULL || ctx == NULL || name == NULL) {
+    if (nikss_ctx == NULL || ctx == NULL || name == NULL) {
         return EINVAL;
     }
 
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
+    if (load_btf(nikss_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "couldn't find a BTF info\n");
     }
 
-    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->reg);
+    int ret = open_bpf_map(nikss_ctx, name, &ctx->btf_metadata, &ctx->reg);
     if (ret != NO_ERROR) {
         fprintf(stderr, "couldn't open a register %s\n", name);
         return ret;
@@ -86,16 +86,16 @@ int psabpf_register_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_register_conte
     return NO_ERROR;
 }
 
-void psabpf_register_entry_init(psabpf_register_entry_t *entry)
+void nikss_register_entry_init(nikss_register_entry_t *entry)
 {
     if (entry == NULL) {
         return;
     }
 
-    memset(entry, 0, sizeof(psabpf_register_entry_t));
+    memset(entry, 0, sizeof(nikss_register_entry_t));
 }
 
-void psabpf_register_entry_free(psabpf_register_entry_t *entry)
+void nikss_register_entry_free(nikss_register_entry_t *entry)
 {
     if (entry == NULL) {
         return;
@@ -114,7 +114,7 @@ void psabpf_register_entry_free(psabpf_register_entry_t *entry)
     entry->raw_value = NULL;
 }
 
-int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *data, size_t data_len)
+int nikss_register_entry_set_key(nikss_register_entry_t *entry, const void *data, size_t data_len)
 {
     if (entry == NULL) {
         return EINVAL;
@@ -130,7 +130,7 @@ int psabpf_register_entry_set_key(psabpf_register_entry_t *entry, const void *da
     return ret;
 }
 
-int psabpf_register_entry_set_value(psabpf_register_entry_t *entry, const void *data, size_t data_len)
+int nikss_register_entry_set_value(nikss_register_entry_t *entry, const void *data, size_t data_len)
 {
     if (entry == NULL) {
         return EINVAL;
@@ -146,7 +146,7 @@ int psabpf_register_entry_set_value(psabpf_register_entry_t *entry, const void *
     return ret;
 }
 
-static void *allocate_key_buffer(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
+static void *allocate_key_buffer(nikss_register_context_t *ctx, nikss_register_entry_t *entry)
 {
     if (entry->raw_key != NULL) {
         return entry->raw_key;  /* already allocated */
@@ -160,7 +160,7 @@ static void *allocate_key_buffer(psabpf_register_context_t *ctx, psabpf_register
     return entry->raw_key;
 }
 
-static void *allocate_value_buffer(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
+static void *allocate_value_buffer(nikss_register_context_t *ctx, nikss_register_entry_t *entry)
 {
     if (entry->raw_value != NULL) {
         return entry->raw_value;
@@ -174,13 +174,13 @@ static void *allocate_value_buffer(psabpf_register_context_t *ctx, psabpf_regist
     return entry->raw_value;
 }
 
-psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
+nikss_struct_field_t * nikss_register_get_next_value_field(nikss_register_context_t *ctx, nikss_register_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd = NULL;
+    nikss_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->value_fds, entry->current_field_id);
     if (fd == NULL) {
         entry->current_field_id = 0;
@@ -197,13 +197,13 @@ psabpf_struct_field_t * psabpf_register_get_next_value_field(psabpf_register_con
     return &entry->current_field;
 }
 
-psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
+nikss_struct_field_t * nikss_register_get_next_index_field(nikss_register_context_t *ctx, nikss_register_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd = NULL;
+    nikss_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->key_fds, entry->current_field_id);
     if (fd == NULL) {
         entry->current_field_id = 0;
@@ -220,7 +220,7 @@ psabpf_struct_field_t * psabpf_register_get_next_index_field(psabpf_register_con
     return &entry->current_field;
 }
 
-psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ctx)
+nikss_register_entry_t * nikss_register_get_next(nikss_register_context_t *ctx)
 {
     if (ctx == NULL) {
         return NULL;
@@ -264,7 +264,7 @@ psabpf_register_entry_t * psabpf_register_get_next(psabpf_register_context_t *ct
     return &ctx->current_entry;
 }
 
-int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry)
+int nikss_register_get(nikss_register_context_t *ctx, nikss_register_entry_t *entry)
 {
     if (allocate_key_buffer(ctx, entry) == NULL) {
         return ENOMEM;
@@ -289,7 +289,7 @@ int psabpf_register_get(psabpf_register_context_t *ctx, psabpf_register_entry_t 
     return NO_ERROR;
 }
 
-int psabpf_register_set(psabpf_register_context_t *ctx, psabpf_register_entry_t *entry) {
+int nikss_register_set(nikss_register_context_t *ctx, nikss_register_entry_t *entry) {
     if (allocate_key_buffer(ctx, entry) == NULL) {
         return ENOMEM;
     }

@@ -1,11 +1,11 @@
-This file lists currently implemented commands for `psabpf-ctl`. Some features these commands might be still unimplemented.
+This file lists currently implemented commands for `nikss-ctl`. Some features of these commands might be still unimplemented.
 
-`psabpf-ctl` supports `help` keyword, which can be used on every object. The same result is when there is no command
+`nikss-ctl` supports `help` keyword, which can be used on every object. The same result is when there is no command
 for object.
 
 ```shell
-psabpf-ctl [OPTIONS] OBJECT { COMMAND | help }
-psabpf-ctl help
+nikss-ctl [OPTIONS] OBJECT { COMMAND | help }
+nikss-ctl help
 
 OBJECT := { clone-session |
             multicast-group |
@@ -26,11 +26,11 @@ OPTIONS := {}
 # Clone sessions
 
 ```shell
-psabpf-ctl clone-session create pipe ID SESSION
-psabpf-ctl clone-session delete pipe ID SESSION
-psabpf-ctl clone-session add-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID [cos CLASS_OF_SERVICE] [truncate plen_bytes BYTES]
-psabpf-ctl clone-session del-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID
-psabpf-ctl clone-session get pipe ID [SESSION]
+nikss-ctl clone-session create pipe ID SESSION
+nikss-ctl clone-session delete pipe ID SESSION
+nikss-ctl clone-session add-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID [cos CLASS_OF_SERVICE] [truncate plen_bytes BYTES]
+nikss-ctl clone-session del-member pipe ID SESSION egress-port OUTPUT_PORT instance INSTANCE_ID
+nikss-ctl clone-session get pipe ID [SESSION]
 
 SESSION := id SESSION_ID
 ```
@@ -38,11 +38,11 @@ SESSION := id SESSION_ID
 # Multicast groups
 
 ```shell
-psabpf-ctl multicast-group create pipe ID MULTICAST_GROUP
-psabpf-ctl multicast-group delete pipe ID MULTICAST_GROUP
-psabpf-ctl multicast-group add-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID
-psabpf-ctl multicast-group del-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID
-psabpf-ctl multicast-group get pipe ID [MULTICAST_GROUP]
+nikss-ctl multicast-group create pipe ID MULTICAST_GROUP
+nikss-ctl multicast-group delete pipe ID MULTICAST_GROUP
+nikss-ctl multicast-group add-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID
+nikss-ctl multicast-group del-member pipe ID MULTICAST_GROUP egress-port OUTPUT_PORT instance INSTANCE_ID
+nikss-ctl multicast-group get pipe ID [MULTICAST_GROUP]
 
 MULTICAST_GROUP := id MULTICAST_GROUP_ID
 ```
@@ -50,23 +50,23 @@ MULTICAST_GROUP := id MULTICAST_GROUP_ID
 # Pipelines and ports management
 
 ```shell
-psabpf-ctl pipeline load id ID PATH
-psabpf-ctl pipeline unload id ID
-psabpf-ctl pipeline show id ID
-psabpf-ctl add-port pipe id ID dev DEV
-psabpf-ctl del-port pipe id ID dev DEV
+nikss-ctl pipeline load id ID PATH
+nikss-ctl pipeline unload id ID
+nikss-ctl pipeline show id ID
+nikss-ctl add-port pipe id ID dev DEV
+nikss-ctl del-port pipe id ID dev DEV
 ```
 
 # Tables
 
 ```shell
-psabpf-ctl table add pipe ID TABLE_NAME action ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
-psabpf-ctl table add pipe ID TABLE_NAME ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]
-psabpf-ctl table update pipe ID TABLE_NAME action ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
-psabpf-ctl table delete pipe ID TABLE_NAME [key MATCH_KEY]
-psabpf-ctl table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]
-psabpf-ctl table default set pipe ID TABLE_NAME action ACTION [data ACTION_PARAMS]
-psabpf-ctl table default get pipe ID TABLE_NAME
+nikss-ctl table add pipe ID TABLE_NAME action ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
+nikss-ctl table add pipe ID TABLE_NAME ref key MATCH_KEY data ACTION_REFS [priority PRIORITY]
+nikss-ctl table update pipe ID TABLE_NAME action ACTION key MATCH_KEY [data ACTION_PARAMS] [priority PRIORITY]
+nikss-ctl table delete pipe ID TABLE_NAME [key MATCH_KEY]
+nikss-ctl table get pipe ID TABLE_NAME [ref] [key MATCH_KEY]
+nikss-ctl table default set pipe ID TABLE_NAME action ACTION [data ACTION_PARAMS]
+nikss-ctl table default get pipe ID TABLE_NAME
 
 ACTION := { id ACTION_ID | name ACTION_NAME }
 ACTION_REFS := { MEMBER_REF | group GROUP_REF } 
@@ -86,15 +86,15 @@ this situation.
 # Action Selectors
 
 ```shell
-psabpf-ctl action-selector add-member pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
-psabpf-ctl action-selector delete-member pipe ID ACTION_SELECTOR_NAME MEMBER_REF
-psabpf-ctl action-selector update-member pipe ID ACTION_SELECTOR_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]
-psabpf-ctl action-selector create-group pipe ID ACTION_SELECTOR_NAME
-psabpf-ctl action-selector delete-group pipe ID ACTION_SELECTOR_NAME GROUP_REF
-psabpf-ctl action-selector add-to-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF
-psabpf-ctl action-selector delete-from-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF
-psabpf-ctl action-selector empty-group-action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
-psabpf-ctl action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | empty-group-action]
+nikss-ctl action-selector add-member pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
+nikss-ctl action-selector delete-member pipe ID ACTION_SELECTOR_NAME MEMBER_REF
+nikss-ctl action-selector update-member pipe ID ACTION_SELECTOR_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]
+nikss-ctl action-selector create-group pipe ID ACTION_SELECTOR_NAME
+nikss-ctl action-selector delete-group pipe ID ACTION_SELECTOR_NAME GROUP_REF
+nikss-ctl action-selector add-to-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF to GROUP_REF
+nikss-ctl action-selector delete-from-group pipe ID ACTION_SELECTOR_NAME MEMBER_REF from GROUP_REF
+nikss-ctl action-selector empty-group-action pipe ID ACTION_SELECTOR_NAME action ACTION [data ACTION_PARAMS]
+nikss-ctl action-selector get pipe ID ACTION_SELECTOR_NAME [member MEMBER_REF | group GROUP_REF | empty-group-action]
 
 ACTION := { id ACTION_ID | name ACTION_NAME }
 ACTION_PARAMS := { DATA }
@@ -103,10 +103,10 @@ ACTION_PARAMS := { DATA }
 # Action Profile
 
 ```shell
-psabpf-ctl action-profile add-member pipe ID ACTION_PROFILE_NAME action ACTION [data ACTION_PARAMS]
-psabpf-ctl action-profile delete-member pipe ID ACTION_PROFILE_NAME MEMBER_REF
-psabpf-ctl action-profile update-member pipe ID ACTION_PROFILE_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]
-psabpf-ctl action-profile get pipe ID ACTION_PROFILE_NAME [member MEMBER_REF]
+nikss-ctl action-profile add-member pipe ID ACTION_PROFILE_NAME action ACTION [data ACTION_PARAMS]
+nikss-ctl action-profile delete-member pipe ID ACTION_PROFILE_NAME MEMBER_REF
+nikss-ctl action-profile update-member pipe ID ACTION_PROFILE_NAME MEMBER_REF action ACTION [data ACTION_PARAMS]
+nikss-ctl action-profile get pipe ID ACTION_PROFILE_NAME [member MEMBER_REF]
 
 ACTION := { id ACTION_ID | name ACTION_NAME }
 ACTION_PARAMS := { DATA }
@@ -115,9 +115,9 @@ ACTION_PARAMS := { DATA }
 # Meters
 
 ```shell
-psabpf-ctl meter get pipe ID METER_NAME [index INDEX]
-psabpf-ctl meter update pipe ID METER_NAME index INDEX PIR:PBS CIR:CBS
-psabpf-ctl meter reset pipe ID METER_NAME [index INDEX]
+nikss-ctl meter get pipe ID METER_NAME [index INDEX]
+nikss-ctl meter update pipe ID METER_NAME index INDEX PIR:PBS CIR:CBS
+nikss-ctl meter reset pipe ID METER_NAME [index INDEX]
 
 INDEX := { DATA }
 PIR := { DATA }
@@ -129,16 +129,16 @@ CBS := { DATA }
 # Digests
 
 ```shell
-psabpf-ctl digest get pipe ID DIGEST_NAME
-psabpf-ctl digest get-all pipe ID DIGEST_NAME
+nikss-ctl digest get pipe ID DIGEST_NAME
+nikss-ctl digest get-all pipe ID DIGEST_NAME
 ```
 
 # Counters
 
 ```shell
-psabpf-ctl counter get pipe ID COUNTER_NAME [key DATA]
-psabpf-ctl counter set pipe ID COUNTER_NAME [key DATA] value COUNTER_VALUE
-psabpf-ctl counter reset pipe ID COUNTER_NAME [key DATA]
+nikss-ctl counter get pipe ID COUNTER_NAME [key DATA]
+nikss-ctl counter set pipe ID COUNTER_NAME [key DATA] value COUNTER_VALUE
+nikss-ctl counter reset pipe ID COUNTER_NAME [key DATA]
 
 COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }
 ```
@@ -146,8 +146,8 @@ COUNTER_VALUE := { BYTES | PACKETS | BYTES:PACKETS }
 # Registers
 
 ```shell
-psabpf-ctl register get pipe ID REGISTER_NAME [index DATA]
-psabpf-ctl register set pipe ID REGISTER_NAME index DATA value REGISTER_VALUE
+nikss-ctl register get pipe ID REGISTER_NAME [index DATA]
+nikss-ctl register set pipe ID REGISTER_NAME index DATA value REGISTER_VALUE
 
 REGISTER_VALUE := { DATA }
 ```
@@ -155,7 +155,7 @@ REGISTER_VALUE := { DATA }
 # Value set
 
 ```shell
-psabpf-ctl value-set insert pipe ID VALUE_SET_NAME value DATA
-psabpf-ctl value-set delete pipe ID VALUE_SET_NAME value DATA
-psabpf-ctl value-set get pipe ID VALUE_SET_NAME
+nikss-ctl value-set insert pipe ID VALUE_SET_NAME value DATA
+nikss-ctl value-set delete pipe ID VALUE_SET_NAME value DATA
+nikss-ctl value-set get pipe ID VALUE_SET_NAME
 ```

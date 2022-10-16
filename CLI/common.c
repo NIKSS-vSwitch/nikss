@@ -23,7 +23,7 @@
 #include <gmp.h>  /* GNU LGPL v3 or GNU GPL v2, used only by function convert_number_to_bytes() */
 #include <jansson.h>
 
-#include <psabpf_pipeline.h>
+#include <nikss_pipeline.h>
 
 #include "common.h"
 
@@ -40,7 +40,7 @@ bool is_keyword(const char *word, const char *str)
     return !memcmp(str, word, strlen(str));
 }
 
-int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
+int parse_pipeline_id(int *argc, char ***argv, nikss_context_t * nikss_ctx)
 {
     if (*argc < 2) {
         fprintf(stderr, "too few parameters\n");
@@ -54,14 +54,14 @@ int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx)
     NEXT_ARGP();
 
     char *endptr = NULL;
-    psabpf_pipeline_id_t id = strtoul(**argv, &endptr, 0);
+    nikss_pipeline_id_t id = strtoul(**argv, &endptr, 0);
     if (*endptr) {
         fprintf(stderr, "can't parse '%s'\n", **argv);
         return EINVAL;
     }
-    psabpf_context_set_pipeline(psabpf_ctx, id);
+    nikss_context_set_pipeline(nikss_ctx, id);
 
-    if (!psabpf_pipeline_exists(psabpf_ctx)) {
+    if (!nikss_pipeline_exists(nikss_ctx)) {
         fprintf(stderr, "pipeline with given id %u does not exist or is inaccessible\n", id);
         return ENOENT;
     }
@@ -113,18 +113,18 @@ int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair
 /* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to build JSON tree */
 int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_func_t get_next_field)
 {
-    psabpf_struct_field_t *field = NULL;
+    nikss_struct_field_t *field = NULL;
     while ((field = get_next_field(ctx, entry)) != NULL) {
         /* To build flat structure of output JSON just remove this and next conditional
          * statement. In other words, preserve only condition and instructions below it:
-         *      if (psabpf_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA) continue; */
-        if (psabpf_struct_get_field_type(field) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_START) {
+         *      if (nikss_digest_get_field_type(field) != DIGEST_FIELD_TYPE_DATA) continue; */
+        if (nikss_struct_get_field_type(field) == NIKSS_STRUCT_FIELD_TYPE_STRUCT_START) {
             json_t *sub_struct = json_object();
             if (sub_struct == NULL) {
                 fprintf(stderr, "failed to prepare message sub-object JSON\n");
                 return ENOMEM;
             }
-            if (json_object_set(json_parent, psabpf_struct_get_field_name(field), sub_struct)) {
+            if (json_object_set(json_parent, nikss_struct_get_field_name(field), sub_struct)) {
                 fprintf(stderr, "failed to add message sub-object JSON\n");
                 json_decref(sub_struct);
                 return EPERM;
@@ -139,21 +139,21 @@ int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_
             continue;
         }
 
-        if (psabpf_struct_get_field_type(field) == PSABPF_STRUCT_FIELD_TYPE_STRUCT_END) {
+        if (nikss_struct_get_field_type(field) == NIKSS_STRUCT_FIELD_TYPE_STRUCT_END) {
             return NO_ERROR;
         }
 
-        if (psabpf_struct_get_field_type(field) != PSABPF_STRUCT_FIELD_TYPE_DATA) {
+        if (nikss_struct_get_field_type(field) != NIKSS_STRUCT_FIELD_TYPE_DATA) {
             continue;
         }
 
-        const char *encoded_data = convert_bin_data_to_hexstr(psabpf_struct_get_field_data(field),
-                                                              psabpf_struct_get_field_data_len(field));
+        const char *encoded_data = convert_bin_data_to_hexstr(nikss_struct_get_field_data(field),
+                                                              nikss_struct_get_field_data_len(field));
         if (encoded_data == NULL) {
             fprintf(stderr, "not enough memory\n");
             return ENOMEM;
         }
-        const char *field_name = psabpf_struct_get_field_name(field);
+        const char *field_name = nikss_struct_get_field_name(field);
         if (field_name == NULL) {
             field_name = "";
         }
@@ -172,25 +172,25 @@ static int update_context(const char *data, size_t len, void *ctx, enum destinat
 {
     switch (ctx_type) {  /* NOLINT(hicpp-multiway-paths-covered): do not add default branch so clang-tidy can warn about unimplemented support for new context type */
         case CTX_MATCH_KEY:
-            return psabpf_matchkey_data(ctx, data, len);
+            return nikss_matchkey_data(ctx, data, len);
 
         case CTX_MATCH_KEY_TERNARY_MASK:
-            return psabpf_matchkey_mask(ctx, data, len);
+            return nikss_matchkey_mask(ctx, data, len);
 
         case CTX_ACTION_DATA:
-            return psabpf_action_param_create(ctx, data, len);
+            return nikss_action_param_create(ctx, data, len);
 
         case CTX_METER_INDEX:
-            return psabpf_meter_entry_index(ctx, data, len);
+            return nikss_meter_entry_index(ctx, data, len);
 
         case CTX_COUNTER_KEY:
-            return psabpf_counter_entry_set_key(ctx, data, len);
+            return nikss_counter_entry_set_key(ctx, data, len);
 
         case CTX_REGISTER_INDEX:
-            return psabpf_register_entry_set_key(ctx, data, len);
+            return nikss_register_entry_set_key(ctx, data, len);
 
         case CTX_REGISTER_DATA:
-            return psabpf_register_entry_set_value(ctx, data, len);
+            return nikss_register_entry_set_value(ctx, data, len);
     }
 
     return EPERM;
@@ -364,19 +364,19 @@ char * convert_bin_data_to_hexstr(const void *data, size_t len)
     return buff;
 }
 
-static json_t *create_json_match_key(psabpf_match_key_t *mk)
+static json_t *create_json_match_key(nikss_match_key_t *mk)
 {
     json_t *root = json_object();
     if (root == NULL) {
         return NULL;
     }
 
-    char *value_str = convert_bin_data_to_hexstr(psabpf_matchkey_get_data(mk), psabpf_matchkey_get_data_size(mk));
-    char *mask_str = convert_bin_data_to_hexstr(psabpf_matchkey_get_mask(mk), psabpf_matchkey_get_mask_size(mk));
+    char *value_str = convert_bin_data_to_hexstr(nikss_matchkey_get_data(mk), nikss_matchkey_get_data_size(mk));
+    char *mask_str = convert_bin_data_to_hexstr(nikss_matchkey_get_mask(mk), nikss_matchkey_get_mask_size(mk));
     bool failed = false;
 
-    switch (psabpf_matchkey_get_type(mk)) {
-        case PSABPF_EXACT:
+    switch (nikss_matchkey_get_type(mk)) {
+        case NIKSS_EXACT:
             json_object_set_new(root, "type", json_string("exact"));
             if (value_str != NULL) {
                 json_object_set_new(root, "value", json_string(value_str));
@@ -385,17 +385,17 @@ static json_t *create_json_match_key(psabpf_match_key_t *mk)
             }
             break;
 
-        case PSABPF_LPM:
+        case NIKSS_LPM:
             json_object_set_new(root, "type", json_string("lpm"));
             if (value_str != NULL) {
                 json_object_set_new(root, "value", json_string(value_str));
             } else {
                 failed = true;
             }
-            json_object_set_new(root, "prefix_len", json_integer(psabpf_matchkey_get_prefix_len(mk)));
+            json_object_set_new(root, "prefix_len", json_integer(nikss_matchkey_get_prefix_len(mk)));
             break;
 
-        case PSABPF_TERNARY:
+        case NIKSS_TERNARY:
             json_object_set_new(root, "type", json_string("ternary"));
             if (value_str != NULL && mask_str != NULL) {
                 json_object_set_new(root, "value", json_string(value_str));
@@ -425,28 +425,28 @@ static json_t *create_json_match_key(psabpf_match_key_t *mk)
     return root;
 }
 
-json_t *create_json_entry_key(psabpf_table_entry_t *entry)
+json_t *create_json_entry_key(nikss_table_entry_t *entry)
 {
     json_t *keys = json_array();
     if (keys == NULL) {
         return NULL;
     }
 
-    psabpf_match_key_t *mk = NULL;
-    while ((mk = psabpf_table_entry_get_next_matchkey(entry)) != NULL) {
+    nikss_match_key_t *mk = NULL;
+    while ((mk = nikss_table_entry_get_next_matchkey(entry)) != NULL) {
         json_t *key_entry = create_json_match_key(mk);
         if (key_entry == NULL) {
             json_decref(keys);
             return NULL;
         }
         json_array_append_new(keys, key_entry);
-        psabpf_matchkey_free(mk);
+        nikss_matchkey_free(mk);
     }
 
     return keys;
 }
 
-int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
+int parse_key_data(int *argc, char ***argv, nikss_table_entry_t *entry)
 {
     bool has_any_key = false;
     /* cppcheck-suppress unreadVariable */
@@ -472,11 +472,11 @@ int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
             return EPERM;
         }
 
-        psabpf_match_key_t mk;
-        psabpf_matchkey_init(&mk);
+        nikss_match_key_t mk;
+        nikss_matchkey_init(&mk);
         char *substr_ptr = NULL;
         if ((substr_ptr = strstr(**argv, "/")) != NULL) {
-            psabpf_matchkey_type(&mk, PSABPF_LPM);
+            nikss_matchkey_type(&mk, NIKSS_LPM);
             *(substr_ptr++) = 0;
             if (*substr_ptr == 0) {
                 fprintf(stderr, "missing prefix length for LPM key\n");
@@ -487,7 +487,7 @@ int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
                 return error_code;
             }
             char *ptr = NULL;
-            psabpf_matchkey_prefix_len(&mk, strtoul(substr_ptr, &ptr, 0));
+            nikss_matchkey_prefix_len(&mk, strtoul(substr_ptr, &ptr, 0));
             if (*ptr) {
                 fprintf(stderr, "%s: unable to parse prefix length\n", substr_ptr);
                 return EINVAL;
@@ -496,7 +496,7 @@ int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
             fprintf(stderr, "range match key not supported yet\n");
             return ENOTSUP;
         } else if ((substr_ptr = strstr(**argv, "^")) != NULL) {
-            psabpf_matchkey_type(&mk, PSABPF_TERNARY);
+            nikss_matchkey_type(&mk, NIKSS_TERNARY);
             /* Split data and mask */
             *substr_ptr = 0;
             substr_ptr++;
@@ -513,14 +513,14 @@ int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry)
                 return error_code;
             }
         } else {
-            psabpf_matchkey_type(&mk, PSABPF_EXACT);
+            nikss_matchkey_type(&mk, NIKSS_EXACT);
             error_code = translate_data_to_bytes(**argv, &mk, CTX_MATCH_KEY);
             if (error_code != NO_ERROR) {
                 return error_code;
             }
         }
-        error_code = psabpf_table_entry_matchkey(entry, &mk);
-        psabpf_matchkey_free(&mk);
+        error_code = nikss_table_entry_matchkey(entry, &mk);
+        nikss_matchkey_free(&mk);
         if (error_code != NO_ERROR) {
             return error_code;
         }

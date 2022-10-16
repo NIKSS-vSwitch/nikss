@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PSABPFCTL_CLONE_SESSION_H
-#define __PSABPFCTL_CLONE_SESSION_H
+#ifndef __NIKSSCTL_CLONE_SESSION_H
+#define __NIKSSCTL_CLONE_SESSION_H
 
 #include "common.h"
 
@@ -37,4 +37,4 @@ static const struct cmd clone_session_cmds[] = {
         {0}
 };
 
-#endif //__PSABPFCTL_CLONE_SESSION_H
+#endif /* __NIKSSCTL_CLONE_SESSION_H */

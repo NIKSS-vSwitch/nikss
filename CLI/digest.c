@@ -21,19 +21,19 @@
 
 #include <jansson.h>
 
-#include <psabpf_digest.h>
+#include <nikss_digest.h>
 
 #include "digest.h"
 
-static int parse_digest(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
-                        psabpf_digest_context_t *ctx, const char **instance_name)
+static int parse_digest(int *argc, char ***argv, nikss_context_t *nikss_ctx,
+                        nikss_digest_context_t *ctx, const char **instance_name)
 {
     if (*argc < 1) {
         fprintf(stderr, "too few parameters\n");
         return EPERM;
     }
 
-    int error_code = psabpf_digest_ctx_name(psabpf_ctx, ctx, **argv);
+    int error_code = nikss_digest_ctx_name(nikss_ctx, ctx, **argv);
     if (error_code != NO_ERROR) {
         fprintf(stderr, "failed to open digest %s: %s\n", **argv, strerror(error_code));
         return error_code;
@@ -47,25 +47,25 @@ static int parse_digest(int *argc, char ***argv, psabpf_context_t *psabpf_ctx,
 
 int get_digests_and_print(int argc, char **argv, bool only_single_entry)
 {
-    psabpf_context_t psabpf_ctx;
-    psabpf_digest_context_t ctx;
+    nikss_context_t nikss_ctx;
+    nikss_digest_context_t ctx;
     int error_code = EPERM;
     const char *digest_instance_name = NULL;
 
-    psabpf_context_init(&psabpf_ctx);
-    psabpf_digest_ctx_init(&ctx);
+    nikss_context_init(&nikss_ctx);
+    nikss_digest_ctx_init(&ctx);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
-        goto clean_up_psabpf;
+    if (parse_pipeline_id(&argc, &argv, &nikss_ctx) != NO_ERROR) {
+        goto clean_up_nikss;
     }
 
-    if (parse_digest(&argc, &argv, &psabpf_ctx, &ctx, &digest_instance_name) != NO_ERROR) {
-        goto clean_up_psabpf;
+    if (parse_digest(&argc, &argv, &nikss_ctx, &ctx, &digest_instance_name) != NO_ERROR) {
+        goto clean_up_nikss;
     }
 
     if (argc > 0) {
         fprintf(stderr, "%s: unused argument\n", *argv);
-        goto clean_up_psabpf;
+        goto clean_up_nikss;
     }
 
     json_t *root = json_object();
@@ -82,16 +82,16 @@ int get_digests_and_print(int argc, char **argv, bool only_single_entry)
         goto clean_up;
     }
 
-    psabpf_digest_t digest;
-    while (psabpf_digest_get_next(&ctx, &digest) == NO_ERROR) {
+    nikss_digest_t digest;
+    while (nikss_digest_get_next(&ctx, &digest) == NO_ERROR) {
         json_t *entry = json_object();
         if (entry == NULL) {
             fprintf(stderr, "failed to prepare digest message in JSON\n");
             goto clean_up;
         }
-        int ret = build_struct_json(entry, &ctx, &digest, (get_next_field_func_t) psabpf_digest_get_next_field);
+        int ret = build_struct_json(entry, &ctx, &digest, (get_next_field_func_t) nikss_digest_get_next_field);
         json_array_append_new(entries, entry);
-        psabpf_digest_free(&digest);
+        nikss_digest_free(&digest);
 
         if (ret != NO_ERROR) {
             break;
@@ -111,9 +111,9 @@ clean_up:
     json_decref(entries);
     json_decref(root);
 
-clean_up_psabpf:
-    psabpf_digest_ctx_free(&ctx);
-    psabpf_context_free(&psabpf_ctx);
+clean_up_nikss:
+    nikss_digest_ctx_free(&ctx);
+    nikss_context_free(&nikss_ctx);
 
     return error_code;
 }

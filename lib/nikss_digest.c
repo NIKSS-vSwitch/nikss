@@ -20,24 +20,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
-#include <psabpf_digest.h>
+#include <nikss.h>
+#include <nikss_digest.h>
 
 #include "btf.h"
 #include "common.h"
 
-void psabpf_digest_ctx_init(psabpf_digest_context_t *ctx)
+void nikss_digest_ctx_init(nikss_digest_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
-    memset(ctx, 0, sizeof(psabpf_digest_context_t));
+    memset(ctx, 0, sizeof(nikss_digest_context_t));
 
     ctx->queue.fd = -1;
     init_btf(&ctx->btf_metadata);
 }
 
-void psabpf_digest_ctx_free(psabpf_digest_context_t *ctx)
+void nikss_digest_ctx_free(nikss_digest_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -48,23 +48,23 @@ void psabpf_digest_ctx_free(psabpf_digest_context_t *ctx)
     free_struct_field_descriptor_set(&ctx->fds);
 }
 
-static int parse_digest_btf(psabpf_digest_context_t *ctx)
+static int parse_digest_btf(nikss_digest_context_t *ctx)
 {
     return parse_struct_type(&ctx->btf_metadata, ctx->queue.value_type_id, ctx->queue.value_size, &ctx->fds);
 }
 
-int psabpf_digest_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t *ctx, const char *name)
+int nikss_digest_ctx_name(nikss_context_t *nikss_ctx, nikss_digest_context_t *ctx, const char *name)
 {
-    if (psabpf_ctx == NULL || ctx == NULL || name == NULL) {
+    if (nikss_ctx == NULL || ctx == NULL || name == NULL) {
         return EINVAL;
     }
 
     /* get the BTF, it is optional so print only warning */
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
+    if (load_btf(nikss_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "warning: couldn't find BTF info\n");
     }
 
-    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->queue);
+    int ret = open_bpf_map(nikss_ctx, name, &ctx->btf_metadata, &ctx->queue);
     if (ret != NO_ERROR) {
         return ret;
     }
@@ -84,13 +84,13 @@ int psabpf_digest_ctx_name(psabpf_context_t *psabpf_ctx, psabpf_digest_context_t
     return NO_ERROR;
 }
 
-int psabpf_digest_get_next(psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
+int nikss_digest_get_next(nikss_digest_context_t *ctx, nikss_digest_t *digest)
 {
     if (ctx == NULL || digest == NULL) {
         return EINVAL;
     }
 
-    memset(digest, 0, sizeof(psabpf_digest_t));
+    memset(digest, 0, sizeof(nikss_digest_t));
 
     if (ctx->queue.fd < 0) {
         return EBADF;
@@ -108,14 +108,14 @@ int psabpf_digest_get_next(psabpf_digest_context_t *ctx, psabpf_digest_t *digest
         if (ret != ENOENT) {
             fprintf(stderr, "failed to pop element from queue: %s\n", strerror(ret));
         }
-        psabpf_digest_free(digest);
+        nikss_digest_free(digest);
         return ret;
     }
 
     return NO_ERROR;
 }
 
-void psabpf_digest_free(psabpf_digest_t *digest)
+void nikss_digest_free(nikss_digest_t *digest)
 {
     if (digest == NULL) {
         return;
@@ -125,16 +125,16 @@ void psabpf_digest_free(psabpf_digest_t *digest)
         free(digest->raw_data);
     }
 
-    memset(digest, 0, sizeof(psabpf_digest_t));
+    memset(digest, 0, sizeof(nikss_digest_t));
 }
 
-psabpf_struct_field_t * psabpf_digest_get_next_field(psabpf_digest_context_t *ctx, psabpf_digest_t *digest)
+nikss_struct_field_t * nikss_digest_get_next_field(nikss_digest_context_t *ctx, nikss_digest_t *digest)
 {
     if (ctx == NULL || digest == NULL) {
         return NULL;
     }
 
-    psabpf_struct_field_descriptor_t *fd = NULL;
+    nikss_struct_field_descriptor_t *fd = NULL;
     fd = get_struct_field_descriptor(&ctx->fds, digest->current_field_id);
     if (fd == NULL) {
         digest->current_field_id = 0;

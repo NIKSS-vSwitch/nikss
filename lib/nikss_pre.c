@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <psabpf_pre.h>
+#include <nikss_pre.h>
 
 #include "bpf_defs.h"
 #include "btf.h"
@@ -33,7 +33,7 @@ struct list_key_t {
 typedef struct list_key_t elem_t;
 
 struct element {
-    psabpf_clone_session_entry_t entry;
+    nikss_clone_session_entry_t entry;
     elem_t next_id;
 } __attribute__((aligned(4)));
 
@@ -41,8 +41,8 @@ struct element {
  * Common functions
  ******************************************************************************/
 
-static int open_pr_maps(psabpf_context_t *ctx, const char *pr_map_outer, const char *pr_map_inner,
-                        psabpf_bpf_map_descriptor_t *outer, psabpf_bpf_map_descriptor_t *inner)
+static int open_pr_maps(nikss_context_t *ctx, const char *pr_map_outer, const char *pr_map_inner,
+                        nikss_bpf_map_descriptor_t *outer, nikss_bpf_map_descriptor_t *inner)
 {
     outer->fd = -1;
     if (inner != NULL) {
@@ -73,8 +73,8 @@ err:
     return ret;
 }
 
-static int open_session_map(psabpf_bpf_map_descriptor_t *pr_map,
-                            psabpf_bpf_map_descriptor_t *session_map, uint32_t session)
+static int open_session_map(nikss_bpf_map_descriptor_t *pr_map,
+                            nikss_bpf_map_descriptor_t *session_map, uint32_t session)
 {
     session_map->fd = -1;
     session_map->key_size = 0;
@@ -117,8 +117,8 @@ static int open_session_map(psabpf_bpf_map_descriptor_t *pr_map,
     return NO_ERROR;
 }
 
-static int do_create_pre_session(psabpf_bpf_map_descriptor_t *pr_map,
-                                 psabpf_bpf_map_descriptor_t *session_template, uint32_t session, psabpf_btf_t *btf)
+static int do_create_pre_session(nikss_bpf_map_descriptor_t *pr_map,
+                                 nikss_bpf_map_descriptor_t *session_template, uint32_t session, nikss_btf_t *btf)
 {
     int error_code = 0;
     if (pr_map->fd < 0 || session_template->fd < 0) {
@@ -179,16 +179,16 @@ ret:
     return error_code;
 }
 
-static int create_pre_session(psabpf_context_t *ctx, const char *pr_map, const char *pr_map_inner, uint32_t session)
+static int create_pre_session(nikss_context_t *ctx, const char *pr_map, const char *pr_map_inner, uint32_t session)
 {
     if (ctx == NULL || session == 0) {
         fprintf(stderr, "invalid session/group or context\n");
         return EINVAL;
     }
 
-    psabpf_bpf_map_descriptor_t outer_map;
-    psabpf_bpf_map_descriptor_t inner_map;
-    psabpf_btf_t btf;
+    nikss_bpf_map_descriptor_t outer_map;
+    nikss_bpf_map_descriptor_t inner_map;
+    nikss_btf_t btf;
     init_btf(&btf);
 
     int ret = open_pr_maps(ctx, pr_map, pr_map_inner, &outer_map, &inner_map);
@@ -210,7 +210,7 @@ err:
     return ret;
 }
 
-static int remove_pre_session(psabpf_context_t *ctx, const char *pr_map_name, uint32_t session)
+static int remove_pre_session(nikss_context_t *ctx, const char *pr_map_name, uint32_t session)
 {
     if (ctx == NULL) {
         return EINVAL;
@@ -220,7 +220,7 @@ static int remove_pre_session(psabpf_context_t *ctx, const char *pr_map_name, ui
         return EINVAL;
     }
 
-    psabpf_bpf_map_descriptor_t pr_map;
+    nikss_bpf_map_descriptor_t pr_map;
 
     int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
     if (ret != 0) {
@@ -248,13 +248,13 @@ err:
     return ret;
 }
 
-static bool pre_session_exists(psabpf_context_t *ctx, const char *pr_map_name, uint32_t session)
+static bool pre_session_exists(nikss_context_t *ctx, const char *pr_map_name, uint32_t session)
 {
     if (ctx == NULL) {
         return false;
     }
 
-    psabpf_bpf_map_descriptor_t pr_map;
+    nikss_bpf_map_descriptor_t pr_map;
     int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
     if (ret != 0) {
         return false;
@@ -277,8 +277,8 @@ static bool pre_session_exists(psabpf_context_t *ctx, const char *pr_map_name, u
     return inner_map_id != 0;
 }
 
-static int pre_session_insert_entry(psabpf_context_t *ctx, const char *pr_map_name,
-                                    uint32_t session, psabpf_clone_session_entry_t *entry)
+static int pre_session_insert_entry(nikss_context_t *ctx, const char *pr_map_name,
+                                    uint32_t session, nikss_clone_session_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return EINVAL;
@@ -288,8 +288,8 @@ static int pre_session_insert_entry(psabpf_context_t *ctx, const char *pr_map_na
         return EINVAL;
     }
 
-    psabpf_bpf_map_descriptor_t session_map;
-    psabpf_bpf_map_descriptor_t pr_map;
+    nikss_bpf_map_descriptor_t session_map;
+    nikss_bpf_map_descriptor_t pr_map;
     int ret = NO_ERROR;
 
     ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
@@ -357,8 +357,8 @@ err:
     return ret;
 }
 
-static int pre_session_del_entry(psabpf_context_t *ctx, const char *pr_map_name,
-                                 uint32_t session, psabpf_clone_session_entry_t *entry)
+static int pre_session_del_entry(nikss_context_t *ctx, const char *pr_map_name,
+                                 uint32_t session, nikss_clone_session_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return EINVAL;
@@ -368,8 +368,8 @@ static int pre_session_del_entry(psabpf_context_t *ctx, const char *pr_map_name,
         return EINVAL;
     }
 
-    psabpf_bpf_map_descriptor_t session_map;
-    psabpf_bpf_map_descriptor_t pr_map;
+    nikss_bpf_map_descriptor_t session_map;
+    nikss_bpf_map_descriptor_t pr_map;
     int ret = NO_ERROR;
 
     ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
@@ -453,10 +453,10 @@ err:
     return ret;
 }
 
-static int pre_get_next_entry(psabpf_context_t *ctx,
-                              psabpf_bpf_map_descriptor_t *session_map, const char *pr_map_name,
+static int pre_get_next_entry(nikss_context_t *ctx,
+                              nikss_bpf_map_descriptor_t *session_map, const char *pr_map_name,
                               uint32_t session, uint32_t *current_egress_port, uint16_t *current_instance,
-                              psabpf_clone_session_entry_t *current_entry)
+                              nikss_clone_session_entry_t *current_entry)
 {
     if (ctx == NULL || session == 0) {
         fprintf(stderr, "invalid session/group or context\n");
@@ -464,7 +464,7 @@ static int pre_get_next_entry(psabpf_context_t *ctx,
     }
 
     if (session_map->fd < 0) {
-        psabpf_bpf_map_descriptor_t pr_map;
+        nikss_bpf_map_descriptor_t pr_map;
 
         int ret = open_pr_maps(ctx, pr_map_name, NULL, &pr_map, NULL);
         if (ret != NO_ERROR) {
@@ -503,7 +503,7 @@ static int pre_get_next_entry(psabpf_context_t *ctx,
         fprintf(stderr, "failed to read next entry: %s", strerror(errno));
         goto no_more_entries;
     }
-    memcpy(current_entry, &value.entry, sizeof(psabpf_clone_session_entry_t));
+    memcpy(current_entry, &value.entry, sizeof(nikss_clone_session_entry_t));
 
     *current_egress_port = value.entry.egress_port;
     *current_instance = value.entry.instance;
@@ -516,7 +516,7 @@ no_more_entries:
     return ENODATA;
 }
 
-static int pre_get_next_session(psabpf_bpf_map_descriptor_t *pr_map, uint32_t *current_session_id)
+static int pre_get_next_session(nikss_bpf_map_descriptor_t *pr_map, uint32_t *current_session_id)
 {
     if (pr_map->fd < 0 ||
         pr_map->type != BPF_MAP_TYPE_ARRAY_OF_MAPS ||
@@ -551,17 +551,17 @@ static int pre_get_next_session(psabpf_bpf_map_descriptor_t *pr_map, uint32_t *c
  * Clone session
  ******************************************************************************/
 
-void psabpf_clone_session_context_init(psabpf_clone_session_ctx_t *ctx)
+void nikss_clone_session_context_init(nikss_clone_session_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
-    memset( ctx, 0, sizeof(psabpf_clone_session_ctx_t));
+    memset( ctx, 0, sizeof(nikss_clone_session_ctx_t));
 
     ctx->session_map.fd = -1;
 }
 
-void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx)
+void nikss_clone_session_context_free(nikss_clone_session_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -570,7 +570,7 @@ void psabpf_clone_session_context_free(psabpf_clone_session_ctx_t *ctx)
     close_object_fd(&ctx->session_map.fd);
 }
 
-void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_session_id_t id)
+void nikss_clone_session_id(nikss_clone_session_ctx_t *ctx, nikss_clone_session_id_t id)
 {
     if (ctx == NULL) {
         return;
@@ -581,7 +581,7 @@ void psabpf_clone_session_id(psabpf_clone_session_ctx_t *ctx, psabpf_clone_sessi
     close_object_fd(&ctx->session_map.fd);
 }
 
-psabpf_clone_session_id_t psabpf_clone_session_get_id(psabpf_clone_session_ctx_t *ctx)
+nikss_clone_session_id_t nikss_clone_session_get_id(nikss_clone_session_ctx_t *ctx)
 {
     if (ctx == NULL) {
         return 0;
@@ -589,7 +589,7 @@ psabpf_clone_session_id_t psabpf_clone_session_get_id(psabpf_clone_session_ctx_t
     return ctx->id;
 }
 
-bool psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
+bool nikss_clone_session_exists(nikss_context_t *ctx, nikss_clone_session_ctx_t *session)
 {
     if (session == NULL) {
         return false;
@@ -597,33 +597,33 @@ bool psabpf_clone_session_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx
     return pre_session_exists(ctx, CLONE_SESSION_TABLE, session->id);
 }
 
-int psabpf_clone_session_create(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
+int nikss_clone_session_create(nikss_context_t *ctx, nikss_clone_session_ctx_t *session)
 {
     return create_pre_session(ctx, CLONE_SESSION_TABLE, CLONE_SESSION_TABLE_INNER, session->id);
 }
 
-void psabpf_clone_session_entry_init(psabpf_clone_session_entry_t *entry)
+void nikss_clone_session_entry_init(nikss_clone_session_entry_t *entry)
 {
     if (entry == NULL) {
         return;
     }
-    memset( entry, 0, sizeof(psabpf_clone_session_entry_t));
+    memset( entry, 0, sizeof(nikss_clone_session_entry_t));
 }
 
-void psabpf_clone_session_entry_free(psabpf_clone_session_entry_t *entry)
+void nikss_clone_session_entry_free(nikss_clone_session_entry_t *entry)
 {
     if (entry == NULL) {
         return;
     }
-    memset(entry, 0, sizeof(psabpf_clone_session_entry_t));
+    memset(entry, 0, sizeof(nikss_clone_session_entry_t));
 }
 
-void psabpf_clone_session_entry_port(psabpf_clone_session_entry_t *entry, uint32_t egress_port)
+void nikss_clone_session_entry_port(nikss_clone_session_entry_t *entry, uint32_t egress_port)
 {
     entry->egress_port = egress_port;
 }
 
-uint32_t psabpf_clone_session_entry_get_port(psabpf_clone_session_entry_t *entry)
+uint32_t nikss_clone_session_entry_get_port(nikss_clone_session_entry_t *entry)
 {
     if (entry == NULL) {
         return 0;
@@ -631,12 +631,12 @@ uint32_t psabpf_clone_session_entry_get_port(psabpf_clone_session_entry_t *entry
     return entry->egress_port;
 }
 
-void psabpf_clone_session_entry_instance(psabpf_clone_session_entry_t *entry, uint16_t instance)
+void nikss_clone_session_entry_instance(nikss_clone_session_entry_t *entry, uint16_t instance)
 {
     entry->instance = instance;
 }
 
-uint16_t psabpf_clone_session_entry_get_instance(psabpf_clone_session_entry_t *entry)
+uint16_t nikss_clone_session_entry_get_instance(nikss_clone_session_entry_t *entry)
 {
     if (entry == NULL) {
         return 0;
@@ -644,12 +644,12 @@ uint16_t psabpf_clone_session_entry_get_instance(psabpf_clone_session_entry_t *e
     return entry->instance;
 }
 
-void psabpf_clone_session_entry_cos(psabpf_clone_session_entry_t *entry, uint8_t class_of_service)
+void nikss_clone_session_entry_cos(nikss_clone_session_entry_t *entry, uint8_t class_of_service)
 {
     entry->class_of_service = class_of_service;
 }
 
-uint8_t psabpf_clone_session_entry_get_cos(psabpf_clone_session_entry_t *entry)
+uint8_t nikss_clone_session_entry_get_cos(nikss_clone_session_entry_t *entry)
 {
     if (entry == NULL) {
         return 0;
@@ -657,20 +657,20 @@ uint8_t psabpf_clone_session_entry_get_cos(psabpf_clone_session_entry_t *entry)
     return entry->class_of_service;
 }
 
-void psabpf_clone_session_entry_truncate_enable(psabpf_clone_session_entry_t *entry, uint16_t packet_length_bytes)
+void nikss_clone_session_entry_truncate_enable(nikss_clone_session_entry_t *entry, uint16_t packet_length_bytes)
 {
     entry->truncate = true;
     entry->packet_length_bytes = packet_length_bytes;
 }
 
 /* cppcheck-suppress unusedFunction ; public API call */
-void psabpf_clone_session_entry_truncate_disable(psabpf_clone_session_entry_t *entry)
+void nikss_clone_session_entry_truncate_disable(nikss_clone_session_entry_t *entry)
 {
     entry->truncate = false;
     entry->packet_length_bytes = 0;
 }
 
-bool psabpf_clone_session_entry_get_truncate_state(psabpf_clone_session_entry_t *entry)
+bool nikss_clone_session_entry_get_truncate_state(nikss_clone_session_entry_t *entry)
 {
     if (entry == NULL) {
         return 0;
@@ -678,7 +678,7 @@ bool psabpf_clone_session_entry_get_truncate_state(psabpf_clone_session_entry_t 
     return entry->truncate != 0;
 }
 
-uint16_t psabpf_clone_session_entry_get_truncate_length(psabpf_clone_session_entry_t *entry)
+uint16_t nikss_clone_session_entry_get_truncate_length(nikss_clone_session_entry_t *entry)
 {
     if (entry == NULL || entry->truncate == 0) {
         return 0;
@@ -686,7 +686,7 @@ uint16_t psabpf_clone_session_entry_get_truncate_length(psabpf_clone_session_ent
     return entry->packet_length_bytes;
 }
 
-int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
+int nikss_clone_session_entry_update(nikss_context_t *ctx, nikss_clone_session_ctx_t *session, nikss_clone_session_entry_t *entry)
 {
     if (session == NULL) {
         return EINVAL;
@@ -695,7 +695,7 @@ int psabpf_clone_session_entry_update(psabpf_context_t *ctx, psabpf_clone_sessio
     return pre_session_insert_entry(ctx, CLONE_SESSION_TABLE, session->id, entry);
 }
 
-int psabpf_clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
+int nikss_clone_session_delete(nikss_context_t *ctx, nikss_clone_session_ctx_t *session)
 {
     if (session == NULL) {
         return EINVAL;
@@ -704,7 +704,7 @@ int psabpf_clone_session_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_
     return remove_pre_session(ctx, CLONE_SESSION_TABLE, session->id);
 }
 
-int psabpf_clone_session_entry_delete(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
+int nikss_clone_session_entry_delete(nikss_context_t *ctx, nikss_clone_session_ctx_t *session, nikss_clone_session_entry_t *entry)
 {
     if (session == NULL) {
         return EINVAL;
@@ -713,13 +713,13 @@ int psabpf_clone_session_entry_delete(psabpf_context_t *ctx, psabpf_clone_sessio
 }
 
 /* cppcheck-suppress unusedFunction ; public API call */
-int psabpf_clone_session_entry_exists(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session, psabpf_clone_session_entry_t *entry)
+int nikss_clone_session_entry_exists(nikss_context_t *ctx, nikss_clone_session_ctx_t *session, nikss_clone_session_entry_t *entry)
 {
     (void) ctx; (void) session; (void) entry;
     return NO_ERROR;
 }
 
-psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context_t *ctx, psabpf_clone_session_ctx_t *session)
+nikss_clone_session_entry_t *nikss_clone_session_get_next_entry(nikss_context_t *ctx, nikss_clone_session_ctx_t *session)
 {
     if (ctx == NULL || session == NULL) {
         fprintf(stderr, "invalid session or context\n");
@@ -737,30 +737,30 @@ psabpf_clone_session_entry_t *psabpf_clone_session_get_next_entry(psabpf_context
     return &session->current_entry;
 }
 
-int psabpf_clone_session_list_init(psabpf_context_t *ctx, psabpf_clone_session_list_t *list)
+int nikss_clone_session_list_init(nikss_context_t *ctx, nikss_clone_session_list_t *list)
 {
     if (ctx == NULL || list == NULL) {
         return EINVAL;
     }
 
-    memset(list, 0, sizeof(psabpf_clone_session_list_t));
+    memset(list, 0, sizeof(nikss_clone_session_list_t));
     list->session_map.fd = -1;
-    psabpf_clone_session_context_init(&list->current_session);
+    nikss_clone_session_context_init(&list->current_session);
 
     return open_pr_maps(ctx, CLONE_SESSION_TABLE, NULL, &list->session_map, NULL);
 }
 
-void psabpf_clone_session_list_free(psabpf_clone_session_list_t *list)
+void nikss_clone_session_list_free(nikss_clone_session_list_t *list)
 {
     if (list == NULL) {
         return;
     }
 
     close_object_fd(&list->session_map.fd);
-    psabpf_clone_session_context_free(&list->current_session);
+    nikss_clone_session_context_free(&list->current_session);
 }
 
-psabpf_clone_session_ctx_t *psabpf_clone_session_list_get_next_group(psabpf_clone_session_list_t *list)
+nikss_clone_session_ctx_t *nikss_clone_session_list_get_next_group(nikss_clone_session_list_t *list)
 {
     if (list == NULL) {
         return NULL;
@@ -770,8 +770,8 @@ psabpf_clone_session_ctx_t *psabpf_clone_session_list_get_next_group(psabpf_clon
         return NULL;
     }
 
-    psabpf_clone_session_context_init(&list->current_session);
-    psabpf_clone_session_id(&list->current_session, list->current_id);
+    nikss_clone_session_context_init(&list->current_session);
+    nikss_clone_session_id(&list->current_session, list->current_id);
 
     return &list->current_session;
 }
@@ -780,17 +780,17 @@ psabpf_clone_session_ctx_t *psabpf_clone_session_list_get_next_group(psabpf_clon
  * Multicast groups
  ******************************************************************************/
 
-void psabpf_mcast_grp_context_init(psabpf_mcast_grp_ctx_t *group)
+void nikss_mcast_grp_context_init(nikss_mcast_grp_ctx_t *group)
 {
     if (group == NULL) {
         return;
     }
-    memset(group, 0, sizeof(psabpf_mcast_grp_ctx_t));
+    memset(group, 0, sizeof(nikss_mcast_grp_ctx_t));
 
     group->group_map.fd = -1;
 }
 
-void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group)
+void nikss_mcast_grp_context_free(nikss_mcast_grp_ctx_t *group)
 {
     if (group == NULL) {
         return;
@@ -798,11 +798,11 @@ void psabpf_mcast_grp_context_free(psabpf_mcast_grp_ctx_t *group)
 
     close_object_fd(&group->group_map.fd);
 
-    memset(group, 0, sizeof(psabpf_mcast_grp_ctx_t));
+    memset(group, 0, sizeof(nikss_mcast_grp_ctx_t));
     group->group_map.fd = -1;
 }
 
-void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mcast_grp_id)
+void nikss_mcast_grp_id(nikss_mcast_grp_ctx_t *group, nikss_mcast_grp_id_t mcast_grp_id)
 {
     if (group != NULL) {
         group->id = mcast_grp_id;
@@ -812,7 +812,7 @@ void psabpf_mcast_grp_id(psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_id_t mc
     close_object_fd(&group->group_map.fd);
 }
 
-psabpf_mcast_grp_id_t psabpf_mcast_grp_get_id(psabpf_mcast_grp_ctx_t *group)
+nikss_mcast_grp_id_t nikss_mcast_grp_get_id(nikss_mcast_grp_ctx_t *group)
 {
     if (group == NULL) {
         return 0;
@@ -821,12 +821,12 @@ psabpf_mcast_grp_id_t psabpf_mcast_grp_get_id(psabpf_mcast_grp_ctx_t *group)
     return group->id;
 }
 
-int psabpf_mcast_grp_create(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+int nikss_mcast_grp_create(nikss_context_t *ctx, nikss_mcast_grp_ctx_t *group)
 {
     return create_pre_session(ctx, MULTICAST_GROUP_TABLE, MULTICAST_GROUP_TABLE_INNER, group->id);
 }
 
-bool psabpf_mcast_grp_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+bool nikss_mcast_grp_exists(nikss_context_t *ctx, nikss_mcast_grp_ctx_t *group)
 {
     if (group == NULL) {
         return false;
@@ -834,7 +834,7 @@ bool psabpf_mcast_grp_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *grou
     return pre_session_exists(ctx, MULTICAST_GROUP_TABLE, group->id);
 }
 
-int psabpf_mcast_grp_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+int nikss_mcast_grp_delete(nikss_context_t *ctx, nikss_mcast_grp_ctx_t *group)
 {
     if (group == NULL) {
         return EINVAL;
@@ -843,37 +843,37 @@ int psabpf_mcast_grp_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group
     return remove_pre_session(ctx, MULTICAST_GROUP_TABLE, group->id);
 }
 
-void psabpf_mcast_grp_member_init(psabpf_mcast_grp_member_t *member)
+void nikss_mcast_grp_member_init(nikss_mcast_grp_member_t *member)
 {
     if (member == NULL) {
         return;
     }
-    memset(member, 0, sizeof(psabpf_mcast_grp_member_t));
+    memset(member, 0, sizeof(nikss_mcast_grp_member_t));
 }
 
-void psabpf_mcast_grp_member_free(psabpf_mcast_grp_member_t *member)
+void nikss_mcast_grp_member_free(nikss_mcast_grp_member_t *member)
 {
     if (member == NULL) {
         return;
     }
-    memset(member, 0, sizeof(psabpf_mcast_grp_member_t));
+    memset(member, 0, sizeof(nikss_mcast_grp_member_t));
 }
 
-void psabpf_mcast_grp_member_port(psabpf_mcast_grp_member_t *member, uint32_t egress_port)
+void nikss_mcast_grp_member_port(nikss_mcast_grp_member_t *member, uint32_t egress_port)
 {
     if (member != NULL) {
         member->egress_port = egress_port;
     }
 }
 
-void psabpf_mcast_grp_member_instance(psabpf_mcast_grp_member_t *member, uint16_t instance)
+void nikss_mcast_grp_member_instance(nikss_mcast_grp_member_t *member, uint16_t instance)
 {
     if (member != NULL) {
         member->instance = instance;
     }
 }
 
-uint32_t psabpf_mcast_grp_member_get_port(psabpf_mcast_grp_member_t *member)
+uint32_t nikss_mcast_grp_member_get_port(nikss_mcast_grp_member_t *member)
 {
     if (member == NULL) {
         return 0;
@@ -881,7 +881,7 @@ uint32_t psabpf_mcast_grp_member_get_port(psabpf_mcast_grp_member_t *member)
     return member->egress_port;
 }
 
-uint16_t psabpf_mcast_grp_member_get_instance(psabpf_mcast_grp_member_t *member)
+uint16_t nikss_mcast_grp_member_get_instance(nikss_mcast_grp_member_t *member)
 {
     if (member == NULL) {
         return 0;
@@ -889,13 +889,13 @@ uint16_t psabpf_mcast_grp_member_get_instance(psabpf_mcast_grp_member_t *member)
     return member->instance;
 }
 
-int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
+int nikss_mcast_grp_member_update(nikss_context_t *ctx, nikss_mcast_grp_ctx_t *group, nikss_mcast_grp_member_t *member)
 {
     if (group == NULL || member == NULL) {
         return EINVAL;
     }
 
-    psabpf_clone_session_entry_t entry = {
+    nikss_clone_session_entry_t entry = {
             .egress_port = member->egress_port,
             .instance = member->instance,
     };
@@ -904,19 +904,19 @@ int psabpf_mcast_grp_member_update(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t
 }
 
 /* cppcheck-suppress unusedFunction ; public API call */
-int psabpf_mcast_grp_member_exists(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
+int nikss_mcast_grp_member_exists(nikss_context_t *ctx, nikss_mcast_grp_ctx_t *group, nikss_mcast_grp_member_t *member)
 {
     (void) ctx; (void) group; (void) member;
     return NO_ERROR;
 }
 
-int psabpf_mcast_grp_member_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group, psabpf_mcast_grp_member_t *member)
+int nikss_mcast_grp_member_delete(nikss_context_t *ctx, nikss_mcast_grp_ctx_t *group, nikss_mcast_grp_member_t *member)
 {
     if (group == NULL || member == NULL) {
         return EINVAL;
     }
 
-    psabpf_clone_session_entry_t entry = {
+    nikss_clone_session_entry_t entry = {
             .egress_port = member->egress_port,
             .instance = member->instance,
     };
@@ -924,14 +924,14 @@ int psabpf_mcast_grp_member_delete(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t
     return pre_session_del_entry(ctx, MULTICAST_GROUP_TABLE, group->id, &entry);
 }
 
-psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ctx, psabpf_mcast_grp_ctx_t *group)
+nikss_mcast_grp_member_t *nikss_mcast_grp_get_next_member(nikss_context_t *ctx, nikss_mcast_grp_ctx_t *group)
 {
     if (ctx == NULL || group == NULL) {
         fprintf(stderr, "invalid group or context\n");
         return NULL;
     }
 
-    psabpf_clone_session_entry_t entry= {};
+    nikss_clone_session_entry_t entry= {};
     int ret = pre_get_next_entry(ctx, &group->group_map, MULTICAST_GROUP_TABLE,
                                  group->id,
                                  &group->current_egress_port, &group->current_instance,
@@ -946,30 +946,30 @@ psabpf_mcast_grp_member_t *psabpf_mcast_grp_get_next_member(psabpf_context_t *ct
     return &group->current_member;
 }
 
-int psabpf_mcast_grp_list_init(psabpf_context_t *ctx, psabpf_mcast_grp_list_t *list)
+int nikss_mcast_grp_list_init(nikss_context_t *ctx, nikss_mcast_grp_list_t *list)
 {
     if (ctx == NULL || list == NULL) {
         return EINVAL;
     }
 
-    memset(list, 0, sizeof(psabpf_mcast_grp_list_t));
+    memset(list, 0, sizeof(nikss_mcast_grp_list_t));
     list->group_map.fd = -1;
-    psabpf_mcast_grp_context_init(&list->current_group);
+    nikss_mcast_grp_context_init(&list->current_group);
 
     return open_pr_maps(ctx, MULTICAST_GROUP_TABLE, NULL, &list->group_map, NULL);
 }
 
-void psabpf_mcast_grp_list_free(psabpf_mcast_grp_list_t *list)
+void nikss_mcast_grp_list_free(nikss_mcast_grp_list_t *list)
 {
     if (list == NULL) {
         return;
     }
 
     close_object_fd(&list->group_map.fd);
-    psabpf_mcast_grp_context_free(&list->current_group);
+    nikss_mcast_grp_context_free(&list->current_group);
 }
 
-psabpf_mcast_grp_ctx_t *psabpf_mcast_grp_list_get_next_group(psabpf_mcast_grp_list_t *list)
+nikss_mcast_grp_ctx_t *nikss_mcast_grp_list_get_next_group(nikss_mcast_grp_list_t *list)
 {
     if (list == NULL) {
         return NULL;
@@ -979,8 +979,8 @@ psabpf_mcast_grp_ctx_t *psabpf_mcast_grp_list_get_next_group(psabpf_mcast_grp_li
         return NULL;
     }
 
-    psabpf_mcast_grp_context_init(&list->current_group);
-    psabpf_mcast_grp_id(&list->current_group, list->current_id);
+    nikss_mcast_grp_context_init(&list->current_group);
+    nikss_mcast_grp_id(&list->current_group, list->current_id);
 
     return &list->current_group;
 }

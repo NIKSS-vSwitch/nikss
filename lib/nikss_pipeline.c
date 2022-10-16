@@ -28,7 +28,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include <psabpf_pipeline.h>
+#include <nikss_pipeline.h>
 
 #include "bpf_defs.h"
 #include "btf.h"
@@ -56,7 +56,7 @@ static int do_initialize_maps(int prog_fd)
                              out, NULL, NULL, NULL);
 }
 
-static int open_prog_by_name(psabpf_context_t *ctx, const char *prog)
+static int open_prog_by_name(nikss_context_t *ctx, const char *prog)
 {
     char pinned_file[256];
     build_ebpf_prog_filename(pinned_file, sizeof(pinned_file), ctx, prog);
@@ -79,7 +79,7 @@ static int tc_create_hook(int ifindex, const char *interface)
     return ret;
 }
 
-static int tc_attach_prog(psabpf_context_t *ctx, const char *prog, int ifindex, enum bpf_tc_attach_point hook_point, const char *interface)
+static int tc_attach_prog(nikss_context_t *ctx, const char *prog, int ifindex, enum bpf_tc_attach_point hook_point, const char *interface)
 {
     int ret = NO_ERROR;
     int fd = open_prog_by_name(ctx, prog);
@@ -112,7 +112,7 @@ clean_up:
     return ret;
 }
 
-static int tc_create_hook_and_attach_progs(psabpf_context_t *ctx, int ifindex, const char *interface)
+static int tc_create_hook_and_attach_progs(nikss_context_t *ctx, int ifindex, const char *interface)
 {
     int ret = tc_create_hook(ifindex, interface);
     if (ret != NO_ERROR) {
@@ -132,7 +132,7 @@ static int tc_create_hook_and_attach_progs(psabpf_context_t *ctx, int ifindex, c
     return NO_ERROR;
 }
 
-static int xdp_attach_prog_to_port(int *fd, psabpf_context_t *ctx, int ifindex, const char *prog)
+static int xdp_attach_prog_to_port(int *fd, nikss_context_t *ctx, int ifindex, const char *prog)
 {
     __u32 flags = 0;
     int ret = 0;
@@ -169,7 +169,7 @@ static int xdp_attach_prog_to_port(int *fd, psabpf_context_t *ctx, int ifindex, 
     return NO_ERROR;
 }
 
-static int update_prog_devmap(psabpf_bpf_map_descriptor_t *devmap, int ifindex, const char *intf, int egress_prog_fd)
+static int update_prog_devmap(nikss_bpf_map_descriptor_t *devmap, int ifindex, const char *intf, int egress_prog_fd)
 {
     struct bpf_devmap_val devmap_val;
 
@@ -196,7 +196,7 @@ static int update_prog_devmap(psabpf_bpf_map_descriptor_t *devmap, int ifindex, 
     return NO_ERROR;
 }
 
-static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
+static int xdp_port_add(nikss_context_t *ctx, const char *intf, int ifindex)
 {
     int ret = NO_ERROR;
     int ig_prog_fd = 0;
@@ -213,7 +213,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
     /* may not exist, ignore errors */
     eg_prog_fd = open_prog_by_name(ctx, XDP_EGRESS_PROG);
 
-    psabpf_bpf_map_descriptor_t devmap;
+    nikss_bpf_map_descriptor_t devmap;
     ret = open_bpf_map(ctx, XDP_DEVMAP, NULL, &devmap);
     if (ret != NO_ERROR) {
         fprintf(stderr, "failed to open DEVMAP: %s\n", strerror(ret));
@@ -230,7 +230,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
 
     eg_prog_fd = open_prog_by_name(ctx, XDP_EGRESS_PROG_OPTIMIZED);
     if (eg_prog_fd >= 0) {
-        psabpf_bpf_map_descriptor_t jmpmap;
+        nikss_bpf_map_descriptor_t jmpmap;
         ret = open_bpf_map(ctx, XDP_JUMP_TBL, NULL, &jmpmap);
         if (ret != NO_ERROR) {
             fprintf(stderr, "failed to open map %s: %s\n", XDP_JUMP_TBL, strerror(errno));
@@ -257,7 +257,7 @@ static int xdp_port_add(psabpf_context_t *ctx, const char *intf, int ifindex)
     return NO_ERROR;
 }
 
-static int tc_port_add(psabpf_context_t *ctx, const char *interface, int ifindex)
+static int tc_port_add(nikss_context_t *ctx, const char *interface, int ifindex)
 {
     int xdp_helper_fd = -1;
 
@@ -275,7 +275,7 @@ static int tc_port_add(psabpf_context_t *ctx, const char *interface, int ifindex
     return NO_ERROR;
 }
 
-bool psabpf_pipeline_exists(psabpf_context_t *ctx)
+bool nikss_pipeline_exists(nikss_context_t *ctx)
 {
     char mounted_path[256];
     build_ebpf_pipeline_path(mounted_path, sizeof(mounted_path), ctx);
@@ -300,7 +300,7 @@ static int extract_tuple_id_from_tuple(const char *tuple_name, uint32_t *tuple_i
     return NO_ERROR;
 }
 
-static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_name)
+static int join_tuple_to_map_if_tuple(nikss_context_t *ctx, const char *tuple_name)
 {
     // We assume that each tuple has "_tuple_" suffix
     // This name also is reserved in a p4c-ebpf-psa compiler
@@ -312,7 +312,7 @@ static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_n
         int ternary_map_name_length = (int)(ternary_tbl_name_lst_char_ptr - tuple_name);
         snprintf(tuples_map_name, sizeof(tuples_map_name), "%.*s_tuples_map", ternary_map_name_length, tuple_name);
 
-        psabpf_bpf_map_descriptor_t tuple_map;
+        nikss_bpf_map_descriptor_t tuple_map;
         int ret = open_bpf_map(ctx, tuples_map_name, NULL, &tuple_map);
         if (ret != NO_ERROR) {
             fprintf(stderr, "couldn't open map %s: %s\n", tuples_map_name, strerror(ret));
@@ -327,7 +327,7 @@ static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_n
             return ENODATA;
         }
 
-        psabpf_bpf_map_descriptor_t tuple;
+        nikss_bpf_map_descriptor_t tuple;
         ret = open_bpf_map(ctx, tuple_name, NULL, &tuple);
         if (ret != NO_ERROR) {
             fprintf(stderr, "couldn't open map %s: %s\n", tuple_name, strerror(ret));
@@ -345,7 +345,7 @@ static int join_tuple_to_map_if_tuple(psabpf_context_t *ctx, const char *tuple_n
     return NO_ERROR;
 }
 
-int psabpf_pipeline_load(psabpf_context_t *ctx, const char *file)
+int nikss_pipeline_load(nikss_context_t *ctx, const char *file)
 {
     struct bpf_object *obj = NULL;
     int ret = 0;
@@ -443,7 +443,7 @@ static int remove_file(const char *fpath, const struct stat *sb, int tflag, stru
     return 0;
 }
 
-static int remove_pipeline_directory(psabpf_context_t *ctx)
+static int remove_pipeline_directory(nikss_context_t *ctx)
 {
     char pipeline_path[256];
     build_ebpf_pipeline_path(pipeline_path, sizeof(pipeline_path), ctx);
@@ -463,14 +463,14 @@ static int remove_pipeline_directory(psabpf_context_t *ctx)
     return NO_ERROR;
 }
 
-int psabpf_pipeline_unload(psabpf_context_t *ctx)
+int nikss_pipeline_unload(nikss_context_t *ctx)
 {
     /* TODO: Should we scan all interfaces to detect if it uses current pipeline programs and detach it? */
 
     return remove_pipeline_directory(ctx);
 }
 
-int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *port_id)
+int nikss_pipeline_add_port(nikss_context_t *ctx, const char *interface, int *port_id)
 {
     char pinned_file[256];
     bool isXDP = false;
@@ -493,7 +493,7 @@ int psabpf_pipeline_add_port(psabpf_context_t *ctx, const char *interface, int *
     return isXDP ? xdp_port_add(ctx, interface, ifindex) : tc_port_add(ctx, interface, ifindex);
 }
 
-int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
+int nikss_pipeline_del_port(nikss_context_t *ctx, const char *interface)
 {
     (void) ctx;
     __u32 flags = 0;
@@ -526,14 +526,14 @@ int psabpf_pipeline_del_port(psabpf_context_t *ctx, const char *interface)
     return NO_ERROR;
 }
 
-int psabpf_port_list_init(psabpf_port_list_t *list, psabpf_context_t *ctx)
+int nikss_port_list_init(nikss_port_list_t *list, nikss_context_t *ctx)
 {
     int ret = NO_ERROR;
     if (list == NULL || ctx == NULL) {
         return EINVAL;
     }
 
-    memset(list, 0, sizeof(psabpf_port_list_t));
+    memset(list, 0, sizeof(nikss_port_list_t));
 
     list->iface_list = if_nameindex();
     if (list->iface_list == NULL) {
@@ -567,7 +567,7 @@ free_program:
     return ret;
 }
 
-void psabpf_port_list_free(psabpf_port_list_t *list)
+void nikss_port_list_free(nikss_port_list_t *list)
 {
     if (list == NULL) {
         return;
@@ -581,7 +581,7 @@ void psabpf_port_list_free(psabpf_port_list_t *list)
     list->current_iface = NULL;
 }
 
-psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list)
+nikss_port_spec_t * nikss_port_list_get_next_port(nikss_port_list_t *list)
 {
     if (list == NULL) {
         return NULL;
@@ -626,7 +626,7 @@ psabpf_port_spec_t * psabpf_port_list_get_next_port(psabpf_port_list_t *list)
     return &list->current_port;
 }
 
-const char * psabpf_port_spec_get_name(psabpf_port_spec_t *port)
+const char * nikss_port_spec_get_name(nikss_port_spec_t *port)
 {
     if (port == NULL) {
         return NULL;
@@ -635,7 +635,7 @@ const char * psabpf_port_spec_get_name(psabpf_port_spec_t *port)
     return port->name;
 }
 
-unsigned psabpf_port_sepc_get_id(psabpf_port_spec_t *port)
+unsigned nikss_port_sepc_get_id(nikss_port_spec_t *port)
 {
     if (port == NULL) {
         return 0;
@@ -644,12 +644,12 @@ unsigned psabpf_port_sepc_get_id(psabpf_port_spec_t *port)
     return port->id;
 }
 
-void psabpf_port_spec_free(psabpf_port_spec_t *port)
+void nikss_port_spec_free(nikss_port_spec_t *port)
 {
     (void) port;
 }
 
-uint64_t psabpf_pipeline_get_load_timestamp(psabpf_context_t *ctx)
+uint64_t nikss_pipeline_get_load_timestamp(nikss_context_t *ctx)
 {
     uint64_t load_timestamp = 0;
     int fd = open_prog_by_name(ctx, XDP_HELPER_PROG);
@@ -704,7 +704,7 @@ clean_up:
     return load_timestamp;
 }
 
-static bool check_if_program_exists(psabpf_context_t *ctx, const char *prog)
+static bool check_if_program_exists(nikss_context_t *ctx, const char *prog)
 {
     char pinned_file[256];
     build_ebpf_prog_filename(pinned_file, sizeof(pinned_file), ctx, prog);
@@ -712,7 +712,7 @@ static bool check_if_program_exists(psabpf_context_t *ctx, const char *prog)
     return access(pinned_file, F_OK) == 0;
 }
 
-bool psabpf_pipeline_is_TC_based(psabpf_context_t *ctx)
+bool nikss_pipeline_is_TC_based(nikss_context_t *ctx)
 {
     if (ctx == NULL) {
         return false;
@@ -722,7 +722,7 @@ bool psabpf_pipeline_is_TC_based(psabpf_context_t *ctx)
            check_if_program_exists(ctx, TC_EGRESS_PROG);
 }
 
-bool psabpf_pipeline_has_egress_program(psabpf_context_t *ctx)
+bool nikss_pipeline_has_egress_program(nikss_context_t *ctx)
 {
     if (ctx == NULL) {
         return false;
@@ -732,13 +732,13 @@ bool psabpf_pipeline_has_egress_program(psabpf_context_t *ctx)
            check_if_program_exists(ctx, XDP_EGRESS_PROG_OPTIMIZED);
 }
 
-int psabpf_pipeline_objects_list_init(psabpf_pipeline_objects_list_t *list, psabpf_context_t *ctx)
+int nikss_pipeline_objects_list_init(nikss_pipeline_objects_list_t *list, nikss_context_t *ctx)
 {
     if (list == NULL || ctx == NULL) {
         return EINVAL;
     }
 
-    memset(list, 0, sizeof(psabpf_pipeline_objects_list_t));
+    memset(list, 0, sizeof(nikss_pipeline_objects_list_t));
 
     build_ebpf_map_filename(&list->base_objects_path[0], sizeof(list->base_objects_path), ctx, "");
     list->directory = opendir(&list->base_objects_path[0]);
@@ -749,7 +749,7 @@ int psabpf_pipeline_objects_list_init(psabpf_pipeline_objects_list_t *list, psab
     return NO_ERROR;
 }
 
-void psabpf_pipeline_objects_list_free(psabpf_pipeline_objects_list_t *list)
+void nikss_pipeline_objects_list_free(nikss_pipeline_objects_list_t *list)
 {
     if (list == NULL) {
         return;
@@ -761,7 +761,7 @@ void psabpf_pipeline_objects_list_free(psabpf_pipeline_objects_list_t *list)
     list->directory = NULL;
 }
 
-bool is_valid_object_name(psabpf_pipeline_objects_list_t *list, const char *name,
+bool is_valid_object_name(nikss_pipeline_objects_list_t *list, const char *name,
                           const char *allowed_suffixes[], const unsigned no_allowed_suffixes)
 {
     const char *reserved_names[] = {
@@ -829,7 +829,7 @@ bool is_valid_object_name(psabpf_pipeline_objects_list_t *list, const char *name
     return false;
 }
 
-psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_pipeline_objects_list_t *list)
+nikss_pipeline_object_t * nikss_pipeline_objects_list_get_next_object(nikss_pipeline_objects_list_t *list)
 {
     if (list == NULL) {
         return NULL;
@@ -869,7 +869,7 @@ psabpf_pipeline_object_t * psabpf_pipeline_objects_list_get_next_object(psabpf_p
     return NULL;
 }
 
-const char * psabpf_pipeline_object_get_name(psabpf_pipeline_object_t *obj)
+const char * nikss_pipeline_object_get_name(nikss_pipeline_object_t *obj)
 {
     if (obj == NULL) {
         return NULL;
@@ -877,7 +877,7 @@ const char * psabpf_pipeline_object_get_name(psabpf_pipeline_object_t *obj)
     return &obj->name[0];
 }
 
-void psabpf_pipeline_object_free(psabpf_pipeline_object_t *obj)
+void nikss_pipeline_object_free(nikss_pipeline_object_t *obj)
 {
     (void) obj;
 }

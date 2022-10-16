@@ -22,12 +22,12 @@
 
 #include <jansson.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "counter.h"
 
 static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
-                             psabpf_context_t *psabpf_ctx, psabpf_counter_context_t *ctx)
+                             nikss_context_t *nikss_ctx, nikss_counter_context_t *ctx)
 {
     if (*argc < 1) {
         fprintf(stderr, "too few parameters\n");
@@ -37,7 +37,7 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
     if (counter_name != NULL) {
         *counter_name = **argv;
     }
-    int error_code = psabpf_counter_ctx_name(psabpf_ctx, ctx, **argv);
+    int error_code = nikss_counter_ctx_name(nikss_ctx, ctx, **argv);
     if (error_code != NO_ERROR) {
         return error_code;
     }
@@ -46,7 +46,7 @@ static int parse_dst_counter(int *argc, char ***argv, const char **counter_name,
     return NO_ERROR;
 }
 
-static int parse_counter_key(int *argc, char ***argv, psabpf_counter_entry_t *entry)
+static int parse_counter_key(int *argc, char ***argv, nikss_counter_entry_t *entry)
 {
     /* TODO: replace 'key' keyword with 'index' */
     if (!is_keyword(**argv, "key")) {
@@ -74,26 +74,26 @@ static int parse_counter_key(int *argc, char ***argv, psabpf_counter_entry_t *en
     return NO_ERROR;
 }
 
-int parse_counter_value_str(const char *str, psabpf_counter_type_t type, psabpf_counter_entry_t *entry)
+int parse_counter_value_str(const char *str, nikss_counter_type_t type, nikss_counter_entry_t *entry)
 {
     char *end_ptr = NULL;
 
-    psabpf_counter_value_t parsed_value = strtoull(str, &end_ptr, 0);
-    if (type == PSABPF_COUNTER_TYPE_BYTES) {
+    nikss_counter_value_t parsed_value = strtoull(str, &end_ptr, 0);
+    if (type == NIKSS_COUNTER_TYPE_BYTES) {
         if (*end_ptr == '\0') {
-            psabpf_counter_entry_set_bytes(entry, parsed_value);
+            nikss_counter_entry_set_bytes(entry, parsed_value);
         }
-    } else if (type == PSABPF_COUNTER_TYPE_PACKETS) {
+    } else if (type == NIKSS_COUNTER_TYPE_PACKETS) {
         if (*end_ptr == '\0') {
-            psabpf_counter_entry_set_packets(entry, parsed_value);
+            nikss_counter_entry_set_packets(entry, parsed_value);
         }
-    } else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+    } else if (type == NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS) {
         if (*end_ptr == ':') {
-            psabpf_counter_entry_set_bytes(entry, parsed_value);
+            nikss_counter_entry_set_bytes(entry, parsed_value);
             ++end_ptr;
             parsed_value = strtoull(end_ptr, &end_ptr, 0);
             if (*end_ptr == '\0') {
-                psabpf_counter_entry_set_packets(entry, parsed_value);
+                nikss_counter_entry_set_packets(entry, parsed_value);
             }
         }
     } else {
@@ -110,7 +110,7 @@ int parse_counter_value_str(const char *str, psabpf_counter_type_t type, psabpf_
 }
 
 static int parse_counter_value(int *argc, char ***argv,
-                               psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+                               nikss_counter_context_t *ctx, nikss_counter_entry_t *entry)
 {
     if (!is_keyword(**argv, "value")) {
         fprintf(stderr, "expected \'value\' keyword\n");
@@ -118,20 +118,20 @@ static int parse_counter_value(int *argc, char ***argv,
     }
     NEXT_ARGP_RET();
 
-    psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
+    nikss_counter_type_t type = nikss_counter_get_type(ctx);
     int ret = parse_counter_value_str(**argv, type, entry);
     NEXT_ARGP();
 
     return ret;
 }
 
-int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf_counter_type_t type)
+int build_json_counter_value(void *parent, nikss_counter_entry_t *entry, nikss_counter_type_t type)
 {
     /* For counter values we cannot use built-in JSON integer type because
      * it is signed type, but we need unsigned one.*/
-    if (type == PSABPF_COUNTER_TYPE_BYTES || type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
-        psabpf_counter_value_t bytes_value = psabpf_counter_entry_get_bytes(entry);
-        char *bytes_str = convert_bin_data_to_hexstr(&bytes_value, sizeof(psabpf_counter_value_t));
+    if (type == NIKSS_COUNTER_TYPE_BYTES || type == NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS) {
+        nikss_counter_value_t bytes_value = nikss_counter_entry_get_bytes(entry);
+        char *bytes_str = convert_bin_data_to_hexstr(&bytes_value, sizeof(nikss_counter_value_t));
         if (bytes_str != NULL) {
             json_object_set_new(parent, "bytes", json_string(bytes_str));
             free(bytes_str);
@@ -140,9 +140,9 @@ int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf
         }
     }
 
-    if (type == PSABPF_COUNTER_TYPE_PACKETS || type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
-        psabpf_counter_value_t packets_value = psabpf_counter_entry_get_packets(entry);
-        char *packets_str = convert_bin_data_to_hexstr(&packets_value, sizeof(psabpf_counter_value_t));
+    if (type == NIKSS_COUNTER_TYPE_PACKETS || type == NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS) {
+        nikss_counter_value_t packets_value = nikss_counter_entry_get_packets(entry);
+        char *packets_str = convert_bin_data_to_hexstr(&packets_value, sizeof(nikss_counter_value_t));
         if (packets_str != NULL) {
             json_object_set_new(parent, "packets", json_string(packets_str));
             free(packets_str);
@@ -154,7 +154,7 @@ int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf
     return NO_ERROR;
 }
 
-static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry)
+static int build_json_counter_entry(json_t *parent, nikss_counter_context_t *ctx, nikss_counter_entry_t *entry)
 {
     if (parent == NULL) {
         return ENOMEM;
@@ -166,13 +166,13 @@ static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ct
     }
     json_object_set(parent, "key", json_key);
 
-    if (build_struct_json(json_key, ctx, entry, (get_next_field_func_t) psabpf_counter_entry_get_next_key) != NO_ERROR) {
+    if (build_struct_json(json_key, ctx, entry, (get_next_field_func_t) nikss_counter_entry_get_next_key) != NO_ERROR) {
         json_decref(json_key);
         return ENOMEM;
     }
     json_decref(json_key);
 
-    psabpf_counter_type_t type = psabpf_counter_get_type(ctx);
+    nikss_counter_type_t type = nikss_counter_get_type(ctx);
     json_t *json_value = json_object();
     if (json_value == NULL) {
         return ENOMEM;
@@ -185,13 +185,13 @@ static int build_json_counter_entry(json_t *parent, psabpf_counter_context_t *ct
     return ret;
 }
 
-int build_json_counter_type(void *parent, psabpf_counter_type_t type)
+int build_json_counter_type(void *parent, nikss_counter_type_t type)
 {
-    if (type == PSABPF_COUNTER_TYPE_BYTES) {
+    if (type == NIKSS_COUNTER_TYPE_BYTES) {
         json_object_set_new(parent, "type", json_string("BYTES"));
-    } else if (type == PSABPF_COUNTER_TYPE_PACKETS) {
+    } else if (type == NIKSS_COUNTER_TYPE_PACKETS) {
         json_object_set_new(parent, "type", json_string("PACKETS"));
-    } else if (type == PSABPF_COUNTER_TYPE_BYTES_AND_PACKETS) {
+    } else if (type == NIKSS_COUNTER_TYPE_BYTES_AND_PACKETS) {
         json_object_set_new(parent, "type", json_string("PACKETS_AND_BYTES"));
     } else {
         json_object_set_new(parent, "type", json_string("UNKNOWN"));
@@ -200,7 +200,7 @@ int build_json_counter_type(void *parent, psabpf_counter_type_t type)
     return NO_ERROR;
 }
 
-static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry,
+static int print_json_counter(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry,
                               const char *counter_name, bool entry_has_key)
 {
     int ret = EINVAL;
@@ -220,22 +220,22 @@ static int print_json_counter(psabpf_counter_context_t *ctx, psabpf_counter_entr
         goto clean_up;
     }
 
-    build_json_counter_type(instance_name, psabpf_counter_get_type(ctx));
+    build_json_counter_type(instance_name, nikss_counter_get_type(ctx));
 
     if (entry_has_key) {
-        if ((ret = psabpf_counter_get(ctx, entry)) != NO_ERROR) {
+        if ((ret = nikss_counter_get(ctx, entry)) != NO_ERROR) {
             goto clean_up;
         }
         json_t *current_obj = json_object();
         ret = build_json_counter_entry(current_obj, ctx, entry);
         json_array_append_new(entries, current_obj);
     } else {
-        psabpf_counter_entry_t *iter = NULL;
-        while ((iter = psabpf_counter_get_next(ctx)) != NULL) {
+        nikss_counter_entry_t *iter = NULL;
+        while ((iter = nikss_counter_get_next(ctx)) != NULL) {
             json_t *current_obj = json_object();
             ret = build_json_counter_entry(current_obj, ctx, iter);
             json_array_append_new(entries, current_obj);
-            psabpf_counter_entry_free(iter);
+            nikss_counter_entry_free(iter);
             if (ret != NO_ERROR) {
                 break;
             }
@@ -263,19 +263,19 @@ int do_counter_get(int argc, char **argv)
 {
     int ret = EINVAL;
     const char *counter_name = NULL;
-    psabpf_context_t psabpf_ctx;
-    psabpf_counter_context_t ctx;
-    psabpf_counter_entry_t entry;
+    nikss_context_t nikss_ctx;
+    nikss_counter_context_t ctx;
+    nikss_counter_entry_t entry;
 
-    psabpf_context_init(&psabpf_ctx);
-    psabpf_counter_ctx_init(&ctx);
-    psabpf_counter_entry_init(&entry);
+    nikss_context_init(&nikss_ctx);
+    nikss_counter_ctx_init(&ctx);
+    nikss_counter_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
+    if (parse_pipeline_id(&argc, &argv, &nikss_ctx) != NO_ERROR) {
         goto clean_up;
     }
 
-    if (parse_dst_counter(&argc, &argv, &counter_name, &psabpf_ctx, &ctx) != NO_ERROR) {
+    if (parse_dst_counter(&argc, &argv, &counter_name, &nikss_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
     }
 
@@ -294,9 +294,9 @@ int do_counter_get(int argc, char **argv)
     ret = print_json_counter(&ctx, &entry, counter_name, counter_key_provided);
 
 clean_up:
-    psabpf_counter_entry_free(&entry);
-    psabpf_counter_ctx_free(&ctx);
-    psabpf_context_free(&psabpf_ctx);
+    nikss_counter_entry_free(&entry);
+    nikss_counter_ctx_free(&ctx);
+    nikss_context_free(&nikss_ctx);
 
     return ret;
 }
@@ -304,19 +304,19 @@ clean_up:
 int do_counter_set(int argc, char **argv)
 {
     int ret = EINVAL;
-    psabpf_context_t psabpf_ctx;
-    psabpf_counter_context_t ctx;
-    psabpf_counter_entry_t entry;
+    nikss_context_t nikss_ctx;
+    nikss_counter_context_t ctx;
+    nikss_counter_entry_t entry;
 
-    psabpf_context_init(&psabpf_ctx);
-    psabpf_counter_ctx_init(&ctx);
-    psabpf_counter_entry_init(&entry);
+    nikss_context_init(&nikss_ctx);
+    nikss_counter_ctx_init(&ctx);
+    nikss_counter_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
+    if (parse_pipeline_id(&argc, &argv, &nikss_ctx) != NO_ERROR) {
         goto clean_up;
     }
 
-    if (parse_dst_counter(&argc, &argv, NULL, &psabpf_ctx, &ctx) != NO_ERROR) {
+    if (parse_dst_counter(&argc, &argv, NULL, &nikss_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
     }
 
@@ -333,12 +333,12 @@ int do_counter_set(int argc, char **argv)
         goto clean_up;
     }
 
-    ret = psabpf_counter_set(&ctx, &entry);
+    ret = nikss_counter_set(&ctx, &entry);
 
 clean_up:
-    psabpf_counter_entry_free(&entry);
-    psabpf_counter_ctx_free(&ctx);
-    psabpf_context_free(&psabpf_ctx);
+    nikss_counter_entry_free(&entry);
+    nikss_counter_ctx_free(&ctx);
+    nikss_context_free(&nikss_ctx);
 
     return ret;
 }
@@ -346,19 +346,19 @@ clean_up:
 int do_counter_reset(int argc, char **argv)
 {
     int ret = EINVAL;
-    psabpf_context_t psabpf_ctx;
-    psabpf_counter_context_t ctx;
-    psabpf_counter_entry_t entry;
+    nikss_context_t nikss_ctx;
+    nikss_counter_context_t ctx;
+    nikss_counter_entry_t entry;
 
-    psabpf_context_init(&psabpf_ctx);
-    psabpf_counter_ctx_init(&ctx);
-    psabpf_counter_entry_init(&entry);
+    nikss_context_init(&nikss_ctx);
+    nikss_counter_ctx_init(&ctx);
+    nikss_counter_entry_init(&entry);
 
-    if (parse_pipeline_id(&argc, &argv, &psabpf_ctx) != NO_ERROR) {
+    if (parse_pipeline_id(&argc, &argv, &nikss_ctx) != NO_ERROR) {
         goto clean_up;
     }
 
-    if (parse_dst_counter(&argc, &argv, NULL, &psabpf_ctx, &ctx) != NO_ERROR) {
+    if (parse_dst_counter(&argc, &argv, NULL, &nikss_ctx, &ctx) != NO_ERROR) {
         goto clean_up;
     }
 
@@ -371,12 +371,12 @@ int do_counter_reset(int argc, char **argv)
         goto clean_up;
     }
 
-    ret = psabpf_counter_reset(&ctx, &entry);
+    ret = nikss_counter_reset(&ctx, &entry);
 
 clean_up:
-    psabpf_counter_entry_free(&entry);
-    psabpf_counter_ctx_free(&ctx);
-    psabpf_context_free(&psabpf_ctx);
+    nikss_counter_entry_free(&entry);
+    nikss_counter_ctx_free(&ctx);
+    nikss_context_free(&nikss_ctx);
 
     return ret;
 }

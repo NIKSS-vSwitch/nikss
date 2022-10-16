@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-#ifndef P4C_PSABPF_COMMON_H
-#define P4C_PSABPF_COMMON_H
+#ifndef __NIKSS_COMMON_H
+#define __NIKSS_COMMON_H
 
 #include <stdint.h>
-#include <psabpf.h>
+#include <nikss.h>
 
 int str_ends_with(const char *str, const char *suffix);
 bool remove_suffix_from_str(char *str, const char *suffix);
@@ -30,17 +30,17 @@ void swap_byte_order(char *data, size_t len);
 
 void close_object_fd(int *fd);
 
-int build_ebpf_map_filename(char *buffer, size_t maxlen, psabpf_context_t *ctx, const char *name);
-int build_ebpf_prog_filename(char *buffer, size_t maxlen, psabpf_context_t *ctx, const char *name);
-int build_ebpf_pipeline_path(char *buffer, size_t maxlen, psabpf_context_t *ctx);
+int build_ebpf_map_filename(char *buffer, size_t maxlen, nikss_context_t *ctx, const char *name);
+int build_ebpf_prog_filename(char *buffer, size_t maxlen, nikss_context_t *ctx, const char *name);
+int build_ebpf_pipeline_path(char *buffer, size_t maxlen, nikss_context_t *ctx);
 
-void free_struct_field_descriptor_set(psabpf_struct_field_descriptor_set_t *fds);
-int parse_struct_type(psabpf_btf_t *btf_md, uint32_t type_id, size_t data_size, psabpf_struct_field_descriptor_set_t *fds);
-psabpf_struct_field_descriptor_t *get_struct_field_descriptor(psabpf_struct_field_descriptor_set_t *fds, size_t index);
+void free_struct_field_descriptor_set(nikss_struct_field_descriptor_set_t *fds);
+int parse_struct_type(nikss_btf_t *btf_md, uint32_t type_id, size_t data_size, nikss_struct_field_descriptor_set_t *fds);
+nikss_struct_field_descriptor_t *get_struct_field_descriptor(nikss_struct_field_descriptor_set_t *fds, size_t index);
 
-void free_struct_field_set(psabpf_struct_field_set_t *sfs);
-int struct_field_set_append(psabpf_struct_field_set_t *sfs, const void *data, size_t data_len);
-int construct_struct_from_fields(psabpf_struct_field_set_t *data, psabpf_struct_field_descriptor_set_t *fds,
+void free_struct_field_set(nikss_struct_field_set_t *sfs);
+int struct_field_set_append(nikss_struct_field_set_t *sfs, const void *data, size_t data_len);
+int construct_struct_from_fields(nikss_struct_field_set_t *data, nikss_struct_field_descriptor_set_t *fds,
                                  char *buffer, size_t buffer_len);
 
-#endif  /* P4C_PSABPF_COMMON_H */
+#endif  /* __NIKSS_COMMON_H */

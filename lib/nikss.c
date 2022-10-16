@@ -17,48 +17,48 @@
 
 #include <string.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
-void psabpf_context_init(psabpf_context_t *ctx)
+void nikss_context_init(nikss_context_t *ctx)
 {
-    memset( ctx, 0, sizeof(psabpf_context_t));
+    memset( ctx, 0, sizeof(nikss_context_t));
 }
 
-void psabpf_context_free(psabpf_context_t *ctx)
+void nikss_context_free(nikss_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
 
-    memset( ctx, 0, sizeof(psabpf_context_t));
+    memset( ctx, 0, sizeof(nikss_context_t));
 }
 
-void psabpf_context_set_pipeline(psabpf_context_t *ctx, psabpf_pipeline_id_t pipeline_id)
+void nikss_context_set_pipeline(nikss_context_t *ctx, nikss_pipeline_id_t pipeline_id)
 {
     ctx->pipeline_id = pipeline_id;
 }
 
-psabpf_pipeline_id_t psabpf_context_get_pipeline(psabpf_context_t *ctx)
+nikss_pipeline_id_t nikss_context_get_pipeline(nikss_context_t *ctx)
 {
     return ctx->pipeline_id;
 }
 
-psabpf_struct_field_type_t psabpf_struct_get_field_type(psabpf_struct_field_t *field)
+nikss_struct_field_type_t nikss_struct_get_field_type(nikss_struct_field_t *field)
 {
     return field->type;
 }
 
-const char * psabpf_struct_get_field_name(psabpf_struct_field_t *field)
+const char * nikss_struct_get_field_name(nikss_struct_field_t *field)
 {
     return field->name;
 }
 
-const void * psabpf_struct_get_field_data(psabpf_struct_field_t *field)
+const void * nikss_struct_get_field_data(nikss_struct_field_t *field)
 {
     return field->data;
 }
 
-size_t psabpf_struct_get_field_data_len(psabpf_struct_field_t *field)
+size_t nikss_struct_get_field_data_len(nikss_struct_field_t *field)
 {
     return field->data_len;
 }

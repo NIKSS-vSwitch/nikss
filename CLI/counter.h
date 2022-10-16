@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PRECTL_COUNTER_H
-#define __PRECTL_COUNTER_H
+#ifndef __NIKSSCTL_COUNTER_H
+#define __NIKSSCTL_COUNTER_H
 
 #include "common.h"
 
@@ -33,8 +33,8 @@ static const struct cmd counter_cmds[] = {
         {0}
 };
 
-int parse_counter_value_str(const char *str, psabpf_counter_type_t type, psabpf_counter_entry_t *entry);
-int build_json_counter_value(void *parent, psabpf_counter_entry_t *entry, psabpf_counter_type_t type);
-int build_json_counter_type(void *parent, psabpf_counter_type_t type);
+int parse_counter_value_str(const char *str, nikss_counter_type_t type, nikss_counter_entry_t *entry);
+int build_json_counter_value(void *parent, nikss_counter_entry_t *entry, nikss_counter_type_t type);
+int build_json_counter_type(void *parent, nikss_counter_type_t type);
 
-#endif  /* __PRECTL_COUNTER_H */
+#endif  /* __NIKSSCTL_COUNTER_H */

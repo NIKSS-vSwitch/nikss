@@ -2,7 +2,7 @@
 
 import socket
 
-from lib.psabpf_mn import P4Host, PSAeBPFSwitch
+from lib.nikss_mn import P4Host, NIKSSSwitch
 
 from mininet.net import Mininet
 from mininet.topo import Topo
@@ -31,7 +31,7 @@ def main():
     topo = MyCustomTopo()
     net = Mininet(topo = topo,
                   host = P4Host,
-                  switch = PSAeBPFSwitch,
+                  switch = NIKSSSwitch,
                   controller = None)
     net.start()
 
@@ -45,8 +45,8 @@ def main():
 
     s1 = net.get('s1')
     # Install table entries to forward traffic between hosts
-    s1.cmd("psabpf-ctl table add pipe 0 ingress_tbl_fwd id 1 key {} data {}".format(h2.MAC(), socket.if_nametoindex("s1-eth3")))
-    s1.cmd("psabpf-ctl table add pipe 0 ingress_tbl_fwd id 1 key {} data {}".format(h1.MAC(), socket.if_nametoindex("s1-eth2")))
+    s1.cmd("nikss-ctl table add pipe 0 ingress_tbl_fwd id 1 key {} data {}".format(h2.MAC(), socket.if_nametoindex("s1-eth3")))
+    s1.cmd("nikss-ctl table add pipe 0 ingress_tbl_fwd id 1 key {} data {}".format(h1.MAC(), socket.if_nametoindex("s1-eth2")))
 
     CLI( net )
     net.stop()

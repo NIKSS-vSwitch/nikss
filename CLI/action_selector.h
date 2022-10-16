@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef P4C_ACTION_SELECTOR_H
-#define P4C_ACTION_SELECTOR_H
+#ifndef __NIKSSCTL_ACTION_SELECTOR_H
+#define __NIKSSCTL_ACTION_SELECTOR_H
 
 #include "common.h"
 
@@ -56,4 +56,4 @@ static const struct cmd action_profile_cmds[] = {
         {0}
 };
 
-#endif  //P4C_ACTION_SELECTOR_H
+#endif  /* __NIKSSCTL_ACTION_SELECTOR_H */

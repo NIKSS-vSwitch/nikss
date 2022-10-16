@@ -20,20 +20,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
-void psabpf_direct_counter_ctx_init(psabpf_direct_counter_context_t *dc_ctx)
+void nikss_direct_counter_ctx_init(nikss_direct_counter_context_t *dc_ctx)
 {
     if (dc_ctx == NULL) {
         return;
     }
 
-    memset(dc_ctx, 0, sizeof(psabpf_direct_counter_context_t));
+    memset(dc_ctx, 0, sizeof(nikss_direct_counter_context_t));
     dc_ctx->counter_idx = -1;
     dc_ctx->mem_can_be_freed = true;
 }
 
-void psabpf_direct_counter_ctx_free(psabpf_direct_counter_context_t *dc_ctx)
+void nikss_direct_counter_ctx_free(nikss_direct_counter_context_t *dc_ctx)
 {
     if (dc_ctx == NULL) {
         return;
@@ -45,8 +45,8 @@ void psabpf_direct_counter_ctx_free(psabpf_direct_counter_context_t *dc_ctx)
     dc_ctx->name = NULL;
 }
 
-int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
-                                   psabpf_table_entry_ctx_t *table_ctx, const char *dc_name)
+int nikss_direct_counter_ctx_name(nikss_direct_counter_context_t *dc_ctx,
+                                  nikss_table_entry_ctx_t *table_ctx, const char *dc_name)
 {
     if (dc_ctx == NULL || table_ctx == NULL || dc_name == NULL) {
         return EINVAL;
@@ -68,8 +68,8 @@ int psabpf_direct_counter_ctx_name(psabpf_direct_counter_context_t *dc_ctx,
     return ENOENT;
 }
 
-int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
-                                          psabpf_direct_counter_context_t *dc_ctx, psabpf_counter_entry_t *dc)
+int nikss_table_entry_set_direct_counter(nikss_table_entry_t *entry,
+                                         nikss_direct_counter_context_t *dc_ctx, nikss_counter_entry_t *dc)
 {
     if (entry == NULL || dc_ctx == NULL || dc == NULL) {
         return EINVAL;
@@ -77,9 +77,9 @@ int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
 
     void *tmp_ptr = NULL;
     if (entry->direct_counters == NULL) {
-        tmp_ptr = malloc(sizeof(psabpf_direct_counter_entry_t));
+        tmp_ptr = malloc(sizeof(nikss_direct_counter_entry_t));
     } else {
-        tmp_ptr = realloc(entry->direct_counters, (entry->n_direct_counters + 1) * sizeof(psabpf_direct_counter_entry_t));
+        tmp_ptr = realloc(entry->direct_counters, (entry->n_direct_counters + 1) * sizeof(nikss_direct_counter_entry_t));
     }
     if (tmp_ptr == NULL) {
         fprintf(stderr, "not enough memory\n");
@@ -89,7 +89,7 @@ int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
     entry->n_direct_counters += 1;
 
     unsigned idx = entry->n_direct_counters - 1;
-    psabpf_counter_entry_init(&entry->direct_counters[idx].counter);
+    nikss_counter_entry_init(&entry->direct_counters[idx].counter);
     entry->direct_counters[idx].counter.bytes = dc->bytes;
     entry->direct_counters[idx].counter.packets = dc->packets;
     entry->direct_counters[idx].counter_idx = dc_ctx->counter_idx;
@@ -97,7 +97,7 @@ int psabpf_table_entry_set_direct_counter(psabpf_table_entry_t *entry,
     return NO_ERROR;
 }
 
-psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table_entry_ctx_t *ctx, psabpf_table_entry_t *entry)
+nikss_direct_counter_context_t *nikss_direct_counter_get_next_ctx(nikss_table_entry_ctx_t *ctx, nikss_table_entry_t *entry)
 {
     if (ctx == NULL || entry == NULL) {
         return NULL;
@@ -110,7 +110,7 @@ psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table
 
     memcpy(&entry->current_direct_counter_ctx,
            &ctx->direct_counters_ctx[entry->current_direct_counter_ctx_id],
-           sizeof(psabpf_direct_counter_context_t));
+           sizeof(nikss_direct_counter_context_t));
     entry->current_direct_counter_ctx.mem_can_be_freed = false;
 
     entry->current_direct_counter_ctx_id += 1;
@@ -118,15 +118,15 @@ psabpf_direct_counter_context_t *psabpf_direct_counter_get_next_ctx(psabpf_table
     return &entry->current_direct_counter_ctx;
 }
 
-psabpf_counter_type_t psabpf_direct_counter_get_type(psabpf_direct_counter_context_t *dc_ctx)
+nikss_counter_type_t nikss_direct_counter_get_type(nikss_direct_counter_context_t *dc_ctx)
 {
     if (dc_ctx == NULL) {
-        return PSABPF_COUNTER_TYPE_UNKNOWN;
+        return NIKSS_COUNTER_TYPE_UNKNOWN;
     }
     return dc_ctx->counter_type;
 }
 
-const char *psabpf_direct_counter_get_name(psabpf_direct_counter_context_t *dc_ctx)
+const char *nikss_direct_counter_get_name(nikss_direct_counter_context_t *dc_ctx)
 {
     if (dc_ctx == NULL) {
         return NULL;
@@ -134,16 +134,16 @@ const char *psabpf_direct_counter_get_name(psabpf_direct_counter_context_t *dc_c
     return dc_ctx->name;
 }
 
-int psabpf_direct_counter_get_entry(psabpf_direct_counter_context_t *dc_ctx, psabpf_table_entry_t *entry, psabpf_counter_entry_t *dc)
+int nikss_direct_counter_get_entry(nikss_direct_counter_context_t *dc_ctx, nikss_table_entry_t *entry, nikss_counter_entry_t *dc)
 {
     if (dc_ctx == NULL || entry == NULL || dc == NULL) {
         return EINVAL;
     }
-    psabpf_counter_entry_init(dc);
+    nikss_counter_entry_init(dc);
 
     for (unsigned i = 0; i < entry->n_direct_counters; i++) {
         if (dc_ctx->counter_idx == entry->direct_counters[i].counter_idx) {
-            memcpy(dc, &entry->direct_counters[i].counter, sizeof(psabpf_counter_entry_t));
+            memcpy(dc, &entry->direct_counters[i].counter, sizeof(nikss_counter_entry_t));
             return NO_ERROR;
         }
     }

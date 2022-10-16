@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PRECTL_DIGEST_H
-#define __PRECTL_DIGEST_H
+#ifndef __NIKSSCTL_DIGEST_H
+#define __NIKSSCTL_DIGEST_H
 
 #include "common.h"
 
@@ -31,4 +31,4 @@ static const struct cmd digest_cmds[] = {
         {0}
 };
 
-#endif  /* __PRECTL_DIGEST_H */
+#endif  /* __NIKSSCTL_DIGEST_H */

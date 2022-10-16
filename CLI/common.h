@@ -15,14 +15,16 @@
  * limitations under the License.
  */
 
-#include <stdbool.h>
-#include "../include/psabpf.h"
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <stdbool.h>
+
 #include <jansson.h>
 
-#ifndef P4C_COMMON_H
-#define P4C_COMMON_H
+#include <nikss.h>
+
+#ifndef __NIKSSCTL_COMMON_H
+#define __NIKSSCTL_COMMON_H
 
 #define NEXT_ARG()	({ argc--; argv++; if (argc < 0) fprintf(stderr, "too few parameters\n"); })
 #define NEXT_ARGP()	({ (*argc)--; (*argv)++; if (*argc < 0) fprintf(stderr, "too few parameters\n"); })
@@ -48,12 +50,12 @@ typedef struct parser_keyword_value_pair {
 
 bool is_keyword(const char *word, const char *str);
 
-int parse_pipeline_id(int *argc, char ***argv, psabpf_context_t * psabpf_ctx);
+int parse_pipeline_id(int *argc, char ***argv, nikss_context_t * nikss_ctx);
 
 /* Optional values are not written when they are missing on command line, so they must be initialized */
 int parse_keyword_value_pairs(int *argc, char ***argv, parser_keyword_value_pair_t *kv_pairs);
 
-typedef psabpf_struct_field_t *(*get_next_field_func_t)(void*, void*);
+typedef nikss_struct_field_t *(*get_next_field_func_t)(void*, void*);
 int build_struct_json(void *json_parent, void *ctx, void *entry, get_next_field_func_t get_next_field);
 
 extern const char *program_name;
@@ -70,7 +72,7 @@ enum destination_ctx_type_t {
 
 int translate_data_to_bytes(const char *data, void *ctx, enum destination_ctx_type_t ctx_type);
 char * convert_bin_data_to_hexstr(const void *data, size_t len);
-json_t *create_json_entry_key(psabpf_table_entry_t *entry);
-int parse_key_data(int *argc, char ***argv, psabpf_table_entry_t *entry);
+json_t *create_json_entry_key(nikss_table_entry_t *entry);
+int parse_key_data(int *argc, char ***argv, nikss_table_entry_t *entry);
 
-#endif //P4C_COMMON_H
+#endif /* __NIKSSCTL_COMMON_H */

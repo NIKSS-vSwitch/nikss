@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PSABPFCTL_METER_H
-#define __PSABPFCTL_METER_H
+#ifndef __NIKSSCTL_METER_H
+#define __NIKSSCTL_METER_H
 
 #include "common.h"
 
@@ -33,7 +33,7 @@ static const struct cmd meter_cmds[] = {
         {0}
 };
 
-int parse_meter_data(int *argc, char ***argv, psabpf_meter_entry_t *entry);
-void *create_json_meter_config(psabpf_meter_entry_t *meter);
+int parse_meter_data(int *argc, char ***argv, nikss_meter_entry_t *entry);
+void *create_json_meter_config(nikss_meter_entry_t *meter);
 
-#endif // __PSABPFCTL_METER_H
+#endif /* __NIKSSCTL_METER_H */

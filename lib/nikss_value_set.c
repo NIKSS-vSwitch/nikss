@@ -22,24 +22,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psabpf.h>
-#include <psabpf_value_set.h>
+#include <nikss.h>
+#include <nikss_value_set.h>
 
 #include "btf.h"
 #include "common.h"
-#include "psabpf_table.h"
+#include "nikss_table.h"
 
-void psabpf_value_set_context_init(psabpf_value_set_context_t *ctx)
+void nikss_value_set_context_init(nikss_value_set_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
     }
 
-    memset(ctx, 0, sizeof(psabpf_value_set_context_t));
+    memset(ctx, 0, sizeof(nikss_value_set_context_t));
     init_btf(&ctx->btf_metadata);
 }
 
-void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx)
+void nikss_value_set_context_free(nikss_value_set_context_t *ctx)
 {
     if (ctx == NULL) {
         return;
@@ -60,38 +60,38 @@ void psabpf_value_set_context_free(psabpf_value_set_context_t *ctx)
     free_struct_field_descriptor_set(&ctx->fds);
 }
 
-static int parse_key_type(psabpf_value_set_context_t *ctx)
+static int parse_key_type(nikss_value_set_context_t *ctx)
 {
     return parse_struct_type(&ctx->btf_metadata, ctx->set_map.key_type_id, ctx->set_map.key_size, &ctx->fds);
 }
 
-int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set_context_t *ctx, const char *name)
+int nikss_value_set_context_name(nikss_context_t *nikss_ctx, nikss_value_set_context_t *ctx, const char *name)
 {
-    if (psabpf_ctx == NULL || ctx == NULL || name == NULL) {
+    if (nikss_ctx == NULL || ctx == NULL || name == NULL) {
         return EINVAL;
     }
 
-    if (load_btf(psabpf_ctx, &ctx->btf_metadata) != NO_ERROR) {
+    if (load_btf(nikss_ctx, &ctx->btf_metadata) != NO_ERROR) {
         fprintf(stderr, "couldn't find a BTF info\n");
     }
 
-    int ret = open_bpf_map(psabpf_ctx, name, &ctx->btf_metadata, &ctx->set_map);
+    int ret = open_bpf_map(nikss_ctx, name, &ctx->btf_metadata, &ctx->set_map);
     /* if map does not exist, try the ternary table */
     if (ret == ENOENT) {
-        psabpf_table_entry_ctx_t tbl_entry_ctx;
-        psabpf_table_entry_ctx_init(&tbl_entry_ctx);
-        ret = open_ternary_table(psabpf_ctx, &tbl_entry_ctx, name);
+        nikss_table_entry_ctx_t tbl_entry_ctx;
+        nikss_table_entry_ctx_init(&tbl_entry_ctx);
+        ret = open_ternary_table(nikss_ctx, &tbl_entry_ctx, name);
 
         if (ret != NO_ERROR) {
             fprintf(stderr, "couldn't open a value_set %s\n", name);
-            psabpf_table_entry_ctx_free(&tbl_entry_ctx);
+            nikss_table_entry_ctx_free(&tbl_entry_ctx);
             return ret;
         }
 
         ctx->prefixes = tbl_entry_ctx.prefixes;
         ctx->tuple_map = tbl_entry_ctx.tuple_map;
 
-        psabpf_table_entry_ctx_free(&tbl_entry_ctx);
+        nikss_table_entry_ctx_free(&tbl_entry_ctx);
     }
 
 
@@ -103,10 +103,10 @@ int psabpf_value_set_context_name(psabpf_context_t *psabpf_ctx, psabpf_value_set
     return NO_ERROR;
 }
 
-psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t *ctx)
+nikss_table_entry_t *nikss_value_set_get_next_entry(nikss_value_set_context_t *ctx)
 {
-    psabpf_table_entry_t * new_entry = NULL;
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_t * new_entry = NULL;
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->set_map,
             .btf_metadata = ctx->btf_metadata,
     };
@@ -119,8 +119,8 @@ psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t
         memcpy(tec.current_raw_key_mask, ctx->current_raw_key_mask, ctx->prefixes.key_size);
     }
 
-    if (psabpf_table_entry_goto_next_key(&tec) != NO_ERROR) {
-        /* psabpf_table_entry_get_next_key free'ed a memory before */
+    if (nikss_table_entry_goto_next_key(&tec) != NO_ERROR) {
+        /* nikss_table_entry_get_next_key free'ed a memory before */
         ctx->current_raw_key = NULL;
         ctx->current_raw_key_mask = NULL;
         goto clean_up;
@@ -139,8 +139,8 @@ psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t
     ctx->current_raw_key_mask = malloc(tec.prefixes.key_size);
     memcpy(ctx->current_raw_key_mask, tec.current_raw_key_mask, tec.prefixes.key_size);
 
-    new_entry = malloc(sizeof(psabpf_table_entry_t));
-    psabpf_table_entry_init(new_entry);
+    new_entry = malloc(sizeof(nikss_table_entry_t));
+    nikss_table_entry_init(new_entry);
 
     int return_code = parse_table_key(&tec, new_entry, tec.current_raw_key, tec.current_raw_key_mask);
     if (return_code != NO_ERROR) {
@@ -149,12 +149,12 @@ psabpf_table_entry_t *psabpf_value_set_get_next_entry(psabpf_value_set_context_t
     }
 
 clean_up:
-    psabpf_table_entry_ctx_free(&tec);
+    nikss_table_entry_ctx_free(&tec);
 
     return new_entry;
 }
 
-int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry)
+int nikss_value_set_insert(nikss_value_set_context_t *ctx, nikss_table_entry_t *entry)
 {
     char *key_buffer = NULL;
     char *value_buffer = NULL;
@@ -173,7 +173,7 @@ int psabpf_value_set_insert(psabpf_value_set_context_t *ctx, psabpf_table_entry_
         goto clean_up;
     }
 
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->set_map,
             .btf_metadata = ctx->btf_metadata,
             .cache.fd = -1,
@@ -207,15 +207,15 @@ clean_up:
     return return_code;
 }
 
-int psabpf_value_set_delete(psabpf_value_set_context_t *ctx, psabpf_table_entry_t *entry)
+int nikss_value_set_delete(nikss_value_set_context_t *ctx, nikss_table_entry_t *entry)
 {
-    psabpf_table_entry_ctx_t tec = {
+    nikss_table_entry_ctx_t tec = {
             .table = ctx->set_map,
             .btf_metadata = ctx->btf_metadata,
             .cache.fd = -1,
     };
 
-    int ret = psabpf_table_entry_del(&tec, entry);
+    int ret = nikss_table_entry_del(&tec, entry);
 
     return ret;
 }

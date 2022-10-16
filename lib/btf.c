@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <psabpf.h>
+#include <nikss.h>
 
 #include "bpf_defs.h"
 #include "btf.h"
@@ -76,7 +76,7 @@ static uint32_t find_data_section_type_id(struct btf *btf, uint32_t sec_type_id,
     return 0;
 }
 
-const struct btf_type *psabtf_get_type_by_id(struct btf *btf, uint32_t type_id)
+const struct btf_type *btf_get_type_by_id(struct btf *btf, uint32_t type_id)
 {
     type_id = follow_types(btf, type_id);
     if (type_id == 0) {
@@ -85,7 +85,7 @@ const struct btf_type *psabtf_get_type_by_id(struct btf *btf, uint32_t type_id)
     return btf__type_by_id(btf, type_id);
 }
 
-static uint32_t psabtf_get_map_type_id_by_name(struct btf *btf, const char *name)
+static uint32_t get_map_type_id_by_name(struct btf *btf, const char *name)
 {
     uint32_t type_id = 0;
     unsigned nodes = btf__get_nr_types(btf);
@@ -117,8 +117,8 @@ static uint32_t psabtf_get_map_type_id_by_name(struct btf *btf, const char *name
     return follow_types(btf, type_id);
 }
 
-int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
-        const char *member_name, psabtf_struct_member_md_t *md)
+int btf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
+                              const char *member_name, btf_struct_member_md_t *md)
 {
     if (type_id == 0 || btf == NULL) {
         return EPERM;
@@ -153,8 +153,8 @@ int psabtf_get_member_md_by_name(struct btf *btf, uint32_t type_id,
     return EPERM;
 }
 
-int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
-                                  psabtf_struct_member_md_t *md)
+int btf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t index,
+                               btf_struct_member_md_t *md)
 {
     if (type_id == 0 || btf == NULL) {
         return EPERM;
@@ -187,8 +187,8 @@ int psabtf_get_member_md_by_index(struct btf *btf, uint32_t type_id, uint16_t in
 
 static uint32_t get_member_type_id_by_name(struct btf *btf, uint32_t type_id, const char *member_name)
 {
-    psabtf_struct_member_md_t md = {};
-    if (psabtf_get_member_md_by_name(btf, type_id, member_name, &md) != 0) {
+    btf_struct_member_md_t md = {};
+    if (btf_get_member_md_by_name(btf, type_id, member_name, &md) != 0) {
         return 0;
     }
 
@@ -196,9 +196,9 @@ static uint32_t get_member_type_id_by_name(struct btf *btf, uint32_t type_id, co
 }
 
 /* NOLINTNEXTLINE(misc-no-recursion): this is the simplest way to get size of any data structure */
-size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
+size_t btf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
 {
-    const struct btf_type *type = psabtf_get_type_by_id(btf, type_id);
+    const struct btf_type *type = btf_get_type_by_id(btf, type_id);
     if (type == NULL) {
         return 0;
     }
@@ -215,7 +215,7 @@ size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
             const struct btf_array *array_info = btf_array(type);
             // BTF is taken from kernel, so we can trust in it that there is no
             // infinite dimensional array (we do not prevent from stack overflow).
-            size_t type_size = psabtf_get_type_size_by_id(btf, array_info->type);
+            size_t type_size = btf_get_type_size_by_id(btf, array_info->type);
             return type_size * (array_info->nelems);
         }
 
@@ -226,13 +226,13 @@ size_t psabtf_get_type_size_by_id(struct btf *btf, uint32_t type_id)
     return 0;
 }
 
-void init_btf(psabpf_btf_t *btf)
+void init_btf(nikss_btf_t *btf)
 {
     btf->btf = NULL;
     btf->btf_fd = -1;
 }
 
-static int try_load_btf(psabpf_btf_t *btf, const char *program_name)
+static int try_load_btf(nikss_btf_t *btf, const char *program_name)
 {
     /* BTF metadata are associated with eBPF program, eBPF map may do not own BTF */
     int associated_prog = bpf_obj_get(program_name);
@@ -266,7 +266,7 @@ free_btf:
     return ENOENT;
 }
 
-int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
+int load_btf(nikss_context_t *nikss_ctx, nikss_btf_t *btf)
 {
     if (btf->btf != NULL) {
         return NO_ERROR;
@@ -278,7 +278,7 @@ int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
 
     for (int i = 0; i < number_of_programs; i++) {
         snprintf(program_file_name, sizeof(program_file_name), "%s/%s%u/%s",
-                 BPF_FS, PIPELINE_PREFIX, psabpf_context_get_pipeline(psabpf_ctx), programs_to_search[i]);
+                 BPF_FS, PIPELINE_PREFIX, nikss_context_get_pipeline(nikss_ctx), programs_to_search[i]);
         if (try_load_btf(btf, program_file_name) == NO_ERROR) {
             break;
         }
@@ -290,7 +290,7 @@ int load_btf(psabpf_context_t *psabpf_ctx, psabpf_btf_t *btf)
     return NO_ERROR;
 }
 
-void free_btf(psabpf_btf_t *btf)
+void free_btf(nikss_btf_t *btf)
 {
     if (btf == NULL) {
         return;
@@ -303,7 +303,7 @@ void free_btf(psabpf_btf_t *btf)
     close_object_fd(&btf->btf_fd);
 }
 
-int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *btf, psabpf_bpf_map_descriptor_t *md)
+int open_bpf_map(nikss_context_t *nikss_ctx, const char *name, nikss_btf_t *btf, nikss_bpf_map_descriptor_t *md)
 {
     char buffer[256];
     int errno_val = NO_ERROR;
@@ -312,7 +312,7 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
         return EPERM;
     }
 
-    build_ebpf_map_filename(buffer, sizeof(buffer), psabpf_ctx, name);
+    build_ebpf_map_filename(buffer, sizeof(buffer), nikss_ctx, name);
     md->fd = bpf_obj_get(buffer);
     if (md->fd < 0) {
         return errno;
@@ -328,7 +328,7 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
     md->key_type_id = 0;
     md->value_type_id = 0;
     if (btf != NULL && btf->btf != NULL) {
-        uint32_t btf_type_id = psabtf_get_map_type_id_by_name(btf->btf, name);
+        uint32_t btf_type_id = get_map_type_id_by_name(btf->btf, name);
         if (btf_type_id == 0) {
             fprintf(stderr, "can't get BTF info for %s\n", name);
         }
@@ -349,7 +349,7 @@ int open_bpf_map(psabpf_context_t *psabpf_ctx, const char *name, psabpf_btf_t *b
     return NO_ERROR;
 }
 
-int update_map_info(psabpf_bpf_map_descriptor_t *md)
+int update_map_info(nikss_bpf_map_descriptor_t *md)
 {
     if (md == NULL) {
         return EINVAL;

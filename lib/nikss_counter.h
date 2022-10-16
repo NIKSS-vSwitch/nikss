@@ -15,16 +15,16 @@
  * limitations under the License.
  */
 
-#ifndef P4C_PSABPF_COUNTER_H
-#define P4C_PSABPF_COUNTER_H
+#ifndef __NIKSS_COUNTER_H
+#define __NIKSS_COUNTER_H
 
-#include <psabpf.h>
+#include <nikss.h>
 
 /* Might be used to test whether given type ID is a valid counter */
-psabpf_counter_type_t get_counter_type(psabpf_btf_t *btf, uint32_t type_id);
+nikss_counter_type_t get_counter_type(nikss_btf_t *btf, uint32_t type_id);
 
-int convert_counter_entry_to_data(psabpf_counter_context_t *ctx, psabpf_counter_entry_t *entry, char *buffer);
+int convert_counter_entry_to_data(nikss_counter_context_t *ctx, nikss_counter_entry_t *entry, char *buffer);
 int convert_counter_data_to_entry(const char *data, size_t counter_size,
-                                  psabpf_counter_type_t counter_type, psabpf_counter_entry_t *entry);
+                                  nikss_counter_type_t counter_type, nikss_counter_entry_t *entry);
 
-#endif  /* P4C_PSABPF_COUNTER_H */
+#endif  /* __NIKSS_COUNTER_H */

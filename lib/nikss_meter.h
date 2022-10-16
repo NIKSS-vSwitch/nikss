@@ -15,8 +15,10 @@
  * limitations under the License.
  */
 
-#ifndef P4C_PSABPF_METER_H
-#define P4C_PSABPF_METER_H
+#ifndef __NIKSS_METER_H
+#define __NIKSS_METER_H
+
+#include <nikss.h>
 
 #ifndef METER_PERIOD_MIN
 #define METER_PERIOD_MIN 100
@@ -27,21 +29,21 @@
 #endif
 
 typedef struct {
-    psabpf_meter_value_t pir_period;
-    psabpf_meter_value_t pir_unit_per_period;
-    psabpf_meter_value_t cir_period;
-    psabpf_meter_value_t cir_unit_per_period;
-    psabpf_meter_value_t pbs;
-    psabpf_meter_value_t cbs;
-    psabpf_meter_value_t pbs_left;
-    psabpf_meter_value_t cbs_left;
-    psabpf_meter_value_t time_p;
-    psabpf_meter_value_t time_c;
-} psabpf_meter_data_t;
+    nikss_meter_value_t pir_period;
+    nikss_meter_value_t pir_unit_per_period;
+    nikss_meter_value_t cir_period;
+    nikss_meter_value_t cir_unit_per_period;
+    nikss_meter_value_t pbs;
+    nikss_meter_value_t cbs;
+    nikss_meter_value_t pbs_left;
+    nikss_meter_value_t cbs_left;
+    nikss_meter_value_t time_p;
+    nikss_meter_value_t time_c;
+} nikss_meter_data_t;
 
-#define DIRECT_METER_SIZE sizeof(psabpf_meter_data_t)
+#define DIRECT_METER_SIZE sizeof(nikss_meter_data_t)
 
-int convert_meter_entry_to_data(const psabpf_meter_entry_t *entry, psabpf_meter_data_t *data);
-int convert_meter_data_to_entry(const psabpf_meter_data_t *data, psabpf_meter_entry_t *entry);
+int convert_meter_entry_to_data(const nikss_meter_entry_t *entry, nikss_meter_data_t *data);
+int convert_meter_data_to_entry(const nikss_meter_data_t *data, nikss_meter_entry_t *entry);
 
-#endif  /* P4C_PSABPF_METER_H */
+#endif  /* __NIKSS_METER_H */

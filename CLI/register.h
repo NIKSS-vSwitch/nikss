@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef __PRECTL_REGISTER_H
-#define __PRECTL_REGISTER_H
+#ifndef __NIKSSCTL_REGISTER_H
+#define __NIKSSCTL_REGISTER_H
 
 #include "common.h"
 
@@ -31,4 +31,4 @@ static const struct cmd register_cmds[] = {
         {0}
 };
 
-#endif  /* __PRECTL_REGISTER_H */
+#endif  /* __NIKSSCTL_REGISTER_H */
