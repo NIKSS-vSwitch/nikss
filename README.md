@@ -1,11 +1,23 @@
-# NIKSS - In-kernel P4 software switch 
+# NIKSS - Native In-Kernel P4-programmable Software Switch for Software-Defined Networking
+
+[![build nikss](https://github.com/NIKSS-vSwitch/nikss/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/NIKSS-vSwitch/nikss/actions/workflows/build.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **This project is still a work in progress. We make no guarantee for the stability of the API or CLI and may modify
 existing functions in the API or CLI.**
 
-**NIKSS** is an in-kernel implementation of a P4 software switch. It works in conjunction with the P4-eBPF compiler. The **NIKSS** switch uses Portable Switch Architecture (PSA) as a forwarding model and extended Berkeley Packet Filter (eBPF) as a packet processing engine. **nikss** works seamlessly with both TC-based and XDP-based design of the PSA model for the P4-eBPF compiler. 
+**NIKSS** is an in-kernel implementation of a [P4](https://p4.org/) software switch. 
+It works in conjunction with the [P4-eBPF](https://github.com/p4lang/p4c/tree/main/backends/ebpf/psa) compiler. 
+The **NIKSS** switch uses [Portable Switch Architecture (PSA)](https://p4.org/p4-spec/docs/PSA.html) as a forwarding model and [extended Berkeley Packet Filter (eBPF)](https://ebpf.io/) as a packet processing engine. 
+**NIKSS** works seamlessly with both TC-based and XDP-based design of the PSA model for the P4-eBPF compiler.
 
-This repository implements C API & command line tool (`nikss-ctl`) to manage P4/PSA programs for eBPF.
+This repository implements NIKSS low-level C API and CLI tool (`nikss-ctl`) to manage P4/PSA programs for NIKSS.
+
+Main features of NIKSS:
+- **No additional dependencies** - NIKSS works on vanilla Linux OS and does not require any additional dependencies. We have tested NIKSS on Ubuntu 18+ and kernel version 5.8+.
+- **P4 programmable** - the use of the P4 language allows to rapidly develop packet processing pipelines for end hosts.
+- **Feature-rich programming model** - NIKSS leverages P4 Portable Switch Architecture that provides packet processing primitives needed to implement complex packet processing behaviors.
+- **High performance** - NIKSS is meant to provide a high-performance P4 software switch due to the use of eBPF and TC/XDP hooks.
 
 # Installation
 
@@ -30,13 +42,13 @@ sudo apt install make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-
 Note that `nikss-ctl` is statically linked with shipped `libbpf`, so there is no need to install this library
 system-wide. It is a submodule for this repository.
 
-## Installing nikss from source
+## Installing NIKSS from source
 
 1. Get the code with submodules:
 
    ```shell
-   git clone --recursive https://github.com/P4-Research/psabpf.git
-   cd psabpf
+   git clone --recursive https://github.com/NIKSS-vSwitch/nikss.git
+   cd nikss
    ```
 
 2. Build libbpf:
