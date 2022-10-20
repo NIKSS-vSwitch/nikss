@@ -123,19 +123,20 @@ static int build_entry(nikss_register_context_t *ctx, nikss_register_entry_t *en
 static int get_and_print_register_json(nikss_register_context_t *ctx, nikss_register_entry_t *entry,
                                        const char *register_name, bool entry_has_index)
 {
-    int ret = EINVAL;
+    int ret = NO_ERROR;
     json_t *root = json_object();
-    json_t *instance_name = json_object();
     json_t *entries = json_array();
-    if (root == NULL || instance_name == NULL || entries == NULL) {
+    if (root == NULL || entries == NULL) {
         fprintf(stderr, "failed to prepare JSON\n");
+        ret = ENOMEM;
         goto clean_up;
     }
 
     json_object_set(root, register_name, entries);
 
     if (entry_has_index) {
-        if (nikss_register_get(ctx, entry) != NO_ERROR) {
+        ret = nikss_register_get(ctx, entry);
+        if (ret != NO_ERROR) {
             goto clean_up;
         }
         json_t *json_entry = json_object();
@@ -164,7 +165,6 @@ static int get_and_print_register_json(nikss_register_context_t *ctx, nikss_regi
 
 clean_up:
     json_decref(entries);
-    json_decref(instance_name);
     json_decref(root);
 
     return ret;
