@@ -1051,4 +1051,33 @@ included in the output JSON.
 
 ## value_set
 
-TODO after fix https://github.com/NIKSS-vSwitch/nikss/issues/71
+- Get whole value_set without entries inserted:
+  ```json
+  {
+      "IngressParser_pvs": []
+  }
+  ```
+  
+- Get whole value_set:
+  ```json
+  {
+      "IngressParser_pvs": [
+          {
+              "value": [
+                  {
+                      "type": "exact",
+                      "value": "0x2"
+                  }
+              ]
+          },
+          {
+              "value": [
+                  {
+                      "type": "exact",
+                      "value": "0x1"
+                  }
+              ]
+          }
+      ]
+  }
+  ```
