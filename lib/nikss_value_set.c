@@ -36,7 +36,13 @@ void nikss_value_set_context_init(nikss_value_set_context_t *ctx)
     }
 
     memset(ctx, 0, sizeof(nikss_value_set_context_t));
+
     init_btf(&ctx->btf_metadata);
+    ctx->set_map.fd = -1;
+    ctx->prefixes.fd = -1;
+    ctx->tuple_map.fd = -1;
+
+    nikss_table_entry_init(&ctx->current_entry);
 }
 
 void nikss_value_set_context_free(nikss_value_set_context_t *ctx)
@@ -57,7 +63,11 @@ void nikss_value_set_context_free(nikss_value_set_context_t *ctx)
 
     free_btf(&ctx->btf_metadata);
     close_object_fd(&(ctx->set_map.fd));
+    close_object_fd(&(ctx->prefixes.fd));
+    close_object_fd(&(ctx->tuple_map.fd));
     free_struct_field_descriptor_set(&ctx->fds);
+
+    nikss_table_entry_free(&ctx->current_entry);
 }
 
 static int parse_key_type(nikss_value_set_context_t *ctx)
@@ -90,6 +100,9 @@ int nikss_value_set_context_name(nikss_context_t *nikss_ctx, nikss_value_set_con
 
         ctx->prefixes = tbl_entry_ctx.prefixes;
         ctx->tuple_map = tbl_entry_ctx.tuple_map;
+        /* Invalidate file descriptors in tec, so they will not be closed during clean up. */
+        tbl_entry_ctx.prefixes.fd = -1;
+        tbl_entry_ctx.tuple_map.fd = -1;
 
         nikss_table_entry_ctx_free(&tbl_entry_ctx);
     }
@@ -108,48 +121,35 @@ nikss_table_entry_t *nikss_value_set_get_next_entry(nikss_value_set_context_t *c
     nikss_table_entry_t * new_entry = NULL;
     nikss_table_entry_ctx_t tec = {
             .table = ctx->set_map,
+            .prefixes = ctx->prefixes,
+            .tuple_map = ctx->tuple_map,
             .btf_metadata = ctx->btf_metadata,
+            .current_raw_key = ctx->current_raw_key,
+            .current_raw_key_mask = ctx->current_raw_key_mask,
+            .is_ternary = false,
     };
 
-    /* Copy current keys from value_set_ctx to table_entry_ctx */
-    if (ctx->current_raw_key != NULL) {
-        tec.current_raw_key = malloc(ctx->set_map.key_size);
-        tec.current_raw_key_mask = malloc(ctx->prefixes.key_size);
-        memcpy(tec.current_raw_key, ctx->current_raw_key, ctx->set_map.key_size);
-        memcpy(tec.current_raw_key_mask, ctx->current_raw_key_mask, ctx->prefixes.key_size);
-    }
-
     if (nikss_table_entry_goto_next_key(&tec) != NO_ERROR) {
-        /* nikss_table_entry_get_next_key free'ed a memory before */
-        ctx->current_raw_key = NULL;
-        ctx->current_raw_key_mask = NULL;
         goto clean_up;
     }
 
-    /* Copy current keys from table_entry_ctx to value_set_ctx */
-    if (ctx->current_raw_key != NULL) {
-        free(ctx->current_raw_key);
-    }
-    ctx->current_raw_key = malloc(ctx->set_map.key_size);
-    memcpy(ctx->current_raw_key, tec.current_raw_key, ctx->set_map.key_size);
+    nikss_table_entry_free(&ctx->current_entry);
+    nikss_table_entry_init(&ctx->current_entry);
 
-    if (ctx->current_raw_key_mask != NULL) {
-        free(ctx->current_raw_key_mask);
-    }
-    ctx->current_raw_key_mask = malloc(tec.prefixes.key_size);
-    memcpy(ctx->current_raw_key_mask, tec.current_raw_key_mask, tec.prefixes.key_size);
-
-    new_entry = malloc(sizeof(nikss_table_entry_t));
-    nikss_table_entry_init(new_entry);
-
-    int return_code = parse_table_key(&tec, new_entry, tec.current_raw_key, tec.current_raw_key_mask);
+    int return_code = parse_table_key(&tec, &ctx->current_entry, tec.current_raw_key, tec.current_raw_key_mask);
     if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to parse entry: %s\n", strerror(return_code));
+        nikss_table_entry_free(&ctx->current_entry);
         goto clean_up;
     }
 
+    new_entry = &ctx->current_entry;
+
 clean_up:
-    nikss_table_entry_ctx_free(&tec);
+    /* Resources were managed by table entry context, now move back what we need to PVS! */
+    ctx->set_map.fd = tec.table.fd;  /* might be changed for ternary match */
+    ctx->current_raw_key = tec.current_raw_key;
+    ctx->current_raw_key_mask = tec.current_raw_key_mask;
 
     return new_entry;
 }
