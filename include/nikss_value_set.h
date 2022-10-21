@@ -24,10 +24,12 @@ typedef struct nikss_value_set_context {
     nikss_bpf_map_descriptor_t set_map;
     nikss_bpf_map_descriptor_t prefixes;
     nikss_bpf_map_descriptor_t tuple_map;
-    /* TODO: add support for cache when ternary match is used */
+    nikss_bpf_map_descriptor_t cache;
 
     nikss_btf_t btf_metadata;
     nikss_struct_field_descriptor_set_t fds;
+
+    bool is_ternary_match;
 
     void *current_raw_key;
     void *current_raw_key_mask;
