@@ -69,14 +69,8 @@ void nikss_value_set_context_free(nikss_value_set_context_t *ctx)
     close_object_fd(&(ctx->prefixes.fd));
     close_object_fd(&(ctx->tuple_map.fd));
     close_object_fd(&(ctx->cache.fd));
-    free_struct_field_descriptor_set(&ctx->fds);
 
     nikss_table_entry_free(&ctx->current_entry);
-}
-
-static int parse_key_type(nikss_value_set_context_t *ctx)
-{
-    return parse_struct_type(&ctx->btf_metadata, ctx->set_map.key_type_id, ctx->set_map.key_size, &ctx->fds);
 }
 
 int nikss_value_set_context_name(nikss_context_t *nikss_ctx, nikss_value_set_context_t *ctx, const char *name)
@@ -118,11 +112,6 @@ int nikss_value_set_context_name(nikss_context_t *nikss_ctx, nikss_value_set_con
     ret = open_bpf_map(nikss_ctx, map_name, &ctx->btf_metadata, &ctx->cache);
     if (ret == NO_ERROR) {
         fprintf(stderr, "found cache for value_set: %s\n", name);
-    }
-
-    if (parse_key_type(ctx) != NO_ERROR) {
-        fprintf(stderr, "%s: couldn't parse structure of a value_set instance\n", name);
-        return EOPNOTSUPP;
     }
 
     return NO_ERROR;

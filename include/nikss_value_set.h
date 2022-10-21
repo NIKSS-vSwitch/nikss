@@ -27,7 +27,6 @@ typedef struct nikss_value_set_context {
     nikss_bpf_map_descriptor_t cache;
 
     nikss_btf_t btf_metadata;
-    nikss_struct_field_descriptor_set_t fds;
 
     bool is_ternary_match;
 
