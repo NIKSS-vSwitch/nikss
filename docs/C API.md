@@ -24,7 +24,7 @@ The public C API exported by this library has the following properties:
   are required.
 - All instances of objects are movable, but not copyable. Pointers acquired using given instance after move are invalid
   (such functionalities use memory space inside context).
-- Data passed to or from functions are considered to be plain binary in the host order byte.
+- Data passed to or from functions are considered to be a plain binary in the host byte order.
 
 # Basic usage
 
