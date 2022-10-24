@@ -68,7 +68,7 @@ nikss_table_entry_ctx_tblname(&nikss_ctx, &table_ctx, /* Table name */);
 nikss_table_entry_ctx_free(&table_ctx);
 ```
 
-Table below summarizes externs and they context:
+The table below lists externs and their context:
 
 | Extern                                | Context type                      | Set up function                  | Notes                                                                                                                                                                                   |
 |---------------------------------------|-----------------------------------|----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
