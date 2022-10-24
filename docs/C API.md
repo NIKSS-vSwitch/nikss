@@ -11,7 +11,7 @@ The public C API exported by this library has the following properties:
   to tables have infix `table_` and names of them will start with `nikss_table_`.
 - The last part of the names (postfix) denotes the purpose of the object (structures, functions, etc.), e.g. functions ended
   with `free` will release all resources allocated for instance of the object.
-- All the functions operates on instances of structures or typedefs, called `contex` or `ctx` for short. Each context must
+- All the functions operates on instances of structures or typedefs, called `context` or `ctx` for short. Each context must
   be initialized (`init` postfix) before use and freed when no more needed (`free` postfix).
 - The content of structures are not considered as a public API, can change at any time. Always use provided functions to
   operate on instances of objects.
