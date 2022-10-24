@@ -61,9 +61,8 @@ static int get_and_print_value_set_json(nikss_value_set_context_t *ctx,
 {
     int ret = NO_ERROR;
     json_t *root = json_object();
-    json_t *instance_name = json_object();
     json_t *entries = json_array();
-    if (root == NULL || instance_name == NULL || entries == NULL) {
+    if (root == NULL || entries == NULL) {
         fprintf(stderr, "failed to prepare JSON\n");
         goto clean_up;
     }
@@ -73,15 +72,17 @@ static int get_and_print_value_set_json(nikss_value_set_context_t *ctx,
     nikss_table_entry_t *current_entry = NULL;
     while ((current_entry = nikss_value_set_get_next_entry(ctx)) != NULL) {
         json_t *json_entry = json_object();
+        json_array_append_new(entries, json_entry);
+
         json_t *key = create_json_entry_key(current_entry);
+        nikss_table_entry_free(current_entry);
+
         if (key == NULL) {
             fprintf(stderr, "failed to build value_set value in JSON\n");
             ret = EINVAL;
             break;
         }
         json_object_set_new(json_entry, "value", key);
-        json_array_append_new(entries, json_entry);
-        nikss_table_entry_free(current_entry);
     }
 
     if (ret != NO_ERROR) {
@@ -94,7 +95,6 @@ static int get_and_print_value_set_json(nikss_value_set_context_t *ctx,
 
 clean_up:
     json_decref(entries);
-    json_decref(instance_name);
     json_decref(root);
 
     return ret;

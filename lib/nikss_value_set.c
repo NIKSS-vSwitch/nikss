@@ -36,7 +36,16 @@ void nikss_value_set_context_init(nikss_value_set_context_t *ctx)
     }
 
     memset(ctx, 0, sizeof(nikss_value_set_context_t));
+
+    ctx->is_ternary_match = false;
+
     init_btf(&ctx->btf_metadata);
+    ctx->set_map.fd = -1;
+    ctx->prefixes.fd = -1;
+    ctx->tuple_map.fd = -1;
+    ctx->cache.fd = -1;
+
+    nikss_table_entry_init(&ctx->current_entry);
 }
 
 void nikss_value_set_context_free(nikss_value_set_context_t *ctx)
@@ -57,12 +66,11 @@ void nikss_value_set_context_free(nikss_value_set_context_t *ctx)
 
     free_btf(&ctx->btf_metadata);
     close_object_fd(&(ctx->set_map.fd));
-    free_struct_field_descriptor_set(&ctx->fds);
-}
+    close_object_fd(&(ctx->prefixes.fd));
+    close_object_fd(&(ctx->tuple_map.fd));
+    close_object_fd(&(ctx->cache.fd));
 
-static int parse_key_type(nikss_value_set_context_t *ctx)
-{
-    return parse_struct_type(&ctx->btf_metadata, ctx->set_map.key_type_id, ctx->set_map.key_size, &ctx->fds);
+    nikss_table_entry_free(&ctx->current_entry);
 }
 
 int nikss_value_set_context_name(nikss_context_t *nikss_ctx, nikss_value_set_context_t *ctx, const char *name)
@@ -88,16 +96,22 @@ int nikss_value_set_context_name(nikss_context_t *nikss_ctx, nikss_value_set_con
             return ret;
         }
 
+        ctx->is_ternary_match = true;
         ctx->prefixes = tbl_entry_ctx.prefixes;
         ctx->tuple_map = tbl_entry_ctx.tuple_map;
+        /* Invalidate file descriptors in tec, so they will not be closed during clean up. */
+        tbl_entry_ctx.prefixes.fd = -1;
+        tbl_entry_ctx.tuple_map.fd = -1;
 
         nikss_table_entry_ctx_free(&tbl_entry_ctx);
     }
 
-
-    if (parse_key_type(ctx) != NO_ERROR) {
-        fprintf(stderr, "%s: couldn't parse structure of a value_set instance\n", name);
-        return EOPNOTSUPP;
+    /* open cache table, this is optional feature for value_sets */
+    char map_name[256];
+    snprintf(map_name, sizeof(map_name), "%s_cache", name);
+    ret = open_bpf_map(nikss_ctx, map_name, &ctx->btf_metadata, &ctx->cache);
+    if (ret == NO_ERROR) {
+        fprintf(stderr, "found cache for value_set: %s\n", name);
     }
 
     return NO_ERROR;
@@ -108,48 +122,35 @@ nikss_table_entry_t *nikss_value_set_get_next_entry(nikss_value_set_context_t *c
     nikss_table_entry_t * new_entry = NULL;
     nikss_table_entry_ctx_t tec = {
             .table = ctx->set_map,
+            .prefixes = ctx->prefixes,
+            .tuple_map = ctx->tuple_map,
             .btf_metadata = ctx->btf_metadata,
+            .current_raw_key = ctx->current_raw_key,
+            .current_raw_key_mask = ctx->current_raw_key_mask,
+            .is_ternary = ctx->is_ternary_match,
     };
 
-    /* Copy current keys from value_set_ctx to table_entry_ctx */
-    if (ctx->current_raw_key != NULL) {
-        tec.current_raw_key = malloc(ctx->set_map.key_size);
-        tec.current_raw_key_mask = malloc(ctx->prefixes.key_size);
-        memcpy(tec.current_raw_key, ctx->current_raw_key, ctx->set_map.key_size);
-        memcpy(tec.current_raw_key_mask, ctx->current_raw_key_mask, ctx->prefixes.key_size);
-    }
-
     if (nikss_table_entry_goto_next_key(&tec) != NO_ERROR) {
-        /* nikss_table_entry_get_next_key free'ed a memory before */
-        ctx->current_raw_key = NULL;
-        ctx->current_raw_key_mask = NULL;
         goto clean_up;
     }
 
-    /* Copy current keys from table_entry_ctx to value_set_ctx */
-    if (ctx->current_raw_key != NULL) {
-        free(ctx->current_raw_key);
-    }
-    ctx->current_raw_key = malloc(ctx->set_map.key_size);
-    memcpy(ctx->current_raw_key, tec.current_raw_key, ctx->set_map.key_size);
+    nikss_table_entry_free(&ctx->current_entry);
+    nikss_table_entry_init(&ctx->current_entry);
 
-    if (ctx->current_raw_key_mask != NULL) {
-        free(ctx->current_raw_key_mask);
-    }
-    ctx->current_raw_key_mask = malloc(tec.prefixes.key_size);
-    memcpy(ctx->current_raw_key_mask, tec.current_raw_key_mask, tec.prefixes.key_size);
-
-    new_entry = malloc(sizeof(nikss_table_entry_t));
-    nikss_table_entry_init(new_entry);
-
-    int return_code = parse_table_key(&tec, new_entry, tec.current_raw_key, tec.current_raw_key_mask);
+    int return_code = parse_table_key(&tec, &ctx->current_entry, tec.current_raw_key, tec.current_raw_key_mask);
     if (return_code != NO_ERROR) {
         fprintf(stderr, "failed to parse entry: %s\n", strerror(return_code));
+        nikss_table_entry_free(&ctx->current_entry);
         goto clean_up;
     }
 
+    new_entry = &ctx->current_entry;
+
 clean_up:
-    nikss_table_entry_ctx_free(&tec);
+    /* Resources were managed by table entry context, now move back what we need to PVS! */
+    ctx->set_map.fd = tec.table.fd;  /* might be changed for ternary match */
+    ctx->current_raw_key = tec.current_raw_key;
+    ctx->current_raw_key_mask = tec.current_raw_key_mask;
 
     return new_entry;
 }
@@ -176,7 +177,8 @@ int nikss_value_set_insert(nikss_value_set_context_t *ctx, nikss_table_entry_t *
     nikss_table_entry_ctx_t tec = {
             .table = ctx->set_map,
             .btf_metadata = ctx->btf_metadata,
-            .cache.fd = -1,
+            .cache = ctx->cache,
+            .is_ternary = ctx->is_ternary_match,
     };
     return_code = construct_buffer(key_buffer, ctx->set_map.key_size, &tec, entry,
                                    fill_key_btf_info, fill_key_byte_by_byte);
@@ -211,8 +213,11 @@ int nikss_value_set_delete(nikss_value_set_context_t *ctx, nikss_table_entry_t *
 {
     nikss_table_entry_ctx_t tec = {
             .table = ctx->set_map,
+            .prefixes = ctx->prefixes,
+            .tuple_map = ctx->tuple_map,
+            .cache = ctx->cache,
             .btf_metadata = ctx->btf_metadata,
-            .cache.fd = -1,
+            .is_ternary = ctx->is_ternary_match,
     };
 
     int ret = nikss_table_entry_del(&tec, entry);
