@@ -30,7 +30,7 @@ The public C API exported by this library has the following properties:
 
 ## Header files
 
-Table below shows which header have to be included to use API for required functionality.
+The table below shows NIKSS functionalities and a corresponding header that have to be included to use API for a given functionality.
 
 | Functionality                                                                                                                        | Header file         |
 |--------------------------------------------------------------------------------------------------------------------------------------|---------------------|
