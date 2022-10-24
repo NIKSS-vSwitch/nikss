@@ -16,7 +16,7 @@ The public C API exported by this library has the following properties:
 - The content of structures are not considered as a public API, can change at any time. Always use provided functions to
   operate on instances of objects.
 - Instances of objects created by the API (returned as a pointer) also must be freed after used.
-- Functions in most cases return `0` (`NO_ERROR` constant) or a valid pointer (not `NULL`) on success. In case of error,
+- In most cases, functions return `0` (`NO_ERROR` constant) or a valid pointer (not `NULL`) on success. In case of an error,
   error code (values from POSIX standard are used) or `NULL` pointer is returned and some message on `stderr` might be printed
   (some functions print to `stdout` but it is considered to change). Functions that return special values, like data length,
   member reference, etc. have own error values.
