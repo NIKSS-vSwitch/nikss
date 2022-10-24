@@ -1,4 +1,6 @@
-NIKSS provides a C API that can be used by external software (e.g., P4Runtime server implementations) to control P4 programs compiled to eBPF. An example of program that uses the C API is the `nikss-ctl` [CLI](../CLI) tool. This document shows how to use the C API provided by NIKSS. 
+NIKSS provides a C API that can be used by external software (e.g., P4Runtime server implementations) to control P4 programs
+compiled to eBPF. An example of program that uses the C API is the `nikss-ctl` [CLI](../CLI) tool. This document shows how
+to use the C API provided by NIKSS. 
 
 **Note:** The library needs `root` privileges to work correctly.
 
@@ -56,8 +58,9 @@ nikss_context_free(&nikss_ctx);
 
 ## P4 extern context
 
-An appropriate context is also required to use any of P4 externs. The context must be initialized and set up (using name) for an operation. One
-context variable can be used for one extern instance during program execution. The below snippet shows a sample  usage of nikss API for P4 tables:
+An appropriate context is also required to use any of P4 externs. The context must be initialized and set up (using name)
+for an operation. One context variable can be used for one extern instance during program execution. The below snippet shows
+a sample  usage of nikss API for P4 tables:
 ```c
 nikss_table_entry_ctx_t table_ctx;
 nikss_table_entry_ctx_init(&table_ctx);
@@ -87,7 +90,7 @@ The table below lists externs and their context:
 ## P4 extern entries
 
 A context itself is unable to alter entries in an extern, except for deleting all of entries. For this purpose, `entry`
- objects exist, which operates on a single entry or all entries. Possible operations (not available for all externs) for such
+objects exist, which operates on a single entry or all entries. Possible operations (not available for all externs) for such
 entries are:
 - **add** or **insert**: add a new entry which did not exist before for given key/index.
 - **update**: modify value of an existing entry or of all entries if key/index is not provided within entry.
@@ -108,10 +111,10 @@ nikss_table_entry_free(&entry);
 
 The table below lists externs and type of entries.
 
-| Extern           | Entry type                                                                            | Notes                                                                     |
-|------------------|---------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| `ActionProfile`  | `nikss_action_selector_member_context_t`                                              | The same type as for `ActionSelector`.                                    |
-| `ActionSelector` | `nikss_action_selector_member_context_t`,<br/>`nikss_action_selector_group_context_t` | Groups and members are different things.                                  |
+| Extern           | Entry type                                                                            | Notes                                    |
+|------------------|---------------------------------------------------------------------------------------|------------------------------------------|
+| `ActionProfile`  | `nikss_action_selector_member_context_t`                                              | The same type as for `ActionSelector`.   |
+| `ActionSelector` | `nikss_action_selector_member_context_t`,<br/>`nikss_action_selector_group_context_t` | Groups and members are different things. |
 | Clone session    | `nikss_clone_session_entry_t`                                                         |
 | `Counter`        | `nikss_counter_entry_t`                                                               |
 | `Digest`         | `nikss_digest_t`                                                                      |
@@ -121,7 +124,7 @@ The table below lists externs and type of entries.
 | Multicast group  | `nikss_mcast_grp_member_t`                                                            |
 | `Register`       | `nikss_register_entry_t`                                                              |
 | Table            | `nikss_table_entry_t`                                                                 |
-| `value_set`      | `nikss_table_entry_t`                                                                 | Due to https://github.com/NIKSS-vSwitch/nikss/issues/71 might be changed. |
+| `value_set`      | `nikss_table_entry_t`                                                                 |
 
-The best way to find out what can be done with entries is to search headers files under `include/` directory for functions that takes an argument with
-desired type.
+The best way to find out what can be done with entries is to search headers files under `include/` directory for functions
+that takes an argument with desired type.
