@@ -22,7 +22,7 @@ The public C API exported by this library has the following properties:
   member reference, etc. have own error values.
 - Passing `NULL` pointer to any functions is safe (but not useful). Arguments are validated and error is returned if they
   are required.
-- All instances of objects are movable, but not copyable. After move pointers acquired using given instance are invalid
+- All instances of objects are movable, but not copyable. Pointers acquired using given instance after move are invalid
   (some such functionalities use memory space inside context).
 - Data passed to or from functions are considered to be plain binary in the host order byte.
 
