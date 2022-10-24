@@ -95,7 +95,7 @@ entries are:
 - **get**: get value of a single entry for provided key/index within entry.
 - **get_next**: get value and key/index of a next entry.
 
-Sample usage of a table entry is:
+A sample usage of a table entry is as follows:
 ```c
 nikss_table_entry_t entry;
 nikss_table_entry_init(&entry);
