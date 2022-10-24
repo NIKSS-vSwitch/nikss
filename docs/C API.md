@@ -57,7 +57,7 @@ nikss_context_free(&nikss_ctx);
 ## P4 extern context
 
 An appropriate context is also required to use any of P4 externs. The context must be initialized and set up (using name) for an operation. One
-context variable can be used for one extern instance during program execution. For example minimum table usage is:
+context variable can be used for one extern instance during program execution. The below snippet shows a sample  usage of nikss API for P4 tables:
 ```c
 nikss_table_entry_ctx_t table_ctx;
 nikss_table_entry_ctx_init(&table_ctx);
