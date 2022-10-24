@@ -106,7 +106,7 @@ nikss_table_entry_add(&table_ctx, &entry);
 nikss_table_entry_free(&entry);
 ```
 
-Table below summarizes externs and type of entries.
+The table below lists externs and type of entries.
 
 | Extern           | Entry type                                                                            | Notes                                                                     |
 |------------------|---------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
