@@ -1,4 +1,4 @@
-To see how to use C API let's look at source code of [CLI implementation](../CLI).
+NIKSS provides a C API that can be used by external software (e.g., P4Runtime server implementations) to control P4 programs compiled to eBPF. An example of program that uses the C API is the `nikss-ctl` [CLI](../CLI) tool. This document shows how to use the C API provided by NIKSS. 
 
 **Note:** The library needs `root` privileges to work correctly.
 
