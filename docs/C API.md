@@ -87,7 +87,7 @@ The table below lists externs and their context:
 ## P4 extern entries
 
 A context itself is unable to alter entries in an extern, except for deleting all of entries. For this purpose, `entry`
-objects, which operates on a single entry or all entries. Possible operations (not available for all externs) for such
+ objects exist, which operates on a single entry or all entries. Possible operations (not available for all externs) for such
 entries are:
 - **add** or **insert**: add a new entry which did not exist before for given key/index.
 - **update**: modify value of an existing entry or of all entries if key/index is not provided within entry.
