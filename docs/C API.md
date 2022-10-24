@@ -123,5 +123,5 @@ The table below lists externs and type of entries.
 | Table            | `nikss_table_entry_t`                                                                 |
 | `value_set`      | `nikss_table_entry_t`                                                                 | Due to https://github.com/NIKSS-vSwitch/nikss/issues/71 might be changed. |
 
-The best way to find out what can be done with entries is to search headers files for functions that takes an argument with
+The best way to find out what can be done with entries is to search headers files under `include/` directory for functions that takes an argument with
 desired type.
