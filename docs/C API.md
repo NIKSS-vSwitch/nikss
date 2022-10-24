@@ -1,6 +1,6 @@
 To see how to use C API let's look at source code of [CLI implementation](../CLI).
 
-**Note:** Library to work correctly needs `root` privileges.
+**Note:** The library needs `root` privileges to work correctly.
 
 # Design principles
 
