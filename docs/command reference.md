@@ -133,6 +133,9 @@ nikss-ctl digest get pipe ID DIGEST_NAME
 nikss-ctl digest get-all pipe ID DIGEST_NAME
 ```
 
+**Note:** the `get-all` command is vulnerable to the (D)DoS attack when rate of digests generation is greater or equal to
+read rate.
+
 # Counters
 
 ```shell
