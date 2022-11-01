@@ -3,6 +3,7 @@ name: Build Docker images
 on:
   push:
     branches: [ master ]
+  pull_request:
 
 concurrency:
   # if workflow for PR or push is already running stop it, and start new one
