@@ -10,12 +10,14 @@ function build_nikss() {
   mkdir -p build
   cd build
   cmake "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}" ..
+  make -j$(nproc)
   make install
 }
 
 function build_bpftool() {
   git clone --recurse-submodules https://github.com/libbpf/bpftool.git /tmp/bpftool
   cd /tmp/bpftool/src
+  make -j$(nproc)
   make install
 }
 
@@ -25,7 +27,9 @@ function build_p4c() {
   if [ -e build ]; then /bin/rm -rf build; fi
   mkdir -p build
   cd build
-  cmake  .. -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DENABLE_EBPF=ON -DENABLE_BMV2=OFF -DENABLE_UBPF=OFF -DENABLE_DPDK=OFF -DENABLE_P4C_GRAPHS=OFF -DENABLE_P4TEST=OFF
+  cmake  .. -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DENABLE_EBPF=ON -DENABLE_UBPF=OFF -DENABLE_DPDK=OFF \
+            -DENABLE_P4C_GRAPHS=OFF -DENABLE_P4TEST=OFF -DENABLE_GTESTS=OFF
+  make -j$(nproc)
   make install
 
   # install libbpf headers globally

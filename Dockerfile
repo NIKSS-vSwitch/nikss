@@ -7,7 +7,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends build-essential ca-certificates python3 flex bison \
      make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-dev libboost-graph-dev libboost-iostreams1.71-dev \
-     libgc-dev libfl-dev
+     libgc-dev libfl-dev pkg-config libcap-dev
 
 COPY . /nikss
 WORKDIR /nikss
@@ -27,7 +27,7 @@ COPY --from=builder /usr/local/include/ebpf_kernel.h /usr/local/include/ebpf_ker
 COPY --from=builder /usr/local/include/ebpf_common.h /usr/local/include/ebpf_common.h
 COPY --from=builder /usr/local/include/psa.h /usr/local/include/psa.h
 COPY --from=builder /usr/include/bpf /usr/include/bpf
-
+COPY --from=builder /usr/local/share/p4c /usr/local/share/p4c
 
 
 WORKDIR /nikss
