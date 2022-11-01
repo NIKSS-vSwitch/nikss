@@ -7,7 +7,7 @@ on:
 
 concurrency:
   # if workflow for PR or push is already running stop it, and start new one
-  group: build-${{ github.ref }}
+  group: docker-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
