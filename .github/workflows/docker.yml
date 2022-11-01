@@ -1,0 +1,23 @@
+name: Build Docker images
+
+on:
+  push:
+    branches: [ master ]
+
+concurrency:
+  # if workflow for PR or push is already running stop it, and start new one
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nikss:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Docker build
+        run: docker build -t nikss:latest .
+      - name: Docker push
+        run: |
+          docker tag nikss:latest osinstom/nikss:latest
+          docker push osinstom/nikss:latest
