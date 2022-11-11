@@ -3,21 +3,25 @@
 [![build nikss](https://github.com/NIKSS-vSwitch/nikss/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/NIKSS-vSwitch/nikss/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**This project is still a work in progress. We make no guarantee for the stability of the API or CLI and may modify
-existing functions in the API or CLI.**
-
 **NIKSS** is an in-kernel implementation of a [P4](https://p4.org/) software switch. 
 It works in conjunction with the [P4-eBPF](https://github.com/p4lang/p4c/tree/main/backends/ebpf/psa) compiler. 
 The **NIKSS** switch uses [Portable Switch Architecture (PSA)](https://p4.org/p4-spec/docs/PSA.html) as a forwarding model and [extended Berkeley Packet Filter (eBPF)](https://ebpf.io/) as a packet processing engine. 
-**NIKSS** works seamlessly with both TC-based and XDP-based design of the PSA model for the P4-eBPF compiler.
+**NIKSS** works seamlessly with both TC-based and XDP-based flavors of the PSA model for the P4-eBPF compiler.
 
-This repository implements NIKSS low-level C API and CLI tool (`nikss-ctl`) to manage P4/PSA programs for NIKSS.
+This repository implements a low-level C API and CLI tool (`nikss-ctl`) to manage P4/PSA programs for NIKSS. The PSA-eBPF compiler that is used to generate P4 programs for NIKSS sits in the [p4lang/p4c](https://github.com/p4lang/p4c/tree/main/backends/ebpf) repository.
 
 Main features of NIKSS:
 - **No additional dependencies** - NIKSS works on vanilla Linux OS and does not require any additional dependencies. We have tested NIKSS on Ubuntu 18+ and kernel version 5.8+.
 - **P4 programmable** - the use of the P4 language allows to rapidly develop packet processing pipelines for end hosts.
 - **Feature-rich programming model** - NIKSS leverages P4 Portable Switch Architecture that provides packet processing primitives needed to implement complex packet processing behaviors.
 - **High performance** - NIKSS is meant to provide a high-performance P4 software switch due to the use of eBPF and TC/XDP hooks.
+
+## Community
+
+To discuss the NIKSS project you can use the following communication channels:
+- Join the [P4 Slack](p4-lang.slack.com) and look for [#p4-ebpf](https://p4-lang.slack.com/archives/C039KK0MUAJ) channel.
+- Feel free to [open a GitHub Issue](https://github.com/NIKSS-vSwitch/nikss/issues/new)!
+- Join the mailing list: [nikss-vswitch](https://groups.google.com/g/nikss-vswitch)
 
 # Installation
 
