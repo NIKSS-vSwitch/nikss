@@ -17,7 +17,7 @@ FROM ubuntu:20.04 as runtime
 LABEL authors="Tomasz Osiński <osinstom@gmail.com>, Jan Palimąka <jan.palimaka95@gmail.com>"
 
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends ca-certificates python3 libelf-dev iproute2 clang llvm gcc libboost-iostreams1.71-dev
+RUN apt-get install -y --no-install-recommends ca-certificates python3 libelf-dev iproute2 clang llvm gcc libboost-iostreams1.71-dev make libjansson4 curl
 
 COPY --from=builder /usr/local/bin/p4c-ebpf /usr/local/bin/p4c-ebpf
 COPY --from=builder /usr/local/bin/p4c /usr/local/bin/p4c
