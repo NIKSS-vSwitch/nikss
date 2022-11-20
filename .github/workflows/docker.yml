@@ -23,3 +23,6 @@ jobs:
           docker login -u osinstom -p '${{ secrets.DOCKER_PASSWD }}'
           docker tag nikss:latest osinstom/nikss:latest
           docker push osinstom/nikss:latest
+      - name: Logout from Docker Registry
+        if: ${{ always() }}
+        run: docker logout

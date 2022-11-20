@@ -21,7 +21,23 @@ Main features of NIKSS:
 
 # Installation
 
-## Dependencies
+## Docker
+
+You can build a Docker image for NIKSS by running the below command from the project's root directory:
+
+```bash
+docker build -t nikss:latest .
+```
+
+We also provide a stable Docker image that is built on CI. You can fetch it by:
+
+```bash
+docker pull osinstom/nikss:latest
+```
+
+## Installing NIKSS from source
+
+### Dependencies
 
 NIKSS depends on following libraries and utilities:
 - GNU [make](https://www.gnu.org/software/make/)
@@ -42,7 +58,7 @@ sudo apt install make cmake gcc git libgmp-dev libelf-dev zlib1g-dev libjansson-
 Note that `nikss-ctl` is statically linked with shipped `libbpf`, so there is no need to install this library
 system-wide. It is a submodule for this repository.
 
-## Installing NIKSS from source
+### Build from source
 
 1. Get the code with submodules:
 
@@ -88,7 +104,7 @@ system-wide. It is a submodule for this repository.
      ldconfig
      ```
 
-# Command reference
+# Commands reference
 
 *See [command reference](docs/command%20reference.md) for all the possible commands. Here listed only the most important ones.*
 
