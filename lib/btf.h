@@ -23,6 +23,8 @@
 #include <linux/btf.h>
 #include <stdint.h>
 
+#include <nikss.h>
+
 const struct btf_type *btf_get_type_by_id(struct btf *btf, uint32_t type_id);
 
 typedef struct btf_struct_member_md {
