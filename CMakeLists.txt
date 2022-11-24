@@ -121,6 +121,8 @@ set(CLANG_TIDY_CHECKS
                  -altera-*,
                  # Do not warn when two or more function arguments has compatible type
                  -bugprone-easily-swappable-parameters,
+                 # TODO: enable this check, mostly caused by use of strerror()
+                 -concurrency-mt-unsafe,
                 '
         -warnings-as-errors='*'
         )
