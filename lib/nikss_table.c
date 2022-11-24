@@ -1703,9 +1703,7 @@ static int handle_direct_counter_write(const char *key, char *value, nikss_bpf_m
                    ctx->direct_counters_ctx[i].counter_size);
         }
 
-        if (old_value_buffer != NULL) {
-            free(old_value_buffer);
-        }
+        free(old_value_buffer);
     }
 
     for (unsigned i = 0; i < entry->n_direct_counters; i++) {
