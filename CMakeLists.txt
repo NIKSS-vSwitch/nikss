@@ -109,8 +109,13 @@ set(CLANG_TIDY_CHECKS
                  # allow hardcoded values (most of them are related to architecture, so can't be changed)
                  -cppcoreguidelines-avoid-magic-numbers,
                  -readability-magic-numbers,
+                 -readability-identifier-length,
                  # Allow libc system headers
                  -llvmlibc-restrict-system-libc-headers,
+                 # Allow to ignore return code from calls to standard library
+                 -cert-err33-c,
+                 # Related to OpenCL programming for FPGA
+                 -altera-*,
                 '
         -warnings-as-errors='*'
         )
