@@ -1259,7 +1259,7 @@ int fill_key_btf_info(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_e
                 /* LPM field have to be last field in the key structure, so we can assume that whole key must match for other keys */
                 uint32_t prefix_value = ctx->table.key_size * 8 - 32;
                 if (mk->type == NIKSS_LPM) {
-                    prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
+                    prefix_value = (unsigned long)(offset * 8) + mk->u.lpm.prefix_len - 32;
                 } else if (mk->type == NIKSS_TERNARY) {
                     fprintf(stderr, "ternary key is not allowed for this table\n");
                     return EINVAL;
