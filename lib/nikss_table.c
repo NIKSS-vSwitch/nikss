@@ -1788,11 +1788,7 @@ static int get_ternary_table_prefix_md(nikss_table_entry_ctx_t *ctx, struct tern
     if (ctx->btf_metadata.btf == NULL || ctx->prefixes.value_type_id == 0) {
         return NO_ERROR;
     }
-
     uint32_t type_id = ctx->prefixes.value_type_id;
-    if (type_id == 0) {
-        return EPERM;
-    }
 
     /* tuple id */
     if (btf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "tuple_id", &member) != NO_ERROR) {

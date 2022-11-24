@@ -1060,6 +1060,7 @@ int nikss_action_selector_get_member(nikss_action_selector_context_t *ctx, nikss
     return get_member_action(ctx, member);
 }
 
+// NOLINTNEXTLINE(readability-non-const-parameter): we everywhere pass structures as non-const parameter
 uint32_t nikss_action_selector_get_member_action_id(nikss_action_selector_context_t *ctx,
                                                     nikss_action_selector_member_context_t *member)
 {
