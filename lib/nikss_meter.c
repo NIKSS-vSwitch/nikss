@@ -364,6 +364,8 @@ nikss_meter_entry_t *nikss_meter_get_next(nikss_meter_ctx_t *ctx)
         goto clean_up;
     }
 
+    fix_struct_data_byte_order(&ctx->index_fds, ctx->current_entry.raw_index, ctx->meter.key_size);
+
     nikss_meter_data_t data;
     memcpy(&data, value_buffer, sizeof(data));
     return_code = convert_meter_data_to_entry(&data, &ctx->current_entry);
