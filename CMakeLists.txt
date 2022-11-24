@@ -110,12 +110,17 @@ set(CLANG_TIDY_CHECKS
                  -cppcoreguidelines-avoid-magic-numbers,
                  -readability-magic-numbers,
                  -readability-identifier-length,
+                 -readability-suspicious-call-argument,
+                 # Disable code maintenance difficulty measurement
+                 -readability-function-cognitive-complexity,
                  # Allow libc system headers
                  -llvmlibc-restrict-system-libc-headers,
                  # Allow to ignore return code from calls to standard library
                  -cert-err33-c,
                  # Related to OpenCL programming for FPGA
                  -altera-*,
+                 # Do not warn when two or more function arguments has compatible type
+                 -bugprone-easily-swappable-parameters,
                 '
         -warnings-as-errors='*'
         )
