@@ -13,7 +13,7 @@ COPY . /nikss
 WORKDIR /nikss
 RUN chmod u+x /nikss/scripts/docker-build.sh && /nikss/scripts/docker-build.sh
 
-FROM ubuntu:22.04 as runtime
+FROM ubuntu:20.04 as runtime
 LABEL authors="Tomasz Osiński <osinstom@gmail.com>, Jan Palimąka <jan.palimaka95@gmail.com>"
 
 RUN apt-get update
