@@ -24,6 +24,7 @@ function build_bpftool() {
 function build_p4c() {
   git clone --recursive https://github.com/p4lang/p4c.git /tmp/p4c
   cd /tmp/p4c
+  git checkout "$1"
   if [ -e build ]; then /bin/rm -rf build; fi
   mkdir -p build
   cd build
@@ -45,7 +46,7 @@ function build_p4c() {
 
 build_nikss
 build_bpftool
-build_p4c
+build_p4c 35b9dbf6d95183d41236d7ebbb4d63dcc401c37d
 
 # cleanup
 rm -rf /tmp/bpftool /tmp/p4c

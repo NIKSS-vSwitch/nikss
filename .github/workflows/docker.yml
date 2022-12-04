@@ -1,8 +1,8 @@
 name: Build Docker images
 
-on:
-  push:
-    branches: [ master ]
+#on:
+#  push:
+#    branches: [ master ]
 
 concurrency:
   # if workflow for PR or push is already running stop it, and start new one
@@ -11,6 +11,7 @@ concurrency:
 
 jobs:
   nikss:
+    if: ${{ github.repository == 'NIKSS-vSwitch/nikss' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
