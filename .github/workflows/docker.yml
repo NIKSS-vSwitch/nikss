@@ -2,7 +2,7 @@ name: Build Docker images
 
 on:
   push:
-#    branches: [ master ]
+    branches: [ master ]
 
 concurrency:
   # if workflow for PR or push is already running stop it, and start new one
