@@ -109,8 +109,20 @@ set(CLANG_TIDY_CHECKS
                  # allow hardcoded values (most of them are related to architecture, so can't be changed)
                  -cppcoreguidelines-avoid-magic-numbers,
                  -readability-magic-numbers,
+                 -readability-identifier-length,
+                 -readability-suspicious-call-argument,
+                 # Disable code maintenance difficulty measurement
+                 -readability-function-cognitive-complexity,
                  # Allow libc system headers
                  -llvmlibc-restrict-system-libc-headers,
+                 # Allow to ignore return code from calls to standard library
+                 -cert-err33-c,
+                 # Related to OpenCL programming for FPGA
+                 -altera-*,
+                 # Do not warn when two or more function arguments has compatible type
+                 -bugprone-easily-swappable-parameters,
+                 # TODO: enable this check, mostly caused by use of strerror()
+                 -concurrency-mt-unsafe,
                 '
         -warnings-as-errors='*'
         )

@@ -1259,7 +1259,7 @@ int fill_key_btf_info(char * buffer, nikss_table_entry_ctx_t *ctx, nikss_table_e
                 /* LPM field have to be last field in the key structure, so we can assume that whole key must match for other keys */
                 uint32_t prefix_value = ctx->table.key_size * 8 - 32;
                 if (mk->type == NIKSS_LPM) {
-                    prefix_value = offset * 8 + mk->u.lpm.prefix_len - 32;
+                    prefix_value = (unsigned long)(offset * 8) + mk->u.lpm.prefix_len - 32;
                 } else if (mk->type == NIKSS_TERNARY) {
                     fprintf(stderr, "ternary key is not allowed for this table\n");
                     return EINVAL;
@@ -1703,9 +1703,7 @@ static int handle_direct_counter_write(const char *key, char *value, nikss_bpf_m
                    ctx->direct_counters_ctx[i].counter_size);
         }
 
-        if (old_value_buffer != NULL) {
-            free(old_value_buffer);
-        }
+        free(old_value_buffer);
     }
 
     for (unsigned i = 0; i < entry->n_direct_counters; i++) {
@@ -1788,11 +1786,7 @@ static int get_ternary_table_prefix_md(nikss_table_entry_ctx_t *ctx, struct tern
     if (ctx->btf_metadata.btf == NULL || ctx->prefixes.value_type_id == 0) {
         return NO_ERROR;
     }
-
     uint32_t type_id = ctx->prefixes.value_type_id;
-    if (type_id == 0) {
-        return EPERM;
-    }
 
     /* tuple id */
     if (btf_get_member_md_by_name(ctx->btf_metadata.btf, type_id, "tuple_id", &member) != NO_ERROR) {
