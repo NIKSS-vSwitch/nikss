@@ -141,7 +141,7 @@ static size_t count_total_fields(nikss_btf_t *btf_md, uint32_t type_id)
 {
     const struct btf_type *type = btf_get_type_by_id(btf_md->btf, type_id);
 
-    if (btf_is_int(type)) {
+    if (btf_is_int(type) || btf_is_array(type)) {
         return 1;
     }
 
@@ -197,7 +197,7 @@ static int setup_struct_field_descriptor_set_btf(nikss_btf_t *btf_md, nikss_stru
         return EINVAL;
     }
 
-    if (btf_is_int(type)) {
+    if (btf_is_int(type) || btf_is_array(type)) {
         if (*field_idx >= fds->n_fields) {
             goto too_many_fields;
         }
