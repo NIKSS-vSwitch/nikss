@@ -141,7 +141,7 @@ static size_t count_total_fields(nikss_btf_t *btf_md, uint32_t type_id)
 {
     const struct btf_type *type = btf_get_type_by_id(btf_md->btf, type_id);
 
-    if (btf_is_int(type)) {
+    if (btf_is_int(type) || btf_is_array(type)) {
         return 1;
     }
 
@@ -197,7 +197,7 @@ static int setup_struct_field_descriptor_set_btf(nikss_btf_t *btf_md, nikss_stru
         return EINVAL;
     }
 
-    if (btf_is_int(type)) {
+    if (btf_is_int(type) || btf_is_array(type)) {
         if (*field_idx >= fds->n_fields) {
             goto too_many_fields;
         }
@@ -297,6 +297,7 @@ int parse_struct_type(nikss_btf_t *btf_md, uint32_t type_id, size_t data_size, n
 {
     if (type_id == 0) {
         fprintf(stderr, "warning: BTF type not found, placing all the data in a single field\n");
+        fds->decoded_with_btf = false;
         return setup_struct_field_descriptor_set_no_btf(fds, data_size);
     }
 
@@ -309,6 +310,7 @@ int parse_struct_type(nikss_btf_t *btf_md, uint32_t type_id, size_t data_size, n
         return EINVAL;
     }
 
+    fds->decoded_with_btf = true;
     unsigned field_idx = 0;
     return setup_struct_field_descriptor_set_btf(btf_md, fds, type_id, &field_idx, 0);
 }
@@ -423,6 +425,7 @@ int construct_struct_from_fields(nikss_struct_field_set_t *data, nikss_struct_fi
             ++field_idx;
         }
         if (!failed) {
+            fix_struct_data_byte_order(fds, buffer, buffer_len);
             return NO_ERROR;
         }
     }
@@ -446,4 +449,24 @@ int construct_struct_from_fields(nikss_struct_field_set_t *data, nikss_struct_fi
 
     fprintf(stderr, "failed to construct data type\n");
     return EINVAL;
+}
+
+void fix_struct_data_byte_order(nikss_struct_field_descriptor_set_t *fds, char *buffer, size_t buffer_len) {
+    if (!fds->decoded_with_btf) {
+        return;
+    }
+
+    for (unsigned descriptor_idx = 0; descriptor_idx < fds->n_fields; descriptor_idx++) {
+        if (fds->fields[descriptor_idx].type != NIKSS_STRUCT_FIELD_TYPE_DATA) {
+            continue;
+        }
+        if (fds->fields[descriptor_idx].data_len + fds->fields[descriptor_idx].data_offset > buffer_len) {
+            /* silently ignore error, probably should be caught somewhere else */
+            break;
+        }
+        if (fds->fields[descriptor_idx].data_len > 8) {
+            swap_byte_order(buffer + fds->fields[descriptor_idx].data_offset,
+                            fds->fields[descriptor_idx].data_len);
+        }
+    }
 }

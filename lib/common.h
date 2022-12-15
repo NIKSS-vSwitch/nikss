@@ -43,4 +43,7 @@ int struct_field_set_append(nikss_struct_field_set_t *sfs, const void *data, siz
 int construct_struct_from_fields(nikss_struct_field_set_t *data, nikss_struct_field_descriptor_set_t *fds,
                                  char *buffer, size_t buffer_len);
 
+/* Will swap byte order of fields if required in buffer */
+void fix_struct_data_byte_order(nikss_struct_field_descriptor_set_t *fds, char *buffer, size_t buffer_len);
+
 #endif  /* __NIKSS_COMMON_H */

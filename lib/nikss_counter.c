@@ -360,6 +360,8 @@ nikss_counter_entry_t *nikss_counter_get_next(nikss_counter_context_t *ctx)
         return NULL;
     }
 
+    fix_struct_data_byte_order(&ctx->key_fds, ctx->current_entry.raw_key, ctx->counter.key_size);
+
     return &ctx->current_entry;
 }
 

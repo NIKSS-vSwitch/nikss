@@ -261,6 +261,9 @@ nikss_register_entry_t * nikss_register_get_next(nikss_register_context_t *ctx)
         return NULL;
     }
 
+    fix_struct_data_byte_order(&ctx->key_fds, ctx->current_entry.raw_key, ctx->reg.key_size);
+    fix_struct_data_byte_order(&ctx->value_fds, ctx->current_entry.raw_value, ctx->reg.value_size);
+
     return &ctx->current_entry;
 }
 
@@ -285,6 +288,8 @@ int nikss_register_get(nikss_register_context_t *ctx, nikss_register_entry_t *en
         fprintf(stderr, "failed to read Register entry: %s\n", strerror(ret));
         return ret;
     }
+
+    fix_struct_data_byte_order(&ctx->value_fds, ctx->current_entry.raw_value, ctx->reg.value_size);
 
     return NO_ERROR;
 }

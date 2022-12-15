@@ -1103,6 +1103,12 @@ static int write_buffer_btf(char *buffer, size_t buffer_len, size_t offset,
                 dst_type, buffer_len, offset, data_len, data_type_len);
         return EAGAIN;
     }
+
+    if (data_type_len > 8) {
+        /* P4C-ebpf compiler does not change byte order for fields with size over 64 bits */
+        flags = WRITE_NETWORK_ORDER;
+    }
+
     if (flags == WRITE_HOST_ORDER) {
         memcpy(buffer + offset, data, data_len);
     } else if (flags == WRITE_NETWORK_ORDER) {
@@ -2602,10 +2608,16 @@ static int parse_table_value_action(nikss_table_entry_ctx_t *ctx, nikss_table_en
         if (size + offset > ctx->table.value_size) {
             return EINVAL;
         }
+
         int ret = nikss_action_param_create(&entry->action->params[i], value + offset, size);
         entry->action->params[i].param_id = i;
         if (ret != NO_ERROR) {
             return ret;
+        }
+
+        /* params wider than 64 bits are in network byte order */
+        if (entry->action->params[i].len > 8) {
+            swap_byte_order(entry->action->params[i].data, entry->action->params[i].len);
         }
     }
 
@@ -2925,6 +2937,12 @@ static int parse_table_key_add_key_field(nikss_table_entry_t *entry, int field_t
     }
     nikss_match_key_t mk;
     nikss_matchkey_init(&mk);
+    bool do_swap_byte_order = false;
+
+    /* Key fields wider than 64 bits are in network byte order */
+    if (field_len > 8) {
+        do_swap_byte_order = true;
+    }
 
     if (field_type == NIKSS_TERNARY) {
         nikss_matchkey_type(&mk, NIKSS_TERNARY);
@@ -2933,12 +2951,17 @@ static int parse_table_key_add_key_field(nikss_table_entry_t *entry, int field_t
     } else if (field_type == NIKSS_LPM) {
         nikss_matchkey_type(&mk, NIKSS_LPM);
         nikss_matchkey_data(&mk, field_data, field_len);
-        /* Convert network byte order into host order */
-        swap_byte_order(mk.data, mk.key_size);
         nikss_matchkey_prefix_len(&mk, prefix);
+        /* LPM keys are always in network byte order in LPM tables. We can assume that
+         * it is LPM_TRIE map because keys in ternary table are never resolved into LPM match type */
+        do_swap_byte_order = true;
     } else if (field_type == NIKSS_EXACT) {
         nikss_matchkey_type(&mk, NIKSS_EXACT);
         nikss_matchkey_data(&mk, field_data, field_len);
+    }
+
+    if (do_swap_byte_order) {
+        swap_byte_order(mk.data, mk.key_size);
     }
 
     int ret = nikss_table_entry_matchkey(entry, &mk);

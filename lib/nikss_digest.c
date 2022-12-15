@@ -112,6 +112,8 @@ int nikss_digest_get_next(nikss_digest_context_t *ctx, nikss_digest_t *digest)
         return ret;
     }
 
+    fix_struct_data_byte_order(&ctx->fds, digest->raw_data, ctx->queue.value_size);
+
     return NO_ERROR;
 }
 

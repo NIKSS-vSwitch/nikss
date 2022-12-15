@@ -101,6 +101,7 @@ typedef struct nikss_struct_field_descriptor {
 typedef struct nikss_struct_field_descriptor_set {
     size_t n_fields;
     nikss_struct_field_descriptor_t *fields;
+    bool decoded_with_btf;
 } nikss_struct_field_descriptor_set_t;
 
 /* Used to read/write structures */
