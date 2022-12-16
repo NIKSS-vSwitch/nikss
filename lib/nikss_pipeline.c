@@ -717,9 +717,10 @@ bool nikss_pipeline_is_TC_based(nikss_context_t *ctx)
     if (ctx == NULL) {
         return false;
     }
-    return check_if_program_exists(ctx, XDP_HELPER_PROG) ||
-           check_if_program_exists(ctx, TC_INGRESS_PROG) ||
-           check_if_program_exists(ctx, TC_EGRESS_PROG);
+    return check_if_program_exists(ctx, XDP_HELPER_PROG) &&
+           !check_if_program_exists(ctx, XDP_INGRESS_PROG) &&
+           !check_if_program_exists(ctx, XDP_EGRESS_PROG) &&
+           !check_if_program_exists(ctx, XDP_EGRESS_PROG_OPTIMIZED);
 }
 
 bool nikss_pipeline_has_egress_program(nikss_context_t *ctx)
@@ -770,6 +771,13 @@ bool is_valid_object_name(nikss_pipeline_objects_list_t *list, const char *name,
             "multicast_grp_tbl",
             "multicast_grp_tbl_inner",
             "hdr_md_cpumap",
+            "xdp2tc_shared_map",
+            "xdp2tc_cpumap",
+            "tx_port",
+            "crc_lookup_tbl",
+    };
+    const char *reserved_prefixes[] = {
+            "ebpf_",
     };
     const char *suffixes[] = {
             "_defaultAction",
@@ -784,11 +792,19 @@ bool is_valid_object_name(nikss_pipeline_objects_list_t *list, const char *name,
     /* cppcheck-suppress variableScope ; for readability all related variables are defined together */
     const char *ternary_tuple_infix = "_tuple_";
     const unsigned no_reserved_names = sizeof(reserved_names) / sizeof(reserved_names[0]);
+    const unsigned no_reserved_prefixes = sizeof(reserved_prefixes) / sizeof(reserved_prefixes[0]);
     const unsigned no_suffixes = sizeof(suffixes) / sizeof(suffixes[0]);
 
     /* Reserved names are not allowed (exact match) */
     for (unsigned i = 0; i < no_reserved_names; ++i) {
         if (strcmp(name, reserved_names[i]) == 0) {
+            return false;
+        }
+    }
+
+    /* Reserved prefixes are not allowed */
+    for (unsigned i = 0; i < no_reserved_prefixes; ++i) {
+        if (strncmp(name, reserved_prefixes[i], strlen(reserved_prefixes[i])) == 0) {
             return false;
         }
     }
@@ -810,7 +826,7 @@ bool is_valid_object_name(nikss_pipeline_objects_list_t *list, const char *name,
         return true;
     }
 
-    /* Allow occurrence of some prefixes */
+    /* Allow occurrence of some suffixes */
     for (unsigned i = 0; i < no_allowed_suffixes; ++i) {
         if (str_ends_with(name, allowed_suffixes[i])) {
             return true;
