@@ -305,6 +305,9 @@ static int read_and_parse_counter_value(nikss_counter_context_t *ctx, nikss_coun
         return ret;
     }
 
+    /* raw_key is always used as a data source for user request on next field, so convert it to right byte order */
+    fix_struct_data_byte_order(&ctx->key_fds, entry->raw_key, ctx->counter.key_size);
+
     return convert_counter_data_to_entry(value, ctx->counter.value_size, ctx->counter_type, entry);
 }
 
@@ -359,8 +362,6 @@ nikss_counter_entry_t *nikss_counter_get_next(nikss_counter_context_t *ctx)
     if (read_and_parse_counter_value(ctx, &ctx->current_entry) != NO_ERROR) {
         return NULL;
     }
-
-    fix_struct_data_byte_order(&ctx->key_fds, ctx->current_entry.raw_key, ctx->counter.key_size);
 
     return &ctx->current_entry;
 }

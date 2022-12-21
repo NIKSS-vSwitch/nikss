@@ -306,6 +306,9 @@ int nikss_meter_entry_get(nikss_meter_ctx_t *ctx, nikss_meter_entry_t *entry)
         goto clean_up;
     }
 
+    /* Later raw_index is used instead of user provided data, so fix its byte order */
+    fix_struct_data_byte_order(&ctx->index_fds, entry->raw_index, ctx->meter.key_size);
+
     nikss_meter_data_t data;
     memcpy(&data, value_buffer, sizeof(data));
     return_code = convert_meter_data_to_entry(&data, entry);

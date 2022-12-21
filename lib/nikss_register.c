@@ -289,7 +289,8 @@ int nikss_register_get(nikss_register_context_t *ctx, nikss_register_entry_t *en
         return ret;
     }
 
-    fix_struct_data_byte_order(&ctx->value_fds, ctx->current_entry.raw_value, ctx->reg.value_size);
+    fix_struct_data_byte_order(&ctx->value_fds, entry->raw_key, ctx->reg.key_size);
+    fix_struct_data_byte_order(&ctx->value_fds, entry->raw_value, ctx->reg.value_size);
 
     return NO_ERROR;
 }
