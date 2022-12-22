@@ -1,5 +1,5 @@
 cmake-*
-build
+build/
 .idea
 install
 *.pyc
@@ -7,3 +7,8 @@ install
 # P4c compiler outputs
 *.o
 *.bc
+
+bazel-bin
+bazel-nikss
+bazel-out
+bazel-testlogs

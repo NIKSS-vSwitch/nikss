@@ -19,6 +19,8 @@
 #include <bpf/libbpf.h>
 #include <dirent.h>
 #include <errno.h>
+// see https://stackoverflow.com/questions/782338/warning-with-nftw
+#define __USE_XOPEN_EXTENDED 1
 #include <ftw.h>
 #include <linux/if_link.h>
 #include <net/if.h>
