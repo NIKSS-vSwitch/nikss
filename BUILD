@@ -13,7 +13,7 @@ filegroup(
 
 cc_library(
     name = "nikss",
-    srcs = [":nikss_hdrs", ":libbpf_hdrs"]
+    srcs = [":nikss_hdrs"]
         + glob(["lib/*.c"], exclude=[])
         + glob(["lib/*.h"], exclude=[]),
     hdrs = [],
