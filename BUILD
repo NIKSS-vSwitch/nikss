@@ -24,7 +24,7 @@ cc_library(
         + glob(["lib/*.h"], exclude=[]),
     hdrs = [],
     includes = ["include", "install/usr/include"],
-    deps = ["@libbpf//:lib"],
+    #deps = ["@libbpf//:lib"],
     linkopts = [
         "-lelf",
         "-lz",
