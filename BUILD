@@ -11,12 +11,6 @@ filegroup(
     visibility = ["//:__subpackages__"],
 )
 
-filegroup(
-    name = "libbpf_hdrs",
-    srcs = glob(["install/usr/include/**/*.h"]),
-    visibility = ["//:__subpackages__"],
-)
-
 cc_library(
     name = "nikss",
     srcs = [":nikss_hdrs", ":libbpf_hdrs"]
