@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.10)
 project(nikss C)
 
 set(CMAKE_C_STANDARD 11)
@@ -54,8 +54,8 @@ set(NIKSSCTL_SRCS
         main.c)
 
 # Use newer version of POSIX - 1995
-add_compile_definitions(_XOPEN_SOURCE=500)
-add_compile_definitions(_GNU_SOURCE)
+add_definitions(-D_XOPEN_SOURCE=500)
+add_definitions(-D_GNU_SOURCE)
 
 if (BUILD_SHARED)
   add_library(nikss SHARED ${NIKSSLIB_SRCS})
