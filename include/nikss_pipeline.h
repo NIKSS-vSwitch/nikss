@@ -18,7 +18,11 @@
 #ifndef __NIKSS_PIPELINE_H
 #define __NIKSS_PIPELINE_H
 
-#include "nikss.h"
+#include <nikss.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 bool nikss_pipeline_exists(nikss_context_t *ctx);
 /* This function should load BPF program and initialize default maps (call map initializer program) */
@@ -69,5 +73,9 @@ void nikss_pipeline_objects_list_free(nikss_pipeline_objects_list_t *list);
 nikss_pipeline_object_t * nikss_pipeline_objects_list_get_next_object(nikss_pipeline_objects_list_t *list);
 const char * nikss_pipeline_object_get_name(nikss_pipeline_object_t *obj);
 void nikss_pipeline_object_free(nikss_pipeline_object_t *obj);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif  /* __NIKSS_PIPELINE_H */

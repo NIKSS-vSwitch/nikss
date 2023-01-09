@@ -18,7 +18,11 @@
 #ifndef __NIKSS_PRE_H
 #define __NIKSS_PRE_H
 
-#include "nikss.h"
+#include <nikss.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * PRE - Clone Sessions
@@ -141,5 +145,9 @@ typedef struct nikss_mcast_grp_list {
 int nikss_mcast_grp_list_init(nikss_context_t *ctx, nikss_mcast_grp_list_t *list);
 void nikss_mcast_grp_list_free(nikss_mcast_grp_list_t *list);
 nikss_mcast_grp_ctx_t *nikss_mcast_grp_list_get_next_group(nikss_mcast_grp_list_t *list);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif  /* __NIKSS_PRE_H */
