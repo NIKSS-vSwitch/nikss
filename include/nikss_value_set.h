@@ -20,6 +20,10 @@
 
 #include <nikss.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct nikss_value_set_context {
     nikss_bpf_map_descriptor_t set_map;
     nikss_bpf_map_descriptor_t prefixes;
@@ -42,5 +46,9 @@ nikss_table_entry_t *nikss_value_set_get_next_entry(nikss_value_set_context_t *c
 
 int nikss_value_set_insert(nikss_value_set_context_t *ctx, nikss_table_entry_t *entry);
 int nikss_value_set_delete(nikss_value_set_context_t *ctx, nikss_table_entry_t *entry);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* __NIKSS_VALUE_SET_H_ */

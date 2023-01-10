@@ -22,6 +22,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define NO_ERROR 0
 
 /*
@@ -635,4 +639,8 @@ const char *nikss_action_selector_action_param_get_name(nikss_action_selector_co
 //  /* Use to retrieve report about packet processing from the data plane. */
 //  int nikss_report_get_next();
 
-#endif //__NIKSS_H
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
+
+#endif /* __NIKSS_H */

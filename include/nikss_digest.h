@@ -20,6 +20,10 @@
 
 #include <nikss.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct nikss_digest_context {
     nikss_bpf_map_descriptor_t queue;
     nikss_btf_t btf_metadata;
@@ -43,5 +47,9 @@ int nikss_digest_get_next(nikss_digest_context_t *ctx, nikss_digest_t *digest);
 void nikss_digest_free(nikss_digest_t *digest);
 
 nikss_struct_field_t * nikss_digest_get_next_field(nikss_digest_context_t *ctx, nikss_digest_t *digest);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif  /* __NIKSS_DIGEST_H */
