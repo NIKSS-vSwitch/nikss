@@ -63,11 +63,11 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_S
 if (BUILD_SHARED)
   # shared library
   add_library(nikss SHARED ${NIKSSLIB_SRCS})
-  target_link_libraries(nikss ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
+  target_link_libraries(nikss ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z m elf)
 
   # When cmd tool is built with shared library then it do not contains library code
   add_executable(nikss-ctl ${NIKSSCTL_SRCS})
-  target_link_libraries(nikss-ctl nikss z elf gmp m jansson)
+  target_link_libraries(nikss-ctl nikss gmp jansson)
 else ()
   # build one binary with all the code built-in
   add_executable(nikss-ctl ${NIKSSLIB_SRCS} ${NIKSSCTL_SRCS})
