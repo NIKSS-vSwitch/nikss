@@ -16,6 +16,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(nikss C)
 
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
 set(CMAKE_C_STANDARD 11)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
@@ -59,6 +61,13 @@ add_definitions(-D_GNU_SOURCE)
 
 # Add include directories on top of the list
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/include)
+
+# validate if dependencies are met
+find_package(LibGmp REQUIRED)
+find_package(LibElf REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(Jansson REQUIRED)
+find_package(LibBpf REQUIRED)
 
 if (BUILD_SHARED)
   # shared library
