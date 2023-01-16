@@ -16,6 +16,10 @@ Main features of NIKSS:
 - **Feature-rich programming model** - NIKSS leverages P4 Portable Switch Architecture that provides packet processing primitives needed to implement complex packet processing behaviors.
 - **High performance** - NIKSS is meant to provide a high-performance P4 software switch due to the use of eBPF and TC/XDP hooks.
 
+Refer to the ACM CoNEXT paper for more details on design and performance numbers: 
+
+> Tomasz Osiński, Jan Palimąka, Mateusz Kossakowski, Frédéric Dang Tran, El-Fadel Bonfoh, and Halina Tarasiuk. 2022. "A novel programmable software datapath for Software-Defined Networking". In Proceedings of the 18th International Conference on emerging Networking EXperiments and Technologies (CoNEXT '22). Association for Computing Machinery, New York, NY, USA, 245–260. https://doi.org/10.1145/3555050.3569117
+
 ## Community
 
 To discuss the NIKSS project you can use the following communication channels:
