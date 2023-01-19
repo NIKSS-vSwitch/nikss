@@ -16,6 +16,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(nikss C)
 
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
 set(CMAKE_C_STANDARD 11)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
@@ -57,23 +59,42 @@ set(NIKSSCTL_SRCS
 add_definitions(-D_XOPEN_SOURCE=500)
 add_definitions(-D_GNU_SOURCE)
 
-if (BUILD_SHARED)
-  add_library(nikss SHARED ${NIKSSLIB_SRCS})
-  target_link_libraries(nikss ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
-  install(TARGETS nikss DESTINATION lib)
-  add_executable(nikss-ctl ${NIKSSCTL_SRCS})
-else ()
-  add_executable(nikss-ctl ${NIKSSLIB_SRCS} ${NIKSSCTL_SRCS})
-endif ()
+# Add include directories on top of the list
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/include)
+
+# validate if dependencies are met
+find_package(LibGmp REQUIRED)
+find_package(LibElf REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(Jansson REQUIRED)
+find_package(LibBpf REQUIRED)
+
 if (BUILD_SHARED)
-  link_directories(${CMAKE_CURRENT_BINARY_DIR})
-  target_link_libraries(nikss-ctl nikss z elf gmp m jansson)
+  # shared library
+  add_library(nikss SHARED ${NIKSSLIB_SRCS})
+  target_link_libraries(nikss ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z m elf)
+
+  # When cmd tool is built with shared library then it do not contains library code
+  add_executable(nikss-ctl ${NIKSSCTL_SRCS})
+  target_link_libraries(nikss-ctl nikss gmp jansson)
 else ()
-  target_link_libraries(nikss-ctl z elf gmp m jansson)
+  # build one binary with all the code built-in
+  add_executable(nikss-ctl ${NIKSSLIB_SRCS} ${NIKSSCTL_SRCS})
+  target_link_libraries(nikss-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf gmp m jansson)
 endif ()
-target_link_libraries(nikss-ctl ${CMAKE_CURRENT_SOURCE_DIR}/install/usr/lib64/libbpf.a z elf)
+
+# installation rules
+if (BUILD_SHARED)
+  install(TARGETS nikss DESTINATION lib)
+endif ()
 install(TARGETS nikss-ctl RUNTIME DESTINATION bin)
+
+# headers installation
+set(HEADERS_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/include/nikss)
+add_custom_target(install_headers
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${HEADERS_INSTALL_PATH}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h ${HEADERS_INSTALL_PATH}
+        COMMENT "Install C/C++ headers into ${HEADERS_INSTALL_PATH}")
 
 # linter
 set(C_LANG_OPTIONS_CHECK

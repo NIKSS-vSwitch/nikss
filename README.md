@@ -81,7 +81,7 @@ system-wide. It is a submodule for this repository.
    ./build_libbpf.sh
    ```
 
-3. Build the code and install files:
+3. Build the code and install binaries:
 
    ```shell
    mkdir build
@@ -111,6 +111,14 @@ system-wide. It is a submodule for this repository.
      echo "/usr/local/lib" > /etc/ld.so.conf.d/usr_local_lib.conf
      ldconfig
      ```
+
+4. (Optional) Install C/C++ headers files:
+
+   ```shell
+   sudo make install_headers
+   ```
+   This step makes sense only when shared library is built (`BUILD_SHARED` is set to `on`) because otherwise linker will
+   fail to find references to the `libnikss` library.
 
 # Commands reference
 
