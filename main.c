@@ -25,6 +25,7 @@
 #include "CLI/digest.h"
 #include "CLI/meter.h"
 #include "CLI/multicast.h"
+#include "CLI/os_validate.h"
 #include "CLI/pipeline.h"
 #include "CLI/register.h"
 #include "CLI/table.h"
@@ -74,7 +75,8 @@ static int do_help(int argc, char **argv)
             "                   digest |\n"
             "                   counter |\n"
             "                   register |\n"
-            "                   value-set }\n"
+            "                   value-set |\n"
+            "                   validate }\n"
             "       OPTIONS := {}\n"
             "",
             program_name, program_name);
@@ -175,6 +177,7 @@ static const struct cmd cmds[] = {
         { "counter",         do_counter },
         { "register",        do_register },
         { "value-set",       do_value_set },
+        { "validate",        do_os_validate },
         { 0 }
 };
 

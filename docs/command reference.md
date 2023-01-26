@@ -19,7 +19,8 @@ OBJECT := { clone-session |
             digest |
             counter |
             register |
-            value-set }
+            value-set |
+            validate }
 OPTIONS := {}
 ```
 
@@ -161,4 +162,10 @@ REGISTER_VALUE := { DATA }
 nikss-ctl value-set insert pipe ID VALUE_SET_NAME value DATA
 nikss-ctl value-set delete pipe ID VALUE_SET_NAME value DATA
 nikss-ctl value-set get pipe ID VALUE_SET_NAME
+```
+
+# Validate system configuration
+
+```shell
+nikss-ctl validate
 ```

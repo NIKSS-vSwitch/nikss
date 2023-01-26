@@ -53,6 +53,7 @@ set(NIKSSCTL_SRCS
         CLI/counter.c
         CLI/register.c
         CLI/value_set.c
+        CLI/os_validate.c
         main.c)
 
 # Use newer version of POSIX - 1995
