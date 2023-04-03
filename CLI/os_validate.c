@@ -197,7 +197,7 @@ static int exec_cmd(char *output_buf, ssize_t buf_size, char *cmd[])
     int error_code = ENOENT;
     int pipe_fds[2];
 
-    if (pipe2(pipe_fds, O_NONBLOCK) != 0) {
+    if (pipe2(pipe_fds, O_NONBLOCK | O_CLOEXEC) != 0) {
         error_code = errno;
         fprintf(stderr, "failed to create pipe: %s\n", strerror(error_code));
         return error_code;
@@ -228,7 +228,7 @@ static int exec_cmd(char *output_buf, ssize_t buf_size, char *cmd[])
 
     /* parent process */
     close(write_fd);
-    int wstatus;
+    int wstatus = 1;  /* init to 1 to avoid enter into if statement below on error */
     waitpid(pid, &wstatus, 0);
     if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0) {
         /* Read the output from the command */
