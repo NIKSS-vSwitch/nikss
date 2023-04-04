@@ -18,7 +18,7 @@ by the following commands:
 - `multicast-group create`
 - `pipeline load`
 - `pipeline unload`
-- `validate`
+- `validate-os`
 
 # Field names reflection
 
@@ -1085,9 +1085,9 @@ included in the output JSON.
 
 # Validate system configuration
 
-There is a command `validate` which tries to validate system configuration and decides whether NIKSS should work. This is
+There is a command `validate-os` which tries to validate system configuration and decides whether NIKSS should work. This is
 an exclusive feature of `nikss-ctl`, there is no API for this. If everything is properly configured, command
-`nikss-ctl valide` should print following output (to the `stdout` stream):
+`nikss-ctl valide-os` should print following output (to the `stdout` stream):
 ```
 Kernel family: Linux ... OK
 Kernel version: 5.15 ... OK
@@ -1151,7 +1151,7 @@ p4c-ebpf version: 1.2.3.5 ... OK
 Invalid system configuration, NIKSS will not work.
 ```
 
-Exit codes from command `validate` are following:
+Exit codes from command `validate-os` are following:
 - 0: valid system configuration - no warnings and no errors;
 - 1: warning occurred with no errors;
 - 2: error occurred.

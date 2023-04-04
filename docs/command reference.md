@@ -20,7 +20,7 @@ OBJECT := { clone-session |
             counter |
             register |
             value-set |
-            validate }
+            validate-os }
 OPTIONS := {}
 ```
 
@@ -167,5 +167,5 @@ nikss-ctl value-set get pipe ID VALUE_SET_NAME
 # Validate system configuration
 
 ```shell
-nikss-ctl validate
+nikss-ctl validate-os
 ```

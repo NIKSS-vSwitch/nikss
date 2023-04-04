@@ -76,7 +76,7 @@ static int do_help(int argc, char **argv)
             "                   counter |\n"
             "                   register |\n"
             "                   value-set |\n"
-            "                   validate }\n"
+            "                   validate-os }\n"
             "       OPTIONS := {}\n"
             "",
             program_name, program_name);
@@ -177,7 +177,7 @@ static const struct cmd cmds[] = {
         { "counter",         do_counter },
         { "register",        do_register },
         { "value-set",       do_value_set },
-        { "validate",        do_os_validate },
+        { "validate-os",     do_os_validate },
         { 0 }
 };
 
