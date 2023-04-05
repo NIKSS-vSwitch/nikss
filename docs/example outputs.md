@@ -18,6 +18,7 @@ by the following commands:
 - `multicast-group create`
 - `pipeline load`
 - `pipeline unload`
+- `validate-os`
 
 # Field names reflection
 
@@ -1081,3 +1082,76 @@ included in the output JSON.
       ]
   }
   ```
+
+# Validate system configuration
+
+There is a command `validate-os` which tries to validate system configuration and decides whether NIKSS should work. This is
+an exclusive feature of `nikss-ctl`, there is no API for this. If everything is properly configured, command
+`nikss-ctl valide-os` should print following output (to the `stdout` stream):
+```
+Kernel family: Linux ... OK
+Kernel version: 5.15 ... OK
+Machine architecture: x86_64 ... OK
+BPF filesystem is mounted: true ... OK
+BPF filesystem mount point: /sys/fs/bpf ... OK
+BPF filesystem in read-write mode: true ... OK
+Kernel build option CONFIG_BPF: yes ... OK
+Kernel build option CONFIG_BPF_SYSCALL: yes ... OK
+Kernel build option CONFIG_BPF_JIT: yes ... OK
+Kernel build option CONFIG_HAVE_EBPF_JIT: yes ... OK
+Kernel build option CONFIG_NET_ACT_BPF: module ... OK
+clang detected: true ... OK
+clang version: 10.0 ... OK
+p4c-ebpf detected: true ... OK
+p4c-ebpf version: 1.2.3.5 ... OK
+
+Valid system configuration, NIKSS should work correctly.
+```
+
+If minor problem is found, a warning is generated and expected condition to fulfil that check. For example when `clang` is
+missing, following output will be printed:
+```
+Kernel family: Linux ... OK
+Kernel version: 5.15 ... OK
+Machine architecture: x86_64 ... OK
+BPF filesystem is mounted: true ... OK
+BPF filesystem mount point: /sys/fs/bpf ... OK
+BPF filesystem in read-write mode: true ... OK
+Kernel build option CONFIG_BPF: yes ... OK
+Kernel build option CONFIG_BPF_SYSCALL: yes ... OK
+Kernel build option CONFIG_BPF_JIT: yes ... OK
+Kernel build option CONFIG_HAVE_EBPF_JIT: yes ... OK
+Kernel build option CONFIG_NET_ACT_BPF: module ... OK
+clang detected: false ... WARNING (no clang compiler detected)
+p4c-ebpf detected: true ... OK
+p4c-ebpf version: 1.2.3.5 ... OK
+
+Valid system configuration, but some NIKSS features may not work.
+```
+So, just in this case will be unable to build programs but data path should work with no problems.
+
+When configuration error occurs then the output might be following (in this case too old kernel):
+```
+Kernel family: Linux ... OK
+Kernel version: 5.4 ... ERROR (expected kernel version >= 5.8)
+Machine architecture: x86_64 ... OK
+BPF filesystem is mounted: true ... OK
+BPF filesystem mount point: /sys/fs/bpf ... OK
+BPF filesystem in read-write mode: true ... OK
+Kernel build option CONFIG_BPF: yes ... OK
+Kernel build option CONFIG_BPF_SYSCALL: yes ... OK
+Kernel build option CONFIG_BPF_JIT: yes ... OK
+Kernel build option CONFIG_HAVE_EBPF_JIT: yes ... OK
+Kernel build option CONFIG_NET_ACT_BPF: module ... OK
+clang detected: true ... OK
+clang version: 10.0 ... OK
+p4c-ebpf detected: true ... OK
+p4c-ebpf version: 1.2.3.5 ... OK
+
+Invalid system configuration, NIKSS will not work.
+```
+
+Exit codes from command `validate-os` are following:
+- 0: valid system configuration - no warnings and no errors;
+- 1: warning occurred with no errors;
+- 2: error occurred.
