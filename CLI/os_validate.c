@@ -256,11 +256,21 @@ static int detect_compilers(struct os_configuration *conf)
         char *ptr = &buf[0];
         char *line = NULL;
         while ((line = strsep(&ptr, "\n")) != NULL) {
-            /* Expected format: "clang version 10.0.0-4ubuntu1" */
-            char *token = strsep(&line, " ");
-            if (!token || strcmp(token, "clang") != 0) {
+            /* Expected format: "... clang version 10.0.0-4ubuntu1" */
+
+            /* Skip any token that is not equal to "clang" */
+            bool found_clang_token = false;
+            char *token = NULL;
+            while ((token = strsep(&line, " ")) != NULL) {
+                if (strcmp(token, "clang") == 0) {
+                    found_clang_token = true;
+                    break;
+                }
+            }
+            if (!found_clang_token) {
                 continue;
             }
+
             token = strsep(&line, " ");
             if (!token || strcmp(token, "version") != 0) {
                 continue;
