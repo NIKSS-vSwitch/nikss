@@ -22,7 +22,7 @@
 
 #include <jansson.h>
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 #include "meter.h"
 

@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 #include "btf.h"
 #include "common.h"

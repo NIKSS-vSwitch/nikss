@@ -23,7 +23,7 @@
 #include <linux/btf.h>
 #include <stdint.h>
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 const struct btf_type *btf_get_type_by_id(struct btf *btf, uint32_t type_id);
 

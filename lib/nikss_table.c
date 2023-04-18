@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 #include "btf.h"
 #include "common.h"

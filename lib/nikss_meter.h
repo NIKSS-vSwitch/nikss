@@ -18,7 +18,7 @@
 #ifndef __NIKSS_METER_H
 #define __NIKSS_METER_H
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 #ifndef METER_PERIOD_MIN
 #define METER_PERIOD_MIN 100

@@ -17,7 +17,7 @@
 
 #include <string.h>
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 void nikss_context_init(nikss_context_t *ctx)
 {

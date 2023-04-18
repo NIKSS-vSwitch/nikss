@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <nikss_pre.h>
+#include <nikss/nikss_pre.h>
 
 #include "bpf_defs.h"
 #include "btf.h"

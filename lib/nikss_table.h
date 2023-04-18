@@ -18,7 +18,7 @@
 #ifndef __NIKSS_TABLE_H
 #define __NIKSS_TABLE_H
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 typedef struct nikss_bpf_map_descriptor nikss_bpf_map_descriptor_t;
 int clear_table_cache(nikss_bpf_map_descriptor_t *map);

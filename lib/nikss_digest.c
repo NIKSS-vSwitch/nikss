@@ -20,8 +20,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <nikss.h>
-#include <nikss_digest.h>
+#include <nikss/nikss.h>
+#include <nikss/nikss_digest.h>
 
 #include "btf.h"
 #include "common.h"
