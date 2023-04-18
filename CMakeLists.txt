@@ -94,7 +94,7 @@ install(TARGETS nikss-ctl RUNTIME DESTINATION bin)
 set(HEADERS_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/include)
 add_custom_target(install_headers
         COMMAND ${CMAKE_COMMAND} -E make_directory ${HEADERS_INSTALL_PATH}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/include ${HEADERS_INSTALL_PATH}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/include/nikss/*.h ${HEADERS_INSTALL_PATH}
         COMMENT "Install C/C++ headers into ${HEADERS_INSTALL_PATH}")
 
 # linter
