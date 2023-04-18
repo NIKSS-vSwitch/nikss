@@ -18,7 +18,7 @@
 #ifndef __NIKSS_VALUE_SET_H_
 #define __NIKSS_VALUE_SET_H_
 
-#include <nikss.h>
+#include "nikss.h"
 
 #ifdef __cplusplus
 extern "C" {

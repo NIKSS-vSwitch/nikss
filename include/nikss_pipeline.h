@@ -18,7 +18,7 @@
 #ifndef __NIKSS_PIPELINE_H
 #define __NIKSS_PIPELINE_H
 
-#include <nikss.h>
+#include "nikss.h"
 
 #ifdef __cplusplus
 extern "C" {
