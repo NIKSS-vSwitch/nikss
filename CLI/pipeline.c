@@ -24,8 +24,8 @@
 
 #include <jansson.h>
 
-#include <nikss.h>
-#include <nikss_pipeline.h>
+#include <nikss/nikss.h>
+#include <nikss/nikss_pipeline.h>
 
 #include "common.h"
 

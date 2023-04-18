@@ -18,7 +18,7 @@
 #ifndef __NIKSS_PRE_H
 #define __NIKSS_PRE_H
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 #ifdef __cplusplus
 extern "C" {

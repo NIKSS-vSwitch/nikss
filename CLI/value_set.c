@@ -21,8 +21,8 @@
 
 #include <jansson.h>
 
-#include <nikss.h>
-#include <nikss_value_set.h>
+#include <nikss/nikss.h>
+#include <nikss/nikss_value_set.h>
 
 #include "value_set.h"
 

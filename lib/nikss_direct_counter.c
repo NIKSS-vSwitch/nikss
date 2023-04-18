@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 void nikss_direct_counter_ctx_init(nikss_direct_counter_context_t *dc_ctx)
 {

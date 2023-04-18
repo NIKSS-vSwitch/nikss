@@ -22,8 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <nikss.h>
-#include <nikss_value_set.h>
+#include <nikss/nikss.h>
+#include <nikss/nikss_value_set.h>
 
 #include "btf.h"
 #include "common.h"

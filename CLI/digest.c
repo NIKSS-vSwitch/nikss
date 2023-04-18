@@ -21,7 +21,7 @@
 
 #include <jansson.h>
 
-#include <nikss_digest.h>
+#include <nikss/nikss_digest.h>
 
 #include "digest.h"
 

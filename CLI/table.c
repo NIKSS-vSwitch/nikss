@@ -23,7 +23,7 @@
 
 #include <jansson.h>
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 #include "common.h"
 #include "counter.h"

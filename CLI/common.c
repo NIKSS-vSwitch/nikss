@@ -24,7 +24,7 @@
 #include <gmp.h>  /* GNU LGPL v3 or GNU GPL v2, used only by function convert_number_to_bytes() */
 #include <jansson.h>
 
-#include <nikss_pipeline.h>
+#include <nikss/nikss_pipeline.h>
 
 #include "common.h"
 

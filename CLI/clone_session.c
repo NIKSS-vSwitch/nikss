@@ -21,7 +21,7 @@
 
 #include <jansson.h>
 
-#include <nikss_pre.h>
+#include <nikss/nikss_pre.h>
 
 #include "clone_session.h"
 #include "common.h"

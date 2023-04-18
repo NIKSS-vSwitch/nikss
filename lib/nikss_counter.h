@@ -18,7 +18,7 @@
 #ifndef __NIKSS_COUNTER_H
 #define __NIKSS_COUNTER_H
 
-#include <nikss.h>
+#include <nikss/nikss.h>
 
 /* Might be used to test whether given type ID is a valid counter */
 nikss_counter_type_t get_counter_type(nikss_btf_t *btf, uint32_t type_id);
