@@ -228,6 +228,6 @@ nikss-ctl table add pipe <ID> <TABLE> action <ACTION> key <KEY> data <DATA> [pri
    - exact - value, e.g. `2`.
    - lpm - value and prefix length separated by `/`, e.g. `192.168.1.0/24`
    - ternary - value and mask separated by `^`, e.g. `0x12^0xFF`
-   - Each key can be written as IPv4 or MAC address, IPv6 is not supported yet. Values can be specified in binary, octal, decimal or hexadecimal format.
-- DATA - list of action arguments. Each argument can be written as IPv4 or MAC address, IPv6 is not supported yet. Arguments can be specified in binary, octal, decimal or hexadecimal format.
+   - Each key can be written as IPv4, IPv6 or MAC address. Values can be specified in binary, octal, decimal or hexadecimal format.
+- DATA - list of action arguments. Each argument can be written as IPv4, IPv6 or MAC address. Arguments can be specified in binary, octal, decimal or hexadecimal format.
 - PRIORITY - value of priority. Higher value means higher priority.
