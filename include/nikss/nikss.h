@@ -302,8 +302,8 @@ typedef struct nikss_match_key {
         } lpm;
         struct {
             // used only for 'range'
-            const uint64_t start;
-            const uint64_t end;
+            uint64_t start;
+            uint64_t end;
         } range;
     } u;
 
