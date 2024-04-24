@@ -104,12 +104,12 @@ static int decode_mounts(struct os_configuration *conf)
         char buf[BUFSIZ];
         while (fgets(buf, BUFSIZ, mounts) != NULL) {
             char *str = &buf[0];
-            char *device = strsep(&str, " ");
+            strsep(&str, " "); //skip device
             char *mount_point = strsep(&str, " ");
             char *fs_type = strsep(&str, " ");
             char *options = strsep(&str, " ");
 
-            if (strcmp(device, "bpf") == 0 && strcmp(fs_type, "bpf") == 0) {
+            if (strcmp(fs_type, "bpf") == 0) {
                 strncpy(&conf->bpf_mount_path[0], mount_point, MAX_STR_LEN);
                 conf->bpf_mount_path[MAX_STR_LEN - 1] = 0;
 
