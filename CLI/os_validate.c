@@ -104,7 +104,7 @@ static int decode_mounts(struct os_configuration *conf)
         char buf[BUFSIZ];
         while (fgets(buf, BUFSIZ, mounts) != NULL) {
             char *str = &buf[0];
-            strsep(&str, " "); //skip device
+            strsep(&str, " "); /* skip device */
             char *mount_point = strsep(&str, " ");
             char *fs_type = strsep(&str, " ");
             char *options = strsep(&str, " ");
